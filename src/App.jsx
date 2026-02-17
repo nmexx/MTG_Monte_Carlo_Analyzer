@@ -44,6 +44,10 @@ const MTGMonteCarloAnalyzer = () => {
   const [disabledArtifacts, setDisabledArtifacts] = useState(new Set());
   const [includeExploration, setIncludeExploration] = useState(true);
   const [disabledExploration, setDisabledExploration] = useState(new Set());
+  const [includeRampSpells, setIncludeRampSpells] = useState(true);
+  const [disabledRampSpells, setDisabledRampSpells] = useState(new Set());
+  const [includeRituals, setIncludeRituals] = useState(true);
+  const [disabledRituals, setDisabledRituals] = useState(new Set());
 
 
   const [simulationResults, setSimulationResults] = useState(null);
@@ -182,7 +186,169 @@ const MTGMonteCarloAnalyzer = () => {
     return null;
   };
 
-  // Known rituals list - mana-generating spells
+
+  // Ramp spells - sorceries/instants that put lands onto the battlefield.
+  // fetchFilter values:
+  //   'any'     – any land card
+  //   'basic'   – basic land cards only
+  //   'subtype' – land must have at least one of fetchSubtypes (basic OR non-basic dual land)
+  //   'snow'    – snow land cards
+  const RAMP_SPELL_DATA = new Map([
+    // 2-CMC: fetch 1 Forest card (any card with Forest subtype) untapped
+    ["nature's lore",       { landsToAdd: 1, landsTapped: false, landsToHand: 0, sacrificeLand: false, fetchFilter: 'subtype', fetchSubtypes: ['Forest'] }],
+    ['three visits',        { landsToAdd: 1, landsTapped: false, landsToHand: 0, sacrificeLand: false, fetchFilter: 'subtype', fetchSubtypes: ['Forest'] }],
+    // 2-CMC: Farseek – Plains/Island/Swamp/Mountain (not Forest; includes duals with those types)
+    ['farseek',             { landsToAdd: 1, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'subtype', fetchSubtypes: ['Plains','Island','Swamp','Mountain'] }],
+    // 2-CMC: basic land only, tapped
+    ['rampant growth',      { landsToAdd: 1, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'basic' }],
+    ['edge of autumn',      { landsToAdd: 1, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'basic' }],
+    // 2-CMC: snow land
+    ['into the north',      { landsToAdd: 1, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'snow'  }],
+    // 2-CMC: any land, scalable (treat as 2 for default)
+    ["open the way",        { landsToAdd: 2, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'any'   }],
+    // 3-CMC: basic land to battlefield (tapped) + basic land to hand
+    ['cultivate',           { landsToAdd: 1, landsTapped: true,  landsToHand: 1, sacrificeLand: false, fetchFilter: 'basic' }],
+    ["kodama's reach",      { landsToAdd: 1, landsTapped: true,  landsToHand: 1, sacrificeLand: false, fetchFilter: 'basic' }],
+    // 3-CMC: sacrifice a land, fetch 2 basic lands untapped
+    ['harrow',              { landsToAdd: 2, landsTapped: false, landsToHand: 0, sacrificeLand: true,  fetchFilter: 'basic' }],
+    ['roiling regrowth',    { landsToAdd: 2, landsTapped: true,  landsToHand: 0, sacrificeLand: true,  fetchFilter: 'basic' }],
+    ['entish restoration',  { landsToAdd: 2, landsTapped: true,  landsToHand: 0, sacrificeLand: true,  fetchFilter: 'basic' }],
+    // 3-CMC: Archdruid's Charm – fetch a Forest card (subtype)
+    ["archdruid's charm",   { landsToAdd: 1, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'subtype', fetchSubtypes: ['Forest'] }],
+    // 4-CMC: Skyshroud Claim – 2 Forest cards, untapped
+    ['skyshroud claim',     { landsToAdd: 2, landsTapped: false, landsToHand: 0, sacrificeLand: false, fetchFilter: 'subtype', fetchSubtypes: ['Forest'] }],
+    // 4-CMC: 2 basic lands, tapped
+    ['explosive vegetation',{ landsToAdd: 2, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'basic' }],
+    ['migration path',      { landsToAdd: 2, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'basic' }],
+    // 5-CMC: Hour of Promise – any 2 land cards, tapped
+    ['hour of promise',     { landsToAdd: 2, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'any'   }],
+    // 5-CMC: Traverse the Outlands – basic lands (X = greatest power)
+    ['traverse the outlands',{ landsToAdd: 3, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'basic' }],
+    // 7-CMC: Boundless Realms – basic lands
+    ['boundless realms',    { landsToAdd: 4, landsTapped: true,  landsToHand: 0, sacrificeLand: false, fetchFilter: 'basic' }],
+    // 9-CMC: Reshape the Earth – any 10 land cards
+    ['reshape the earth',   { landsToAdd: 10, landsTapped: true, landsToHand: 0, sacrificeLand: false, fetchFilter: 'any'   }],
+  ]);
+
+  // Returns true if a land card in the library matches a ramp spell's search restriction.
+  const matchesRampFilter = (land, rampSpell) => {
+    if (!land.isLand) return false;
+    switch (rampSpell.fetchFilter) {
+      case 'any':
+        return true;
+      case 'basic':
+        return !!land.isBasic;
+      case 'subtype':
+        // Land must have at least one of the specified basic land subtypes.
+        // This covers basics AND dual/shock/triome lands with matching subtypes.
+        return !!(rampSpell.fetchSubtypes && land.landSubtypes &&
+          rampSpell.fetchSubtypes.some(t => land.landSubtypes.includes(t)));
+      case 'snow':
+        // Treat any land whose name contains 'snow' or is a basic snow land.
+        return !!(land.name && land.name.toLowerCase().includes('snow'));
+      default:
+        return !!land.isBasic;
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Mana-artifact behavioral data – mirrors the RAMP_SPELL_DATA pattern.
+  // processManaArtifact() looks up this map first for accurate overrides;
+  // oracle-text parsing is only used for unknown cards.
+  //
+  // Fields:
+  //   manaAmount          – mana produced per activation
+  //                         (signets: net 1 after their {1} activation cost)
+  //   produces            – explicit color array;
+  //                         ['W','U','B','R','G'] = can produce any single color
+  //   entersTapped        – enters the battlefield tapped
+  //   doesntUntapNaturally – doesn't untap during the untap step
+  //   etbCost             – ETB requirement:
+  //                         'discardLand' | 'imprintNonland' | 'discardHand' | 'sacrifice' | null
+  //   condition           – production condition: 'metalcraft' | 'legendary' | null
+  // ─────────────────────────────────────────────────────────────────────────────
+  const ARTIFACT_DATA = new Map([
+    // ── 0-CMC Fast Mana ───────────────────────────────────────────────────────
+    ['mana crypt',              { manaAmount: 2, produces: ['C'],                    entersTapped: false, doesntUntapNaturally: false }],
+    ['mox diamond',             { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false, etbCost: 'discardLand'    }],
+    ['chrome mox',              { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false, etbCost: 'imprintNonland' }],
+    ['mox opal',                { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false, condition: 'metalcraft'   }],
+    ['mox amber',               { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false, condition: 'legendary'    }],
+    ['lotus petal',             { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false, etbCost: 'sacrifice'      }],
+    ["lion's eye diamond",      { manaAmount: 3, produces: ['W','U','B','R','G'],    entersTapped: false, etbCost: 'discardHand'    }],
+    ['jeweled lotus',           { manaAmount: 3, produces: ['W','U','B','R','G'],    entersTapped: false, etbCost: 'sacrifice'      }],
+
+    // ── Sol Ring & Vaults ─────────────────────────────────────────────────────
+    ['sol ring',                { manaAmount: 2, produces: ['C'],                    entersTapped: false }],
+    ['mana vault',              { manaAmount: 3, produces: ['C'],                    entersTapped: false, doesntUntapNaturally: true }],
+    ['grim monolith',           { manaAmount: 3, produces: ['C'],                    entersTapped: false, doesntUntapNaturally: true }],
+    ['basalt monolith',         { manaAmount: 3, produces: ['C'],                    entersTapped: false, doesntUntapNaturally: true }],
+
+    // ── Signets  ({1},{T}: Add 2 colored – net manaAmount=1 after activation) ─
+    ['arcane signet',           { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false }],
+    ['azorius signet',          { manaAmount: 1, produces: ['W','U'],                entersTapped: false }],
+    ['dimir signet',            { manaAmount: 1, produces: ['U','B'],                entersTapped: false }],
+    ['rakdos signet',           { manaAmount: 1, produces: ['B','R'],                entersTapped: false }],
+    ['gruul signet',            { manaAmount: 1, produces: ['R','G'],                entersTapped: false }],
+    ['selesnya signet',         { manaAmount: 1, produces: ['G','W'],                entersTapped: false }],
+    ['orzhov signet',           { manaAmount: 1, produces: ['W','B'],                entersTapped: false }],
+    ['izzet signet',            { manaAmount: 1, produces: ['U','R'],                entersTapped: false }],
+    ['golgari signet',          { manaAmount: 1, produces: ['B','G'],                entersTapped: false }],
+    ['boros signet',            { manaAmount: 1, produces: ['R','W'],                entersTapped: false }],
+    ['simic signet',            { manaAmount: 1, produces: ['G','U'],                entersTapped: false }],
+
+    // ── Talismans  ({T}: {C} free, or colored for 1 damage) ───────────────────
+    ['talisman of progress',    { manaAmount: 1, produces: ['C','W','U'],            entersTapped: false }],
+    ['talisman of dominance',   { manaAmount: 1, produces: ['C','U','B'],            entersTapped: false }],
+    ['talisman of indulgence',  { manaAmount: 1, produces: ['C','B','R'],            entersTapped: false }],
+    ['talisman of impulse',     { manaAmount: 1, produces: ['C','R','G'],            entersTapped: false }],
+    ['talisman of unity',       { manaAmount: 1, produces: ['C','G','W'],            entersTapped: false }],
+    ['talisman of hierarchy',   { manaAmount: 1, produces: ['C','W','B'],            entersTapped: false }],
+    ['talisman of creativity',  { manaAmount: 1, produces: ['C','U','R'],            entersTapped: false }],
+    ['talisman of resilience',  { manaAmount: 1, produces: ['C','B','G'],            entersTapped: false }],
+    ['talisman of conviction',  { manaAmount: 1, produces: ['C','R','W'],            entersTapped: false }],
+    ['talisman of curiosity',   { manaAmount: 1, produces: ['C','G','U'],            entersTapped: false }],
+
+    // ── Diamonds (ETB Tapped, colored rocks) ──────────────────────────────────
+    ['marble diamond',          { manaAmount: 1, produces: ['W'],                    entersTapped: true  }],
+    ['sky diamond',             { manaAmount: 1, produces: ['U'],                    entersTapped: true  }],
+    ['charcoal diamond',        { manaAmount: 1, produces: ['B'],                    entersTapped: true  }],
+    ['fire diamond',            { manaAmount: 1, produces: ['R'],                    entersTapped: true  }],
+    ['moss diamond',            { manaAmount: 1, produces: ['G'],                    entersTapped: true  }],
+
+    // ── Other ETB-Tapped Rocks ────────────────────────────────────────────────
+    ['coldsteel heart',         { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: true  }],
+    ['fractured powerstone',    { manaAmount: 1, produces: ['C'],                    entersTapped: true  }],
+    ['guardian idol',           { manaAmount: 1, produces: ['C'],                    entersTapped: true  }],
+    ['star compass',            { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: true  }],
+
+    // ── Utility 2-MV Rocks ────────────────────────────────────────────────────
+    ['fellwar stone',           { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false }],
+    ['mind stone',              { manaAmount: 1, produces: ['C'],                    entersTapped: false }],
+    ['thought vessel',          { manaAmount: 1, produces: ['C'],                    entersTapped: false }],
+    ['liquimetal torque',       { manaAmount: 1, produces: ['C'],                    entersTapped: false }],
+    ['prismatic lens',          { manaAmount: 1, produces: ['C','W','U','B','R','G'],entersTapped: false }],
+    ['everflowing chalice',     { manaAmount: 0, produces: ['C'],                    entersTapped: false }],
+
+    // ── 3-MV Staples ──────────────────────────────────────────────────────────
+    ['chromatic lantern',       { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false }],
+    ["commander's sphere",      { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false }],
+    ['heraldic banner',         { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false }],
+    ['cursed mirror',           { manaAmount: 1, produces: ['R'],                    entersTapped: false }],
+    ['relic of legends',        { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false }],
+    ["patriar's seal",          { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false }],
+    ['decanter of endless water',{ manaAmount: 1, produces: ['W','U','B','R','G'],   entersTapped: false }],
+    ["dragon's hoard",          { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false }],
+
+    // ── Big Mana Rocks ────────────────────────────────────────────────────────
+    ['thran dynamo',            { manaAmount: 3, produces: ['C'],                    entersTapped: false }],
+    ['gilded lotus',            { manaAmount: 3, produces: ['W','U','B','R','G'],    entersTapped: false }],
+    ['nyx lotus',               { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: true  }],
+    ['the great henge',         { manaAmount: 2, produces: ['G'],                    entersTapped: false }],
+    ['forsaken monument',       { manaAmount: 1, produces: ['C'],                    entersTapped: false }],
+    ['coveted jewel',           { manaAmount: 3, produces: ['W','U','B','R','G'],    entersTapped: false }],
+  ]);
+
   // Exploration effects - allow playing multiple lands per turn
   const EXPLORATION_EFFECTS = new Set([
     'exploration', 'burgeoning', 'azusa, lost but seeking', 'oracle of mul daya',
@@ -192,34 +358,65 @@ const MTGMonteCarloAnalyzer = () => {
     'excavator', 'patron of the moon', 'manabond', 'budoka gardener'
   ]);
 
-  // Mana artifacts that enter battlefield tapped
-  const ENTERS_TAPPED_ARTIFACTS = new Set([
-    'coldsteel heart',
-    'fractured powerstone',
-    'guardian idol',
-    'star compass',
-    'charcoal diamond',
-    'fire diamond',
-    'marble diamond',
-    'moss diamond',
-    'sky diamond',
+  // ── Mox / 0-CMC artifact simulation flags ────────────────────────────────────
+  // When true: Mox Opal (metalcraft) and Mox Amber (legendary) always produce
+  // mana from turn 3 onwards, avoiding frustrating "never mana" edge cases.
+  // Set to false to restore strict rules-accurate checks.
+  const SIMPLIFY_MOX_CONDITIONS = true;
+
+  // These four are pulled to the front of the casting queue every turn so they
+  // come down as early as possible before spending other mana sources.
+  const MOX_PRIORITY_ARTIFACTS = new Set([
+    'mox diamond', 'chrome mox', 'mox opal', 'mox amber'
+  ]);
+
+  // One-shot burst-mana sources: used to compute the "with burst" key-card line.
+  // Optimistic model: mana is simply added to the available pool (drawbacks ignored).
+  const BURST_MANA_SOURCES = new Set([
+    "lion's eye diamond",
+    'jeweled lotus',
+    'lotus petal'
+  ]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Ritual spell data – sorceries/instants that produce a burst of mana.
+  // Modelled as burst sources: they stay in hand and their net mana gain is
+  // added to the "with burst" key-card line (optimistic, drawbacks ignored).
+  //
+  // Fields:
+  //   manaProduced  – total mana symbols produced by the spell
+  //   netGain       – manaProduced minus the spell's CMC (mana net gain)
+  //   colors        – color identity of the spell (for display)
+  // ─────────────────────────────────────────────────────────────────────────────
+  const RITUAL_DATA = new Map([
+    // ── Black Rituals ──────────────────────────────────────────────────────────
+    ['dark ritual',           { manaProduced: 3, netGain: 2, colors: ['B'] }],
+    ['cabal ritual',          { manaProduced: 3, netGain: 1, colors: ['B'] }],
+    ['culling the weak',      { manaProduced: 4, netGain: 3, colors: ['B'] }],
+    ['burnt offering',        { manaProduced: 4, netGain: 3, colors: ['B'] }],
+    ['sacrifice',             { manaProduced: 3, netGain: 2, colors: ['B'] }],
+    ['bubbling muck',         { manaProduced: 2, netGain: 1, colors: ['B'] }],
+    // ── Red Rituals ───────────────────────────────────────────────────────────
+    ['seething song',         { manaProduced: 5, netGain: 2, colors: ['R'] }],
+    ['pyretic ritual',        { manaProduced: 3, netGain: 1, colors: ['R'] }],
+    ['desperate ritual',      { manaProduced: 3, netGain: 1, colors: ['R'] }],
+    ['rite of flame',         { manaProduced: 2, netGain: 1, colors: ['R'] }],
+    ["jeska's will",          { manaProduced: 5, netGain: 2, colors: ['R'] }],
+    ['mana geyser',           { manaProduced: 8, netGain: 3, colors: ['R'] }],
+    ['inner fire',            { manaProduced: 5, netGain: 1, colors: ['R'] }],
+    // ── Blue (High Tide Package) ──────────────────────────────────────────────
+    ['high tide',             { manaProduced: 2, netGain: 1, colors: ['U'] }],
+    ['turnabout',             { manaProduced: 4, netGain: 0, colors: ['U'] }],
+    ['dramatic reversal',     { manaProduced: 3, netGain: 1, colors: ['U'] }],
+    // ── Multi-color / Misc ────────────────────────────────────────────────────
+    ['manamorphose',          { manaProduced: 2, netGain: 0, colors: ['R', 'G'] }],
+    ['squandered resources',  { manaProduced: 2, netGain: 0, colors: ['B', 'G'] }],
   ]);
 
   // Special lands with unique mechanics
   const SPECIAL_LANDS = new Set([
     'ancient tomb',
     'city of traitors'
-  ]);
-
-  // Special mana artifacts with unique mechanics
-  const SPECIAL_ARTIFACTS = new Set([
-    'basalt monolith',
-    'grim monolith',
-    'mana vault',
-    'mox diamond',
-    'chrome mox',
-    'mox opal',
-    'mox amber'
   ]);
 
   // Known fetch lands list
@@ -490,9 +687,27 @@ const MTGMonteCarloAnalyzer = () => {
       return processManaArtifact(data);
     }
 
+    // Also catch mana artifacts that are known by name but whose oracle text does
+    // NOT follow the standard "{T}: Add" pattern.
+    // Exclude burst sources (LED, Jeweled Lotus, Lotus Petal) — they must stay in
+    // hand as uncast spells so the burst-mana graph calculation can find them.
+    if (isArtifact && !isCreature && ARTIFACT_DATA.has(cardName) && !BURST_MANA_SOURCES.has(cardName)) {
+      return processManaArtifact(data);
+    }
+
     // Check for exploration effects (allows playing multiple lands per turn)
     if (EXPLORATION_EFFECTS.has(cardName)) {
       return processExploration(data);
+    }
+
+    // Check for ramp spells (sorceries/instants that put lands onto the battlefield)
+    if (RAMP_SPELL_DATA.has(cardName)) {
+      return processRampSpell(data);
+    }
+
+    // Check for ritual spells (burst-mana sorceries/instants)
+    if (RITUAL_DATA.has(cardName)) {
+      return processRitual(data);
     }
 
     // Regular spell
@@ -836,41 +1051,39 @@ const MTGMonteCarloAnalyzer = () => {
   };
 
   const processManaArtifact = (data) => {
-    const produces = extractManaProduction(data.oracle_text);
-    const manaAmount = extractManaAmount(data.oracle_text);
-
-    // Check if artifact enters tapped
     const cardName = data.name.toLowerCase();
-    const oracle = (data.oracle_text || '').toLowerCase();
+    const oracle   = (data.oracle_text || '').toLowerCase();
 
-    const entersTapped = ENTERS_TAPPED_ARTIFACTS.has(cardName) ||
-      oracle.includes('enters tapped') ||
-      oracle.includes('enters the battlefield tapped');
+    // Look up explicit data from ARTIFACT_DATA (mirrors processRampSpell pattern).
+    // Falls back to oracle-text parsing for unknown / community-created cards.
+    const known = ARTIFACT_DATA.get(cardName);
 
-    // Special artifact mechanics
-    const isBasaltMonolith = cardName === 'basalt monolith';
-    const isGrimMonolith = cardName === 'grim monolith';
-    const isManaVault = cardName === 'mana vault';
-    const isMoxDiamond = cardName === 'mox diamond';
-    const isChromeMox = cardName === 'chrome mox';
-    const isMoxOpal = cardName === 'mox opal';
-    const isMoxAmber = cardName === 'mox amber';
+    const produces       = known ? known.produces       : extractManaProduction(data.oracle_text);
+    const manaAmount     = known ? known.manaAmount     : extractManaAmount(data.oracle_text);
+    const entersTapped   = known != null
+      ? known.entersTapped
+      : (oracle.includes('enters tapped') || oracle.includes('enters the battlefield tapped'));
+    const doesntUntapNaturally = known?.doesntUntapNaturally ?? false;
 
-    // Basalt/Grim Monolith/Mana Vault produce 3 colorless
-    let finalManaAmount = manaAmount;
-    if (isBasaltMonolith || isGrimMonolith || isManaVault) {
-      finalManaAmount = 3;
-    }
+    // ETB cost / condition metadata (stored on the card for use in castSpells)
+    const etbCost   = known?.etbCost   ?? null;
+    const condition = known?.condition ?? null;
 
-    // Basalt Monolith, Grim Monolith, and Mana Vault don't untap during untap step
-    const doesntUntapNaturally = isBasaltMonolith || isGrimMonolith || isManaVault;
+    // Backward-compatible boolean flags derived from map metadata
+    const isMoxDiamond    = cardName === 'mox diamond';
+    const isChromeMox     = cardName === 'chrome mox';
+    const isMoxOpal       = condition === 'metalcraft';
+    const isMoxAmber      = condition === 'legendary';
+    const isBasaltMonolith = doesntUntapNaturally && cardName === 'basalt monolith';
+    const isGrimMonolith   = doesntUntapNaturally && cardName === 'grim monolith';
+    const isManaVault      = doesntUntapNaturally && cardName === 'mana vault';
 
     return {
       name: data.name,
       type: 'artifact',
       isManaArtifact: true,
       produces,
-      manaAmount: finalManaAmount,
+      manaAmount,
       entersTapped,
       isBasaltMonolith,
       isGrimMonolith,
@@ -880,6 +1093,8 @@ const MTGMonteCarloAnalyzer = () => {
       isMoxOpal,
       isMoxAmber,
       doesntUntapNaturally,
+      etbCost,
+      condition,
       cmc: calculateCMC(data.cmc, data.mana_cost),
       manaCost: data.mana_cost || '',
       oracleText: data.oracle_text
@@ -922,6 +1137,43 @@ const MTGMonteCarloAnalyzer = () => {
       isCreature: isCreature,
       isArtifact: isArtifact,
       landsPerTurn: landsPerTurn,
+      cmc: calculateCMC(data.cmc, data.mana_cost),
+      manaCost: data.mana_cost || '',
+      oracleText: data.oracle_text
+    };
+  };
+
+  const processRampSpell = (data) => {
+    const cardName = data.name.toLowerCase();
+    const rampData = RAMP_SPELL_DATA.get(cardName) || { landsToAdd: 1, landsTapped: true, landsToHand: 0, sacrificeLand: false, fetchFilter: 'basic' };
+
+    return {
+      name: data.name,
+      type: 'rampSpell',
+      isRampSpell: true,
+      landsToAdd: rampData.landsToAdd,
+      landsTapped: rampData.landsTapped,
+      landsToHand: rampData.landsToHand || 0,
+      sacrificeLand: rampData.sacrificeLand || false,
+      fetchFilter: rampData.fetchFilter || 'basic',
+      fetchSubtypes: rampData.fetchSubtypes || null,
+      cmc: calculateCMC(data.cmc, data.mana_cost),
+      manaCost: data.mana_cost || '',
+      oracleText: data.oracle_text
+    };
+  };
+
+  const processRitual = (data) => {
+    const cardName = data.name.toLowerCase();
+    const ritualData = RITUAL_DATA.get(cardName) || { manaProduced: 1, netGain: 0, colors: [] };
+
+    return {
+      name: data.name,
+      type: 'ritual',
+      isRitual: true,
+      manaProduced: ritualData.manaProduced,
+      netGain: ritualData.netGain,
+      ritualColors: ritualData.colors,
       cmc: calculateCMC(data.cmc, data.mana_cost),
       manaCost: data.mana_cost || '',
       oracleText: data.oracle_text
@@ -999,9 +1251,16 @@ const MTGMonteCarloAnalyzer = () => {
   const extractManaAmount = (oracleText) => {
     if (!oracleText) return 1;
 
-    // Check for {C}{C} patterns
-    const colorlessMatch = oracleText.match(/\{C\}\{C\}/);
-    if (colorlessMatch) return 2;
+    // Count the longest consecutive run of {C} symbols (e.g. {C}{C}{C} → 3).
+    // Handles Thran Dynamo, Mana Vault overrides, etc. for unknown cards.
+    const colorlessRuns = oracleText.match(/(?:\{C\})+/g);
+    if (colorlessRuns) {
+      const maxRun = colorlessRuns.reduce((max, run) => {
+        const count = run.split('{C}').length - 1;
+        return Math.max(max, count);
+      }, 0);
+      if (maxRun > 1) return maxRun;
+    }
 
     // Default to 1
     return 1;
@@ -1073,12 +1332,12 @@ const MTGMonteCarloAnalyzer = () => {
     
     if (!deckText.trim()) {
       errors.push('Please enter a deck list');
-      return { errors, lands: [], artifacts: [], creatures: [], exploration: [], rituals: [], spells: [], totalCards: 0, landCount: 0 };
+      return { errors, lands: [], artifacts: [], creatures: [], exploration: [], rituals: [], rampSpells: [], spells: [], totalCards: 0, landCount: 0 };
     }
 
     if (cardLookupMap.size === 0 && apiMode === 'local') {
       errors.push('Please upload cards.json file first');
-      return { errors, lands: [], artifacts: [], creatures: [], exploration: [], rituals: [], spells: [], totalCards: 0, landCount: 0 };
+      return { errors, lands: [], artifacts: [], creatures: [], exploration: [], rituals: [], rampSpells: [], spells: [], totalCards: 0, landCount: 0 };
     }
 
     const lines = deckText.split('\n');
@@ -1115,6 +1374,7 @@ const MTGMonteCarloAnalyzer = () => {
     const artifacts = [];
     const creatures = [];
     const rituals = [];
+    const rampSpells = [];
     const exploration = [];
     const spells = [];
 
@@ -1178,6 +1438,8 @@ const MTGMonteCarloAnalyzer = () => {
         exploration.push(processed);
       } else if (processed.isRitual) {
         rituals.push(processed);
+      } else if (processed.isRampSpell) {
+        rampSpells.push(processed);
       } else {
         spells.push(processed);
       }
@@ -1185,7 +1447,7 @@ const MTGMonteCarloAnalyzer = () => {
 
     setError(errors.length > 0 ? errors.join(', ') : '');
 
-    const totalCards = [...lands, ...artifacts, ...creatures, ...exploration, ...rituals, ...spells]
+    const totalCards = [...lands, ...artifacts, ...creatures, ...exploration, ...rituals, ...rampSpells, ...spells]
       .reduce((sum, card) => sum + card.quantity, 0);
 
     return {
@@ -1194,6 +1456,7 @@ const MTGMonteCarloAnalyzer = () => {
       creatures,
       exploration,
       rituals,
+      rampSpells,
       spells,
       totalCards,
       landCount: lands.reduce((sum, card) => sum + card.quantity, 0),
@@ -1236,6 +1499,10 @@ const MTGMonteCarloAnalyzer = () => {
     const disabledCreats = disabledCreatures;
     const includeExplor = includeExploration;
     const disabledExplor = disabledExploration;
+    const includeRamp = includeRampSpells;
+    const disabledRamp = disabledRampSpells;
+    const includeRits = includeRituals;
+    const disabledRits = disabledRituals;
 
     const deck = [];
 
@@ -1268,6 +1535,26 @@ const MTGMonteCarloAnalyzer = () => {
     if (includeExplor && deckToParse.exploration) {
       deckToParse.exploration.forEach(card => {
         if (!disabledExplor.has(card.name)) {
+          for (let i = 0; i < card.quantity; i++) {
+            deck.push({ ...card });
+          }
+        }
+      });
+    }
+
+    if (includeRamp && deckToParse.rampSpells) {
+      deckToParse.rampSpells.forEach(card => {
+        if (!disabledRamp.has(card.name)) {
+          for (let i = 0; i < card.quantity; i++) {
+            deck.push({ ...card });
+          }
+        }
+      });
+    }
+
+    if (includeRits && deckToParse.rituals) {
+      deckToParse.rituals.forEach(card => {
+        if (!disabledRits.has(card.name)) {
           for (let i = 0; i < card.quantity; i++) {
             deck.push({ ...card });
           }
@@ -1322,14 +1609,26 @@ const MTGMonteCarloAnalyzer = () => {
       totalManaPerTurn: Array(turns).fill(null).map(() => []),
       lifeLossPerTurn: Array(turns).fill(null).map(() => []),
       keyCardPlayability: {},
+      keyCardPlayabilityBurst: {},
+      hasBurstCards: false,
       fastestPlaySequences: {},
+      fastestPlaySequencesBurst: {},
       mulligans: 0,
       handsKept: 0
     };
 
     keyCardNames.forEach(name => {
       results.keyCardPlayability[name] = Array(turns).fill(0);
+      results.keyCardPlayabilityBurst[name] = Array(turns).fill(0);
     });
+
+    // Detect burst cards once from deck composition (not per-hand, so hasBurstCards
+    // is set even when the burst card isn't drawn into every opening hand).
+    results.hasBurstCards =
+      [...deckToParse.spells, ...(deckToParse.artifacts || [])].some(
+        c => BURST_MANA_SOURCES.has(c.name?.toLowerCase())
+      ) ||
+      (deckToParse.rituals && deckToParse.rituals.length > 0);
 
     for (let iter = 0; iter < iterations; iter++) {
       const shuffled = shuffle(deck);
@@ -1633,7 +1932,19 @@ const MTGMonteCarloAnalyzer = () => {
         }
 
         // PHASE 5: Cast remaining spells (mana dorks, artifacts, etc.)
-        castSpells(hand, battlefield, graveyard, turnLog, keyCardNames, deckToParse);
+        castSpells(hand, battlefield, graveyard, turnLog, keyCardNames, deckToParse, library, turn);
+
+        // Mana Crypt: coin-flip upkeep trigger — 50% chance of 3 damage = 1.5 avg per turn.
+        const manaCryptCount = battlefield.filter(p =>
+          p.card.isManaArtifact && p.card.name?.toLowerCase() === 'mana crypt'
+        ).length;
+        const manaCryptDamage = manaCryptCount * 1.5;
+
+        if (manaCryptDamage > 0) {
+          cumulativeLifeLoss += manaCryptDamage;
+          turnLog.lifeLoss += manaCryptDamage;
+          turnLog.actions.push(`Mana Crypt damage: -${manaCryptDamage} life (avg)`);
+        }
 
         // Ancient Tomb: deals 2 damage per turn (regardless of tapped state)
         const ancientTombCount = battlefield.filter(p =>
@@ -1703,30 +2014,68 @@ const MTGMonteCarloAnalyzer = () => {
           results.colorsByTurn[turn][color].push(manaAvailable.colors[color] || 0);
         });
 
+        // Burst mana from one-shot sources in hand (optimistic model: no drawbacks).
+        // hasBurstCards is pre-set from deck composition — no need to update it here.
+        const burstInHand = hand.filter(c => BURST_MANA_SOURCES.has(c.name?.toLowerCase()));
+        const burstFromArtifacts = burstInHand.reduce((sum, c) => {
+          const known = ARTIFACT_DATA.get(c.name?.toLowerCase());
+          return sum + (known?.manaAmount ?? 1);
+        }, 0);
+        // Rituals in hand contribute their net mana gain only when their casting cost
+        // is affordable this turn (e.g. Dark Ritual needs ≥1B, Seething Song needs ≥3 incl. 1R).
+        const ritualsInHand = hand.filter(c => c.isRitual && canPlayCard(c, manaAvailable));
+        const burstFromRituals = ritualsInHand.reduce((sum, c) => sum + (c.netGain || 0), 0);
+        const burstTotal = burstFromArtifacts + burstFromRituals;
+
+        // Build per-color burst bonus:
+        //   Artifact burst sources (LED, Jeweled Lotus, Lotus Petal) produce any color.
+        //   Ritual spells only produce their specific colors (e.g. Dark Ritual → B only).
+        const burstColorBonus = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+        burstInHand.forEach(c => {
+          const known = ARTIFACT_DATA.get(c.name?.toLowerCase());
+          const amt = known?.manaAmount ?? 1;
+          ['W', 'U', 'B', 'R', 'G'].forEach(col => { burstColorBonus[col] += amt; });
+        });
+        ritualsInHand.forEach(c => {
+          const colors = c.ritualColors;
+          const gain = c.netGain || 0;
+          if (colors && colors.length > 0) {
+            colors.forEach(col => { if (col in burstColorBonus) burstColorBonus[col] += gain; });
+          } else {
+            // Fallback: colorless rituals add to all colors
+            ['W', 'U', 'B', 'R', 'G'].forEach(col => { burstColorBonus[col] += gain; });
+          }
+        });
+
+        const manaWithBurst = burstTotal > 0 ? {
+          total: manaAvailable.total + burstTotal,
+          colors: Object.fromEntries(
+            Object.entries(manaAvailable.colors).map(([k, v]) =>
+              [k, v + (burstColorBonus[k] || 0)]
+            )
+          )
+        } : manaAvailable;
+
         // Check key card playability
         keyCardNames.forEach(cardName => {
           // Find the key card in deckToParse
           const keyCard = deckToParse.spells.find(c => c.name === cardName) ||
             deckToParse.creatures.find(c => c.name === cardName) ||
             deckToParse.artifacts.find(c => c.name === cardName) ||
+            (deckToParse.rampSpells && deckToParse.rampSpells.find(c => c.name === cardName)) ||
             (deckToParse.exploration && deckToParse.exploration.find(c => c.name === cardName));
 
           if (keyCard && canPlayCard(keyCard, manaAvailable)) {
             results.keyCardPlayability[cardName][turn]++;
 
-            // Track play sequences by turn
+            // Track play sequences by turn (base mana only)
             if (!results.fastestPlaySequences[cardName]) {
               results.fastestPlaySequences[cardName] = {};
             }
-
             const currentTurn = turn + 1;
-
-            // Initialize array for this turn if needed
             if (!results.fastestPlaySequences[cardName][currentTurn]) {
               results.fastestPlaySequences[cardName][currentTurn] = [];
             }
-
-            // Add this sequence (limit to maxSequences examples per turn)
             if (results.fastestPlaySequences[cardName][currentTurn].length < maxSequences) {
               results.fastestPlaySequences[cardName][currentTurn].push({
                 turn: currentTurn,
@@ -1734,6 +2083,36 @@ const MTGMonteCarloAnalyzer = () => {
                 sequence: JSON.parse(JSON.stringify(turnActions)),
                 openingHand: [...openingHand]
               });
+            }
+          }
+
+          // Burst check — does burst mana (optimistic) allow playing this card?
+          if (keyCard && canPlayCard(keyCard, manaWithBurst)) {
+            results.keyCardPlayabilityBurst[cardName][turn]++;
+
+            // Only record a burst sequence when base mana alone isn't enough.
+            // This highlights cases where a burst card actually makes the difference.
+            if (!canPlayCard(keyCard, manaAvailable)) {
+              if (!results.fastestPlaySequencesBurst[cardName]) {
+                results.fastestPlaySequencesBurst[cardName] = {};
+              }
+              const currentTurnBurst = turn + 1;
+              if (!results.fastestPlaySequencesBurst[cardName][currentTurnBurst]) {
+                results.fastestPlaySequencesBurst[cardName][currentTurnBurst] = [];
+              }
+              if (results.fastestPlaySequencesBurst[cardName][currentTurnBurst].length < maxSequences) {
+                results.fastestPlaySequencesBurst[cardName][currentTurnBurst].push({
+                  turn: currentTurnBurst,
+                  manaAvailable: manaAvailable.total,
+                  manaWithBurst: manaWithBurst.total,
+                  burstCards: [
+                    ...burstInHand.map(c => c.name),
+                    ...ritualsInHand.map(c => c.name)
+                  ],
+                  sequence: JSON.parse(JSON.stringify(turnActions)),
+                  openingHand: [...openingHand]
+                });
+              }
             }
           }
         });
@@ -1752,9 +2131,14 @@ const MTGMonteCarloAnalyzer = () => {
       });
     }
 
-    // Calculate key card percentages
+    // Calculate key card percentages (base and burst)
     Object.keys(results.keyCardPlayability).forEach(cardName => {
       results.keyCardPlayability[cardName] = results.keyCardPlayability[cardName].map(
+        count => (count / results.handsKept) * 100
+      );
+    });
+    Object.keys(results.keyCardPlayabilityBurst).forEach(cardName => {
+      results.keyCardPlayabilityBurst[cardName] = results.keyCardPlayabilityBurst[cardName].map(
         count => (count / results.handsKept) * 100
       );
     });
@@ -2153,68 +2537,93 @@ const MTGMonteCarloAnalyzer = () => {
     return false;
   };
 
-  const castSpells = (hand, battlefield, graveyard, turnLog, keyCardNames, parsedDeck) => {
+  const castSpells = (hand, battlefield, graveyard, turnLog, keyCardNames, parsedDeck, library, turn = 999) => {
     let changed = true;
 
     // Phase 1: Cast mana-producing permanents (creatures, artifacts)
     // Note: Exploration effects are already cast in the main turn loop BEFORE lands
-    // Priority: Regular mana dorks > Artifacts
+    // Priority: MOX_PRIORITY_ARTIFACTS first, then regular mana dorks, then other artifacts
     while (changed) {
       changed = false;
-      const manaAvailable = calculateManaAvailability(battlefield);
+      const manaAvailable = calculateManaAvailability(battlefield, turn);
 
       const creatures = hand.filter(c => c.isManaCreature);
       const exploration = hand.filter(c => c.isExploration); // Usually empty - already cast earlier
-      const artifacts = hand.filter(c => c.isManaArtifact);
+      // Burst sources are intentionally excluded — they stay in hand for the graph.
+      const artifacts = hand.filter(c => c.isManaArtifact && !BURST_MANA_SOURCES.has(c.name?.toLowerCase()));
 
-      // Priority order: Regular mana dorks > Exploration effects (if any left) > Artifacts
-      const castable = [...creatures, ...exploration, ...artifacts].sort((a, b) => a.cmc - b.cmc);
+      // Sort: MOX_PRIORITY_ARTIFACTS always first (weight -1), then by CMC ascending
+      const castable = [...creatures, ...exploration, ...artifacts].sort((a, b) => {
+        const aPrio = MOX_PRIORITY_ARTIFACTS.has(a.name?.toLowerCase()) ? -1 : a.cmc;
+        const bPrio = MOX_PRIORITY_ARTIFACTS.has(b.name?.toLowerCase()) ? -1 : b.cmc;
+        return aPrio - bPrio;
+      });
 
       for (const spell of castable) {
         if (canPlayCard(spell, manaAvailable)) {
-          // Special artifact requirements
+          // Special artifact ETB-cost requirements — capture names for the play log
+          let etbNote = ''; // filled in below for each cost type
 
-          // Mox Diamond: requires discarding a land
-          if (spell.isMoxDiamond) {
+          // discardLand: Mox Diamond — discard a land from hand
+          if (spell.etbCost === 'discardLand' || spell.isMoxDiamond) {
             const landsInHand = hand.filter(c => c.isLand);
             if (landsInHand.length === 0) {
-              continue; // Can't cast Mox Diamond without a land to discard
+              continue; // Can't play without a land to discard
             }
-            // Discard a land (prefer tapped lands or basics)
+            // Prefer tapped/basics so we lose as little tempo as possible
             const landToDiscard = landsInHand.find(l => l.entersTappedAlways) || landsInHand[0];
+            etbNote = ` (discarded ${landToDiscard.name})`;
             const discardIndex = hand.indexOf(landToDiscard);
             hand.splice(discardIndex, 1);
             graveyard.push(landToDiscard);
           }
 
-          // Chrome Mox: requires imprinting a non-land card
-          if (spell.isChromeMox) {
+          // imprintNonland: Chrome Mox — exile a non-land from hand
+          else if (spell.etbCost === 'imprintNonland' || spell.isChromeMox) {
             const nonLandsInHand = hand.filter(c => !c.isLand);
             if (nonLandsInHand.length === 0) {
-              continue; // Can't cast Chrome Mox without a non-land to imprint
+              continue; // Can't play without a non-land to imprint
             }
-            // Imprint (exile) a non-land card
             const cardToImprint = nonLandsInHand[0];
+            etbNote = ` (imprinted ${cardToImprint.name})`;
             const imprintIndex = hand.indexOf(cardToImprint);
             hand.splice(imprintIndex, 1);
-            // Note: We'd need to track imprinted card for color production
-            // For now, assume it produces any color
+            // Imprinted card is exiled; color production already set to any-color in ARTIFACT_DATA
           }
 
-          // Mox Opal: requires metalcraft (3 artifacts)
-          if (spell.isMoxOpal) {
+          // discardHand: Lion's Eye Diamond — discard entire hand
+          else if (spell.etbCost === 'discardHand') {
+            const handNames = hand.filter(c => c !== spell).map(c => c.name);
+            if (handNames.length > 0) {
+              etbNote = ` (discarded hand: ${handNames.join(', ')})`;
+              // Move entire hand (except the LED itself) to graveyard
+              const rest = hand.filter(c => c !== spell);
+              rest.forEach(c => graveyard.push(c));
+              hand.length = 0;
+              hand.push(spell); // keep the LED so it can be moved to battlefield below
+            } else {
+              etbNote = ' (discarded empty hand)';
+            }
+          }
+
+          // sacrifice: one-shot rocks (Lotus Petal, Jeweled Lotus) — noted but no extra cost
+          else if (spell.etbCost === 'sacrifice') {
+            etbNote = ' (sacrifice for mana)';
+          }
+
+          // condition-based restrictions: warn in the log if not yet met
+          // Note: SIMPLIFY_MOX_CONDITIONS bypasses these from turn 3 onwards.
+          if (spell.condition === 'metalcraft' && !(SIMPLIFY_MOX_CONDITIONS && turn >= 2)) {
             const artifactCount = battlefield.filter(p =>
               p.card.type?.includes('artifact') || p.card.isManaArtifact
             ).length;
-            // Note: Mox Opal itself doesn't count yet (not on battlefield)
-            // After casting, it will be artifact #(N+1)
-            // For now, we allow casting but it won't produce mana until 3+ artifacts total
+            if (artifactCount < 2) etbNote += ' ⚠ metalcraft not yet active';
           }
-
-          // Mox Amber: requires legendary creature/planeswalker
-          if (spell.isMoxAmber) {
-            // Note: Requires checking for legendaries on battlefield
-            // For simplicity, allow casting but may not produce mana
+          if (spell.condition === 'legendary' && !(SIMPLIFY_MOX_CONDITIONS && turn >= 2)) {
+            const hasLegendary = battlefield.some(p =>
+              p.card.type?.includes('Legendary') || p.card.oracleText?.includes('Legendary')
+            );
+            if (!hasLegendary) etbNote += ' ⚠ no legendary — no mana produced';
           }
 
           const index = hand.indexOf(spell);
@@ -2222,8 +2631,8 @@ const MTGMonteCarloAnalyzer = () => {
 
           battlefield.push({
             card: spell,
-            tapped: spell.entersTapped || false, // Artifacts can enter tapped
-            summoningSick: spell.isManaCreature || spell.isExploration // Creatures and exploration creatures have summoning sickness
+            tapped: spell.entersTapped || false,
+            summoningSick: spell.isManaCreature || spell.isExploration
           });
 
           // Tap mana sources to pay for the spell
@@ -2235,16 +2644,96 @@ const MTGMonteCarloAnalyzer = () => {
             else if (spell.isManaCreature) type = 'creature';
             else if (spell.isExploration) type = spell.isCreature ? 'creature' : (spell.isArtifact ? 'artifact' : 'permanent');
 
-            const suffix = spell.isExploration ? ' (Exploration effect)' : '';
+            const explorationSuffix = spell.isExploration ? ' (Exploration effect)' : '';
             const tappedSuffix = spell.entersTapped ? ' (enters tapped)' : '';
-            let specialSuffix = '';
-            if (spell.isMoxDiamond) specialSuffix = ' (discarded land)';
-            if (spell.isChromeMox) specialSuffix = ' (imprinted card)';
 
-            turnLog.actions.push(`Cast ${type}: ${spell.name}${suffix}${tappedSuffix}${specialSuffix}`);
+            turnLog.actions.push(`Cast ${type}: ${spell.name}${explorationSuffix}${tappedSuffix}${etbNote}`);
           }
 
           changed = true;
+          break;
+        }
+      }
+    }
+
+    // Phase 2: Cast ramp spells (sorceries that put lands onto the battlefield)
+    if (includeRampSpells) {
+      let rampChanged = true;
+      while (rampChanged) {
+        rampChanged = false;
+        const manaAvailable = calculateManaAvailability(battlefield, turn);
+        const rampInHand = hand.filter(c => c.isRampSpell && !disabledRampSpells.has(c.name));
+
+        for (const rampSpell of rampInHand.sort((a, b) => a.cmc - b.cmc)) {
+          if (!canPlayCard(rampSpell, manaAvailable)) continue;
+
+          // Only cast the spell if there is at least one matching land in the library.
+          // Count how many eligible lands exist (need at least 1 for battlefield;
+          // spells that also put a land to hand need at least 2).
+          const eligibleInLibrary = library.filter(c => matchesRampFilter(c, rampSpell));
+          const requiredCount = (rampSpell.landsToAdd || 1) > 0 ? 1 : 0;
+          // For spells that need a land to hand too, we want at least 2 eligible
+          const minNeeded = requiredCount + (rampSpell.landsToHand > 0 ? 1 : 0);
+          if (eligibleInLibrary.length < Math.max(1, minNeeded === 0 ? 1 : minNeeded)) continue;
+
+          // Remove from hand, add to graveyard
+          const idx = hand.indexOf(rampSpell);
+          hand.splice(idx, 1);
+          graveyard.push(rampSpell);
+
+          // Tap mana sources to pay for the spell
+          tapManaSources(rampSpell, battlefield);
+
+          // Sacrifice a land if required (Harrow-style)
+          let sacrificedLandName = null;
+          if (rampSpell.sacrificeLand) {
+            const nonFetchLand = battlefield.find(p => p.card.isLand && !p.card.isFetch);
+            if (nonFetchLand) {
+              sacrificedLandName = nonFetchLand.card.name;
+              const bfIdx = battlefield.indexOf(nonFetchLand);
+              battlefield.splice(bfIdx, 1);
+              graveyard.push(nonFetchLand.card);
+            }
+          }
+
+          // Find lands in library to put on battlefield (respects fetchFilter; no fallback)
+          const landsToFieldNames = [];
+          const target = rampSpell.landsToAdd || 1;
+          for (let li = 0; li < library.length && landsToFieldNames.length < target; li++) {
+            if (matchesRampFilter(library[li], rampSpell)) {
+              const [fetchedCard] = library.splice(li, 1);
+              li--;
+              battlefield.push({ card: fetchedCard, tapped: rampSpell.landsTapped, enteredTapped: rampSpell.landsTapped });
+              landsToFieldNames.push(fetchedCard.name);
+            }
+          }
+
+          // Lands to hand (Cultivate / Kodama's Reach effect)
+          const landsToHandNames = [];
+          if (rampSpell.landsToHand > 0) {
+            for (let li = 0; li < library.length && landsToHandNames.length < rampSpell.landsToHand; li++) {
+              if (matchesRampFilter(library[li], rampSpell)) {
+                const [card] = library.splice(li, 1);
+                li--;
+                hand.push(card);
+                landsToHandNames.push(card.name);
+              }
+            }
+          }
+
+          if (turnLog) {
+            const tappedNote = rampSpell.landsTapped ? 'tapped' : 'untapped';
+            const sacNote = sacrificedLandName ? `, sac'd ${sacrificedLandName}` : '';
+            const fieldNote = landsToFieldNames.length > 0
+              ? ` → ${landsToFieldNames.join(', ')} (${tappedNote})`
+              : ' → no land found';
+            const handNote = landsToHandNames.length > 0
+              ? `; ${landsToHandNames.join(', ')} to hand`
+              : '';
+            turnLog.actions.push(`Cast ramp spell: ${rampSpell.name}${sacNote}${fieldNote}${handNote}`);
+          }
+
+          rampChanged = true;
           break;
         }
       }
@@ -2304,9 +2793,12 @@ const MTGMonteCarloAnalyzer = () => {
     }
   };
 
-  const calculateManaAvailability = (battlefield) => {
+  const calculateManaAvailability = (battlefield, turn = 999) => {
     const colors = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
     let total = 0;
+
+    // From which turn does the simplified Mox condition kick in (0-indexed, so turn 2 = turn 3).
+    const moxSimpleTurn = 2;
 
     battlefield.filter(p => !p.tapped).forEach(permanent => {
       const card = permanent.card;
@@ -2319,27 +2811,32 @@ const MTGMonteCarloAnalyzer = () => {
           colors[color] = (colors[color] || 0) + landManaAmount;
         });
       } else if (card.isManaArtifact) {
-        // Mox Opal: only produces mana with metalcraft (3+ artifacts)
+        // Mox Opal: only produces mana with metalcraft (3+ artifacts).
+        // SIMPLIFY_MOX_CONDITIONS (flag) – skip this restriction from turn 3 onwards.
         if (card.isMoxOpal) {
-          const artifactCount = battlefield.filter(p =>
-            p.card.type?.includes('artifact') || p.card.isManaArtifact
-          ).length;
-          if (artifactCount < 3) {
-            return; // Mox Opal doesn't produce mana without metalcraft
+          if (!(SIMPLIFY_MOX_CONDITIONS && turn >= moxSimpleTurn)) {
+            const artifactCount = battlefield.filter(p =>
+              p.card.type?.includes('artifact') || p.card.isManaArtifact
+            ).length;
+            if (artifactCount < 3) {
+              return; // Mox Opal doesn't produce mana without metalcraft
+            }
           }
         }
 
-        // Mox Amber: only produces colors from legendary creatures/planeswalkers
+        // Mox Amber: only produces colors from legendary creatures/planeswalkers.
+        // SIMPLIFY_MOX_CONDITIONS (flag) – skip this restriction from turn 3 onwards.
         if (card.isMoxAmber) {
-          const legendaries = battlefield.filter(p =>
-            p.card.oracleText?.includes('Legendary') ||
-            p.card.type?.includes('Legendary')
-          );
-          if (legendaries.length === 0) {
-            return; // Mox Amber doesn't produce mana without legendaries
+          if (!(SIMPLIFY_MOX_CONDITIONS && turn >= moxSimpleTurn)) {
+            const legendaries = battlefield.filter(p =>
+              p.card.oracleText?.includes('Legendary') ||
+              p.card.type?.includes('Legendary')
+            );
+            if (legendaries.length === 0) {
+              return; // Mox Amber doesn't produce mana without legendaries
+            }
           }
-          // For simplicity, allow any color if legendaries exist
-          // Proper implementation would track legendary colors
+          // Proper implementation would track legendary colors; simplified: any color
         }
 
         // Artifacts don't have summoning sickness - can tap immediately
@@ -2522,6 +3019,45 @@ const MTGMonteCarloAnalyzer = () => {
     return symbols[fetchType] || '';
   };
 
+  // Reusable sequence body: opening hand + turn-by-turn actions.
+  // accentColor drives the left-border on each turn block.
+  const renderSequenceBody = (data, accentColor = '#667eea') => (
+    <>
+      <div style={{ marginBottom: '12px', padding: '10px', background: 'white', borderRadius: '6px' }}>
+        <p style={{ fontWeight: 600, margin: '0 0 6px 0', fontSize: '0.85rem', color: '#374151' }}>
+          Opening Hand:
+        </p>
+        <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+          {data.openingHand.join(', ')}
+        </div>
+      </div>
+      <div>
+        <p style={{ fontWeight: 600, marginBottom: '8px', fontSize: '0.9rem' }}>Turn-by-turn sequence:</p>
+        {data.sequence && data.sequence.map((turnLog, idx) => (
+          <div key={idx} style={{ marginBottom: '8px', paddingLeft: '10px', borderLeft: `3px solid ${accentColor}` }}>
+            <p style={{ margin: '0 0 4px 0', fontWeight: 600, fontSize: '0.85rem', color: '#374151' }}>
+              Turn {turnLog.turn}:
+            </p>
+            {turnLog.actions.length > 0 ? (
+              <ul style={{ margin: '0', paddingLeft: '20px', fontSize: '0.8rem', color: '#6b7280' }}>
+                {turnLog.actions.map((action, actionIdx) => (
+                  <li key={actionIdx}>{action}</li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af', fontStyle: 'italic' }}>No actions</p>
+            )}
+            {turnLog.lifeLoss > 0 && (
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#dc2626' }}>
+                Life lost this turn: {turnLog.lifeLoss}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
   // Chart data preparation
   const prepareChartData = () => {
     if (!simulationResults) return null;
@@ -2557,6 +3093,14 @@ const MTGMonteCarloAnalyzer = () => {
       if (simulationResults.keyCardPlayability) {
         Object.keys(simulationResults.keyCardPlayability).forEach(cardName => {
           keyCardRow[cardName] = safeToFixed(simulationResults.keyCardPlayability[cardName]?.[i], 1);
+        });
+      }
+      // Burst line – only populated if burst cards are in the deck
+      if (simulationResults.hasBurstCards && simulationResults.keyCardPlayabilityBurst) {
+        Object.keys(simulationResults.keyCardPlayabilityBurst).forEach(cardName => {
+          keyCardRow[`${cardName} (+burst)`] = safeToFixed(
+            simulationResults.keyCardPlayabilityBurst[cardName]?.[i], 1
+          );
         });
       }
       keyCardsData.push(keyCardRow);
@@ -3004,8 +3548,148 @@ const MTGMonteCarloAnalyzer = () => {
             </div>
           )}
 
+          {/* Ramp Spells Section Row */}
+          {(parsedDeck.rampSpells && parsedDeck.rampSpells.length > 0) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', marginBottom: '20px', alignItems: 'start' }}>
+              <div style={{
+                background: 'white',
+                padding: '20px',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}>
+                <h3 style={{ marginTop: 0 }}>🌿 Ramp Spells</h3>
+                <label style={{ display: 'block', marginBottom: '15px' }}>
+                  <input
+                    type="checkbox"
+                    checked={includeRampSpells}
+                    onChange={(e) => {
+                      setIncludeRampSpells(e.target.checked);
+                      if (e.target.checked) {
+                        setDisabledRampSpells(new Set());
+                      } else {
+                        const allRamp = new Set(parsedDeck.rampSpells.map(c => c.name));
+                        setDisabledRampSpells(allRamp);
+                      }
+                    }}
+                  />
+                  <span style={{ marginLeft: '8px' }}>Enable All Ramp Spells</span>
+                </label>
+                {parsedDeck.rampSpells.map((ramp, idx) => (
+                  <div key={idx} style={{
+                    padding: '8px 0',
+                    borderBottom: '1px solid #f3f4f6',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <label style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={includeRampSpells && !disabledRampSpells.has(ramp.name)}
+                        onChange={(e) => {
+                          const newSet = new Set(disabledRampSpells);
+                          if (e.target.checked) {
+                            newSet.delete(ramp.name);
+                          } else {
+                            newSet.add(ramp.name);
+                          }
+                          setDisabledRampSpells(newSet);
+                        }}
+                      />
+                      <span style={{ marginLeft: '8px', fontWeight: 600 }}>
+                        {ramp.quantity}x {ramp.name}
+                      </span>
+                      <span style={{ marginLeft: '10px', fontSize: '0.875rem', color: '#6b7280' }}>
+                        +{ramp.landsToAdd} land{ramp.landsToAdd !== 1 ? 's' : ''}{ramp.landsTapped ? ' (tapped)' : ' (untapped)'}
+                        {ramp.fetchFilter === 'basic' ? ' · basics only' : ''}
+                        {ramp.fetchFilter === 'subtype' && ramp.fetchSubtypes ? ` · ${ramp.fetchSubtypes.join('/')} type` : ''}
+                        {ramp.fetchFilter === 'snow' ? ' · snow lands' : ''}
+                        {ramp.fetchFilter === 'any' ? ' · any land' : ''}
+                        {ramp.sacrificeLand ? ' · sac a land' : ''}
+                        {ramp.landsToHand > 0 ? ` · +${ramp.landsToHand} to hand` : ''}
+                        {' · CMC '}{ramp.cmc}
+                      </span>
+                    </label>
+                    <div style={{ marginLeft: '10px', fontSize: '1.2rem' }}>
+                      {renderManaCost(ramp.manaCost)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Rituals Section */}
+          {(parsedDeck.rituals && parsedDeck.rituals.length > 0) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', marginBottom: '20px', alignItems: 'start' }}>
+              <div style={{
+                background: 'white',
+                padding: '20px',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}>
+                <h3 style={{ marginTop: 0 }}>⚡ Ritual Spells (Burst Mana)</h3>
+                <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '12px' }}>
+                  Rituals contribute their net mana gain to the &ldquo;with burst&rdquo; key-card line.
+                </p>
+                <label style={{ display: 'block', marginBottom: '15px' }}>
+                  <input
+                    type="checkbox"
+                    checked={includeRituals}
+                    onChange={(e) => {
+                      setIncludeRituals(e.target.checked);
+                      if (e.target.checked) {
+                        setDisabledRituals(new Set());
+                      } else {
+                        const allRituals = new Set(parsedDeck.rituals.map(c => c.name));
+                        setDisabledRituals(allRituals);
+                      }
+                    }}
+                  />
+                  <span style={{ marginLeft: '8px' }}>Enable All Rituals</span>
+                </label>
+                {parsedDeck.rituals.map((ritual, idx) => (
+                  <div key={idx} style={{
+                    padding: '8px 0',
+                    borderBottom: '1px solid #f3f4f6',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <label style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={includeRituals && !disabledRituals.has(ritual.name)}
+                        onChange={(e) => {
+                          const newSet = new Set(disabledRituals);
+                          if (e.target.checked) {
+                            newSet.delete(ritual.name);
+                          } else {
+                            newSet.add(ritual.name);
+                          }
+                          setDisabledRituals(newSet);
+                        }}
+                      />
+                      <span style={{ marginLeft: '8px', fontWeight: 600 }}>
+                        {ritual.quantity}x {ritual.name}
+                      </span>
+                      <span style={{ marginLeft: '10px', fontSize: '0.875rem', color: '#6b7280' }}>
+                        +{ritual.manaProduced} mana produced&nbsp;&nbsp;
+                        {ritual.netGain > 0 ? `(+${ritual.netGain} net)` : ritual.netGain === 0 ? '(neutral)' : `(${ritual.netGain} net)`}
+                        {' · CMC '}{ritual.cmc}
+                      </span>
+                    </label>
+                    <div style={{ marginLeft: '10px', fontSize: '1.2rem' }}>
+                      {renderManaCost(ritual.manaCost)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Spells & Key Cards Section */}
-          {(parsedDeck.spells.length > 0 || parsedDeck.creatures.length > 0 || parsedDeck.artifacts.length > 0 || (parsedDeck.rituals && parsedDeck.rituals.length > 0) || (parsedDeck.exploration && parsedDeck.exploration.length > 0)) && (
+          {(parsedDeck.spells.length > 0 || parsedDeck.creatures.length > 0 || parsedDeck.artifacts.length > 0 || (parsedDeck.rituals && parsedDeck.rituals.length > 0) || (parsedDeck.rampSpells && parsedDeck.rampSpells.length > 0) || (parsedDeck.exploration && parsedDeck.exploration.length > 0)) && (
             <div style={{
               background: 'white',
               padding: '20px',
@@ -3015,7 +3699,7 @@ const MTGMonteCarloAnalyzer = () => {
             }}>
               <h3 style={{ marginTop: 0 }}>🎴 Spells & Creatures (Key Card Selection)</h3>
               <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Select cards to track playability:</p>
-              {[...parsedDeck.spells, ...parsedDeck.creatures, ...parsedDeck.artifacts, ...(parsedDeck.rituals || []), ...(parsedDeck.exploration || [])]
+              {[...parsedDeck.spells, ...parsedDeck.creatures, ...parsedDeck.artifacts, ...(parsedDeck.rituals || []), ...(parsedDeck.rampSpells || []), ...(parsedDeck.exploration || [])]
                 .sort((a, b) => a.cmc - b.cmc)
                 .map((card, idx) => (
                   <div
@@ -3425,14 +4109,30 @@ const MTGMonteCarloAnalyzer = () => {
                   <Legend />
                   {Array.from(selectedKeyCards).map((cardName, idx) => {
                     const colors = ['#667eea', '#f59e0b', '#22c55e', '#dc2626', '#60a5fa'];
+                    const color = colors[idx % colors.length];
+                    const burstKey = `${cardName} (+burst)`;
+                    const showBurst = simulationResults?.hasBurstCards &&
+                      chartData.keyCardsData?.[0]?.[burstKey] !== undefined;
                     return (
-                      <Line
-                        key={cardName}
-                        type="monotone"
-                        dataKey={cardName}
-                        stroke={colors[idx % colors.length]}
-                        strokeWidth={2}
-                      />
+                      <React.Fragment key={cardName}>
+                        <Line
+                          type="monotone"
+                          dataKey={cardName}
+                          stroke={color}
+                          strokeWidth={2}
+                        />
+                        {showBurst && (
+                          <Line
+                            type="monotone"
+                            dataKey={burstKey}
+                            stroke={color}
+                            strokeWidth={2}
+                            strokeDasharray="6 3"
+                            dot={false}
+                            name={`${cardName} (+burst)`}
+                          />
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </LineChart>
@@ -3456,9 +4156,10 @@ const MTGMonteCarloAnalyzer = () => {
 
               {Object.entries(simulationResults.fastestPlaySequences).map(([cardName, sequencesByTurn]) => {
                 const sequencesForTurn = sequencesByTurn[selectedTurnForSequences];
+                const burstSequencesForTurn = simulationResults.fastestPlaySequencesBurst?.[cardName]?.[selectedTurnForSequences];
 
-                // Skip if no sequences exist for this turn
-                if (!sequencesForTurn || sequencesForTurn.length === 0) {
+                // Skip if no sequences exist for this turn (base or burst)
+                if ((!sequencesForTurn || sequencesForTurn.length === 0) && (!burstSequencesForTurn || burstSequencesForTurn.length === 0)) {
                   return (
                     <div key={cardName} style={{ marginBottom: '25px' }}>
                       <h4 style={{
@@ -3496,7 +4197,7 @@ const MTGMonteCarloAnalyzer = () => {
                       {cardName}
                     </h4>
 
-                    {sequencesForTurn.map((data, seqIdx) => (
+                    {sequencesForTurn && sequencesForTurn.map((data, seqIdx) => (
                       <div key={seqIdx} style={{
                         marginBottom: '15px',
                         padding: '15px',
@@ -3507,60 +4208,37 @@ const MTGMonteCarloAnalyzer = () => {
                         <p style={{ margin: '0 0 10px 0', fontSize: '0.875rem', color: '#6b7280' }}>
                           <strong>Example {seqIdx + 1}:</strong> Playable on turn {data.turn} ({data.manaAvailable} mana available)
                         </p>
-
-                        {/* Opening Hand */}
-                        <div style={{ marginBottom: '12px', padding: '10px', background: 'white', borderRadius: '6px' }}>
-                          <p style={{ fontWeight: 600, margin: '0 0 6px 0', fontSize: '0.85rem', color: '#374151' }}>
-                            Opening Hand:
-                          </p>
-                          <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                            {data.openingHand.join(', ')}
-                          </div>
-                        </div>
-
-                        {/* Turn by Turn */}
-                        <div>
-                          <p style={{ fontWeight: 600, marginBottom: '8px', fontSize: '0.9rem' }}>Turn-by-turn sequence:</p>
-                          {data.sequence && data.sequence.map((turnLog, idx) => (
-                            <div key={idx} style={{
-                              marginBottom: '8px',
-                              paddingLeft: '10px',
-                              borderLeft: '3px solid #667eea'
-                            }}>
-                              <p style={{
-                                margin: '0 0 4px 0',
-                                fontWeight: 600,
-                                fontSize: '0.85rem',
-                                color: '#374151'
-                              }}>
-                                Turn {turnLog.turn}:
-                              </p>
-                              {turnLog.actions.length > 0 ? (
-                                <ul style={{
-                                  margin: '0',
-                                  paddingLeft: '20px',
-                                  fontSize: '0.8rem',
-                                  color: '#6b7280'
-                                }}>
-                                  {turnLog.actions.map((action, actionIdx) => (
-                                    <li key={actionIdx}>{action}</li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af', fontStyle: 'italic' }}>
-                                  No actions
-                                </p>
-                              )}
-                              {turnLog.lifeLoss > 0 && (
-                                <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#dc2626' }}>
-                                  Life lost this turn: {turnLog.lifeLoss}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                        {renderSequenceBody(data, '#667eea')}
                       </div>
                     ))}
+
+                    {/* Burst-only sequences — only shown when burst mana makes the difference */}
+                    {burstSequencesForTurn && burstSequencesForTurn.length > 0 && (
+                      <>
+                        <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f59e0b', margin: '14px 0 8px 0' }}>
+                          ⚡ Burst-only — playable only by spending {burstSequencesForTurn[0]?.burstCards?.join(' / ')}
+                        </p>
+                        {burstSequencesForTurn.map((data, seqIdx) => (
+                          <div key={`burst-${seqIdx}`} style={{
+                            marginBottom: '15px',
+                            padding: '15px',
+                            background: '#fffbeb',
+                            borderRadius: '8px',
+                            border: '2px dashed #f59e0b'
+                          }}>
+                            <p style={{ margin: '0 0 6px 0', fontSize: '0.875rem', color: '#92400e' }}>
+                              <strong>Burst example {seqIdx + 1}:</strong> Turn {data.turn} &mdash;&nbsp;
+                              {data.manaAvailable} base + {data.manaWithBurst - data.manaAvailable} burst
+                              &nbsp;= {data.manaWithBurst} mana total
+                            </p>
+                            <p style={{ margin: '0 0 10px 0', fontSize: '0.78rem', color: '#b45309' }}>
+                              Burst cards in hand: <strong>{data.burstCards.join(', ')}</strong>
+                            </p>
+                            {renderSequenceBody(data, '#f59e0b')}
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
                 );
               })}

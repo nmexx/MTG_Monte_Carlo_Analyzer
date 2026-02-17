@@ -30,13 +30,6 @@
           "net_gain": "+3 Mana" 
         },
         { 
-          "name": "Rain of Filth", 
-          "mana_value": 1, 
-          "cost": "{B}", 
-          "logic": "all_in_sacrifice", 
-          "effect": "Until end of turn, sacrifice a land: Add {B}." 
-        },
-        { 
           "name": "Bubbling Muck", 
           "mana_value": 1, 
           "cost": "{B}", 
@@ -106,64 +99,10 @@
           "net_gain": "+1 Mana" 
         },
         { 
-          "name": "Brightstone Ritual", 
-          "mana_value": 1, 
-          "cost": "{R}", 
-          "produces": "{R} for each Goblin you control", 
-          "logic": "tribal_burst" 
-        },
-        { 
-          "name": "Battle Hymn", 
-          "mana_value": 2, 
-          "cost": "{1}{R}", 
-          "produces": "{R} for each creature you control", 
-          "logic": "go_wide_payoff" 
-        },
-        { 
           "name": "Inner Fire", 
           "mana_value": 4, 
           "cost": "{3}{R}", 
           "produces": "{R} for each card in your hand" 
-        }
-      ]
-    },
-    {
-      "name": "Treasure Rituals (Modern Era)",
-      "behavior": { "logic": "create_treasures", "fixing": true },
-      "items": [
-        { 
-          "name": "Dockside Extortionist", 
-          "mana_value": 2, 
-          "type": "Creature",
-          "color_identity": ["R"], 
-          "effect": "Create X Treasures (X is artifacts/enchantments opponents control)" 
-        },
-        { 
-          "name": "Brass's Bounty", 
-          "mana_value": 7, 
-          "color_identity": ["R"], 
-          "effect": "Create Treasure token for each land you control", 
-          "logic": "late_game_doubler" 
-        },
-        { 
-          "name": "Unexpected Windfall", 
-          "mana_value": 4, 
-          "cost": "{2}{R}{R}, Discard a card", 
-          "produces": "2 Treasures", 
-          "note": "Mana neutral, card selection positive" 
-        },
-        { 
-          "name": "Big Score", 
-          "mana_value": 4, 
-          "cost": "{2}{R}{R}, Discard a card", 
-          "produces": "2 Treasures" 
-        },
-        { 
-          "name": "Strike It Rich", 
-          "mana_value": 1, 
-          "cost": "{R}", 
-          "produces": "1 Treasure", 
-          "mechanic": "Flashback" 
         }
       ]
     },
@@ -194,20 +133,6 @@
           "logic": "iso_rev_combo_piece",
           "note": "Combos with Isochron Scepter and mana rocks." 
         },
-        { 
-          "name": "Frantic Search", 
-          "mana_value": 3, 
-          "cost": "{2}{U}", 
-          "effect": "Draw 2, discard 2, untap 3 lands", 
-          "logic": "free_spell" 
-        },
-        { 
-          "name": "Time Spiral", 
-          "mana_value": 6, 
-          "cost": "{4}{U}{U}", 
-          "effect": "Shuffle GY and Hand, Draw 7, Untap 6 lands", 
-          "logic": "wheel_and_reset" 
-        }
       ]
     },
     {
@@ -224,28 +149,12 @@
           "net_gain": "Neutral (Fixing + Storm Count)" 
         },
         { 
-          "name": "Channel", 
-          "mana_value": 2, 
-          "color_identity": ["G"], 
-          "cost": "{G}{G}", 
-          "effect": "Pay 1 life: Add {C}", 
-          "status": "Often Banned in Commander (Check Banlist)" 
-        },
-        { 
           "name": "Squandered Resources", 
           "mana_value": 2, 
           "type": "Enchantment",
           "color_identity": ["B", "G"], 
           "effect": "Sacrifice a land: Add one mana of any type the land produced." 
         },
-        { 
-          "name": "Underworld Breach", 
-          "mana_value": 2, 
-          "type": "Enchantment",
-          "color_identity": ["R"], 
-          "logic": "ritual_enabler", 
-          "effect": "Escape allows recasting rituals from graveyard" 
-        }
       ]
     }
   ]
