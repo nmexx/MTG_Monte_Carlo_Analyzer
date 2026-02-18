@@ -1,5 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import LANDS_JSON from '../Card_Archive/Lands.json';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAND_DATA – built once at module load from Lands.json.
+// Keyed by lowercase land name → { cycleName, behavior, sim_flags, color_identity }
+//
+// sim_flags mirrors the boolean properties used throughout processLand():
+//   entersTappedAlways  – land always ETBs tapped (no conditional untap)
+//   isBounce            – land bounces a land back to hand on ETB
+//   isReveal            – ETB-tapped unless a land type is revealed from hand
+//   isCheck             – ETB-tapped unless appropriate land type is controlled
+//   isFast              – ETB-tapped unless ≤2 other lands are controlled
+//   isBattleLand        – ETB-tapped unless 2+ basic lands are controlled
+//   isPathway           – MDFC pathway, always ETBs untapped
+//   isCrowd             – ETB-tapped unless 2+ opponents exist (commander)
+//   isOdysseyFilter     – Odyssey/Fallout filter lands (untapped, {1} for color)
+//   isManLand           – creature land (always ETBs tapped)
+//   isHideawayFetch     – SNC auto-sacrifice fetch (not really a Set, resolved via FETCH_LAND_DATA)
+// ─────────────────────────────────────────────────────────────────────────────
+const LAND_DATA = (() => {
+  const map = new Map();
+  for (const cycle of LANDS_JSON.cycles) {
+    const cycleFlags = cycle.sim_flags || {};
+    for (const land of cycle.lands) {
+      const key = land.name.toLowerCase();
+      if (!map.has(key)) {
+        // Merge cycle-level sim_flags with any per-land sim_flags overrides
+        const flags = land.sim_flags
+          ? { ...cycleFlags, ...land.sim_flags }
+          : cycleFlags;
+        map.set(key, {
+          cycleName:      cycle.name,
+          behavior:       cycle.behavior || {},
+          sim_flags:      flags,
+          color_identity: land.color_identity || [],
+          types:          land.types || land.reveals || [],
+        });
+      }
+    }
+  }
+  return map;
+})();
 
 // html2canvas library will be loaded from CDN
 const loadHtml2Canvas = () => {
@@ -186,13 +228,14 @@ const MTGMonteCarloAnalyzer = () => {
     return null;
   };
 
-
+  // ─────────────────────────────────────────────────────────────────────────────
   // Ramp spells - sorceries/instants that put lands onto the battlefield.
   // fetchFilter values:
   //   'any'     – any land card
   //   'basic'   – basic land cards only
   //   'subtype' – land must have at least one of fetchSubtypes (basic OR non-basic dual land)
   //   'snow'    – snow land cards
+  // ─────────────────────────────────────────────────────────────────────────────
   const RAMP_SPELL_DATA = new Map([
     // 2-CMC: fetch 1 Forest card (any card with Forest subtype) untapped
     ["nature's lore",       { landsToAdd: 1, landsTapped: false, landsToHand: 0, sacrificeLand: false, fetchFilter: 'subtype', fetchSubtypes: ['Forest'] }],
@@ -328,7 +371,7 @@ const MTGMonteCarloAnalyzer = () => {
     ['thought vessel',          { manaAmount: 1, produces: ['C'],                    entersTapped: false }],
     ['liquimetal torque',       { manaAmount: 1, produces: ['C'],                    entersTapped: false }],
     ['prismatic lens',          { manaAmount: 1, produces: ['C','W','U','B','R','G'],entersTapped: false }],
-    ['everflowing chalice',     { manaAmount: 0, produces: ['C'],                    entersTapped: false }],
+    ['everflowing chalice',     { manaAmount: 1, produces: ['C'],                    entersTapped: false }],
 
     // ── 3-MV Staples ──────────────────────────────────────────────────────────
     ['chromatic lantern',       { manaAmount: 1, produces: ['W','U','B','R','G'],    entersTapped: false }],
@@ -406,11 +449,9 @@ const MTGMonteCarloAnalyzer = () => {
     ['inner fire',            { manaProduced: 5, netGain: 1, colors: ['R'] }],
     // ── Blue (High Tide Package) ──────────────────────────────────────────────
     ['high tide',             { manaProduced: 2, netGain: 1, colors: ['U'] }],
-    ['turnabout',             { manaProduced: 4, netGain: 0, colors: ['U'] }],
-    ['dramatic reversal',     { manaProduced: 3, netGain: 1, colors: ['U'] }],
+    ['dramatic reversal',     { manaProduced: 4, netGain: 2, colors: ['U'] }],
     // ── Multi-color / Misc ────────────────────────────────────────────────────
     ['manamorphose',          { manaProduced: 2, netGain: 0, colors: ['R', 'G'] }],
-    ['squandered resources',  { manaProduced: 2, netGain: 0, colors: ['B', 'G'] }],
   ]);
 
   // Special lands with unique mechanics
@@ -419,210 +460,201 @@ const MTGMonteCarloAnalyzer = () => {
     'city of traitors'
   ]);
 
-  // Known fetch lands list
-  const KNOWN_FETCH_LANDS = new Set([
-    'scalding tarn', 'misty rainforest', 'verdant catacombs', 'marsh flats', 'arid mesa',
-    'polluted delta', 'flooded strand', 'bloodstained mire', 'wooded foothills', 'windswept heath',
-    'prismatic vista', 'fabled passage', 'evolving wilds', 'terramorphic expanse',
-    'flood plain', 'bad river', 'rocky tar pit', 'mountain valley', 'grasslands',
-    'panorama', 'myriad landscape', 'warped landscape',
-    // Hideaway fetch lands (Streets of New Capenna)
-    'obscura storefront', 'maestros theater', 'riveteers overlook', 'cabaretti courtyard', 'brokers hideout',
-    // Landscape fetch lands (Modern Horizons 3) - {1}, T, Sacrifice: fetch basic of 2 types
-    'bountiful landscape', 'contaminated landscape', 'deceptive landscape', 'foreboding landscape',
-    'perilous landscape', 'seething landscape', 'shattered landscape', 'sheltering landscape',
-    'tranquil landscape', 'twisted landscape',
-    // Other landscape-type fetch lands
-    'ash barrens',
-    // Additional fetch lands
-    'multiversal passage'  // Fetches basic, enters tapped
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Fetch land behavioral data – mirrors the ARTIFACT_DATA / RAMP_SPELL_DATA pattern.
+  // processLand() looks up this map first; oracle-text detection is the fallback.
+  //
+  // Fields:
+  //   fetchType          – 'classic' | 'slow' | 'free_slow' | 'mana_cost' | 'hideaway'
+  //                        'auto_sacrifice' | 'colorless_or_fetch' | 'colorless_or_cycle_fetch'
+  //   fetchColors        – color letters the land can fetch ('W','U','B','R','G')
+  //                        Empty array means "any basic" (all 5 treated in simulation)
+  //   fetchesOnlyBasics  – true: only basic lands; false: any land with matching subtype
+  //   fetchesTwoLands    – true: fetches 2 lands in one activation
+  //   fetchedLandEntersTapped – true: the fetched land itself enters tapped
+  //   entersTappedAlways – true: this fetch land ETBs tapped (before activating)
+  //   fetchcost          – additional generic mana cost to activate the fetch ability
+  // ─────────────────────────────────────────────────────────────────────────────
+  const FETCH_LAND_DATA = new Map([
+    // ── Classic Onslaught / Zendikar Fetch Lands ──────────────────────────────
+    // {T}, Pay 1 life, Sacrifice: search for Plains or Island, put onto battlefield untapped.
+    ['flooded strand',       { fetchType: 'classic', fetchColors: ['W','U'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+    ['polluted delta',       { fetchType: 'classic', fetchColors: ['U','B'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+    ['bloodstained mire',    { fetchType: 'classic', fetchColors: ['B','R'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+    ['wooded foothills',     { fetchType: 'classic', fetchColors: ['R','G'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+    ['windswept heath',      { fetchType: 'classic', fetchColors: ['G','W'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+    ['marsh flats',          { fetchType: 'classic', fetchColors: ['W','B'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+    ['scalding tarn',        { fetchType: 'classic', fetchColors: ['U','R'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+    ['verdant catacombs',    { fetchType: 'classic', fetchColors: ['B','G'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+    ['arid mesa',            { fetchType: 'classic', fetchColors: ['R','W'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+    ['misty rainforest',     { fetchType: 'classic', fetchColors: ['G','U'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+
+    // ── Slow / Mirage Fetch Lands ─────────────────────────────────────────────
+    // ETBs tapped. {T}, Sacrifice: search for Plains or Island, put onto battlefield.
+    ['flood plain',          { fetchType: 'slow', fetchColors: ['W','U'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: true,  fetchcost: 0 }],
+    ['bad river',            { fetchType: 'slow', fetchColors: ['U','B'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: true,  fetchcost: 0 }],
+    ['rocky tar pit',        { fetchType: 'slow', fetchColors: ['B','R'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: true,  fetchcost: 0 }],
+    ['mountain valley',      { fetchType: 'slow', fetchColors: ['R','G'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: true,  fetchcost: 0 }],
+    ['grasslands',           { fetchType: 'slow', fetchColors: ['G','W'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: true,  fetchcost: 0 }],
+
+    // ── Prismatic Vista – fetch any basic, pay 1 life ─────────────────────────
+    ['prismatic vista',      { fetchType: 'classic', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: false, entersTappedAlways: false, fetchcost: 0 }],
+
+    // ── Fabled Passage – basic, tapped (untapped if 4+ lands) ────────────────
+    // Modelled conservatively as free_slow (ETBs tapped until threshold met).
+    ['fabled passage',       { fetchType: 'free_slow', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+
+    // ── Evolving Wilds / Terramorphic Expanse – basic, tapped ─────────────────
+    ['evolving wilds',       { fetchType: 'free_slow', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['terramorphic expanse', { fetchType: 'free_slow', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+
+    // ── Escape Tunnel / Shire Terrace / Promising Vein ────────────────────────
+    // Produces {C} normally; {T}, Sacrifice to fetch a basic (tapped).
+    ['escape tunnel',        { fetchType: 'free_slow', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['shire terrace',        { fetchType: 'mana_cost', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 1 }],
+    ['promising vein',       { fetchType: 'mana_cost', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 1 }],
+    ['terminal moraine',     { fetchType: 'mana_cost', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 2 }],
+
+    // ── Ash Barrens – {1}, T, Sacrifice: basic land; OR basic landcycling {1} ─
+    ['ash barrens',          { fetchType: 'mana_cost', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 1 }],
+
+    // ── Multiversal Passage ───────────────────────────────────────────────────
+    ['multiversal passage',  { fetchType: 'free_slow', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+
+    // ── Panoramas (Shards of Alara) ───────────────────────────────────────────
+    // Produce {C} normally; {1}, {T}, Sacrifice: fetch specific 3-color basic, tapped.
+    ['bant panorama',        { fetchType: 'mana_cost', fetchColors: ['G','W','U'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 1 }],
+    ['esper panorama',       { fetchType: 'mana_cost', fetchColors: ['W','U','B'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 1 }],
+    ['grixis panorama',      { fetchType: 'mana_cost', fetchColors: ['U','B','R'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 1 }],
+    ['jund panorama',        { fetchType: 'mana_cost', fetchColors: ['B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 1 }],
+    ['naya panorama',        { fetchType: 'mana_cost', fetchColors: ['R','G','W'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 1 }],
+
+    // ── MH3 Landscapes ────────────────────────────────────────────────────────
+    // Produce {C} normally; {T}, Sacrifice: fetch 1 of 3 basic types, tapped. Has cycling.
+    ['bountiful landscape',  { fetchType: 'colorless_or_cycle_fetch', fetchColors: ['G','W','U'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['contaminated landscape',{ fetchType: 'colorless_or_cycle_fetch', fetchColors: ['U','B','R'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['deceptive landscape',  { fetchType: 'colorless_or_cycle_fetch', fetchColors: ['B','G','U'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['foreboding landscape', { fetchType: 'colorless_or_cycle_fetch', fetchColors: ['W','B','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['perilous landscape',   { fetchType: 'colorless_or_cycle_fetch', fetchColors: ['R','W','B'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['seething landscape',   { fetchType: 'colorless_or_cycle_fetch', fetchColors: ['B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['shattered landscape',  { fetchType: 'colorless_or_cycle_fetch', fetchColors: ['U','R','W'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['sheltering landscape', { fetchType: 'colorless_or_cycle_fetch', fetchColors: ['R','G','W'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['tranquil landscape',   { fetchType: 'colorless_or_cycle_fetch', fetchColors: ['W','U','B'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+    ['twisted landscape',    { fetchType: 'colorless_or_cycle_fetch', fetchColors: ['G','U','R'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+
+    // ── New Capenna Family Lands (Hideaway Auto-Sacrifice) ─────────────────────
+    // Enter untapped; when they ETB they are immediately sacrificed to fetch a 3-color basic (tapped).
+    ['brokers hideout',      { fetchType: 'auto_sacrifice', fetchColors: ['G','W','U'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0, isHideawayFetch: true }],
+    ['obscura storefront',   { fetchType: 'auto_sacrifice', fetchColors: ['W','U','B'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0, isHideawayFetch: true }],
+    ['maestros theater',     { fetchType: 'auto_sacrifice', fetchColors: ['U','B','R'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0, isHideawayFetch: true }],
+    ['riveteers overlook',   { fetchType: 'auto_sacrifice', fetchColors: ['B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0, isHideawayFetch: true }],
+    ['cabaretti courtyard',  { fetchType: 'auto_sacrifice', fetchColors: ['R','G','W'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0, isHideawayFetch: true }],
+
+    // ── Myriad Landscape – {2}, {T}, Sacrifice: fetch 2 basics that share a type ─
+    ['myriad landscape',     { fetchType: 'mana_cost', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: true,  fetchedLandEntersTapped: true,  entersTappedAlways: true,  fetchcost: 2 }],
+
+    // ── Warped Landscape – {2}, {T}, Sacrifice: fetch 1 basic (tapped) ─────────
+    ['warped landscape',     { fetchType: 'mana_cost', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 2 }],
+
+    // ── Krosan Verge – {2}, {T}, Sacrifice: fetch Forest AND Plains (tapped) ──
+    ['krosan verge',         { fetchType: 'mana_cost', fetchColors: ['G','W'],            fetchesOnlyBasics: false, fetchesTwoLands: true,  fetchedLandEntersTapped: true,  entersTappedAlways: true,  fetchcost: 2 }],
+
+    // ── Terminal Moraine (already in list above; costs {2}) ───────────────────
+
+    // ── Blighted Woodland – {3}{G}, {T}, Sacrifice: fetch 2 basics (tapped) ──
+    ['blighted woodland',    { fetchType: 'mana_cost', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: true,  fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 4 }],
+
+    // ── Thawing Glaciers – {1}, {T}: fetch basic (tapped), bounces back to hand ─
+    ['thawing glaciers',     { fetchType: 'mana_cost', fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: true,  fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: true,  fetchcost: 1 }],
+
+    // ── Flagstones of Trokair – fetches Plains when put into graveyard ────────
+    ['flagstones of trokair',{ fetchType: 'trigger',   fetchColors: ['W'],                fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
+
+    // ── Urza's Cave – Chapter III: search for ANY land (tapped) ──────────────
+    ["urza's cave",          { fetchType: 'saga_any',  fetchColors: ['W','U','B','R','G'], fetchesOnlyBasics: false, fetchesTwoLands: false, fetchedLandEntersTapped: true,  entersTappedAlways: false, fetchcost: 0 }],
   ]);
 
-  // Comprehensive land cycle detection
-  const LANDS_ENTER_TAPPED_ALWAYS = new Set([
-    // Tri-Lands (Shards/Khans)
-    'seaside citadel', 'crumbling necropolis', 'arcane sanctum', 'savage lands', 'jungle shrine',
-    'frontier bivouac', 'mystic monastery', 'nomad outpost', 'sandsteppe citadel', 'opulent palace',
+  // KNOWN_FETCH_LANDS is now derived directly from the data map so the two never drift.
+  const KNOWN_FETCH_LANDS = new Set(FETCH_LAND_DATA.keys());
 
-    // Tri-Lands (Ikoria Triomes - have basic land types, can be fetched)
-    'savai triome', 'raugrin triome', 'ketria triome', 'indatha triome', 'zagoth triome',
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Land cycle Sets – now derived from LAND_DATA (built from Lands.json) so that
+  // adding a new land to the JSON automatically propagates here.
+  // Hard-coded fallback entries are kept for cycles not yet in the JSON.
+  // ─────────────────────────────────────────────────────────────────────────────
 
-    // Tri-Lands (Streets of New Capenna)
-    'raffine\'s tower', 'spara\'s headquarters', 'ziatora\'s proving ground', 'jetmir\'s garden', 'xander\'s lounge',
+  // Helper: collect all names from LAND_DATA with a given sim_flag set to true.
+  const landNamesWithFlag = (flag) => {
+    const names = [];
+    for (const [name, entry] of LAND_DATA.entries()) {
+      if (entry.sim_flags && entry.sim_flags[flag]) names.push(name);
+    }
+    return names;
+  };
 
-    // Depletion Lands (Mercadian Masques)
-    'saprazzan skerry', 'remote farm', 'rushwood grove', 'sandstone needle', 'hickory woodlot',
-    'peat bog', 'everglades', 'timberline ridge', 'caldera lake', 'hollow trees',
+  // Comprehensive land cycle detection — all entries now derived from Lands.json via LAND_DATA.
+  // landNamesWithFlag(flag) returns every land name whose resolved sim_flags include that flag.
+  const LANDS_ENTER_TAPPED_ALWAYS = new Set(landNamesWithFlag('entersTappedAlways'));
 
-    // Gain Lands (Core Set)
-    'tranquil cove', 'dismal backwater', 'bloodfell caves', 'rugged highlands', 'blossoming sands',
-    'scoured barrens', 'swiftwater cliffs', 'jungle hollow', 'wind-scarred crag', 'thornwood falls',
+  // Bounce Lands (return a land to hand on ETB)
+  const BOUNCE_LANDS = new Set(landNamesWithFlag('isBounce'));
 
-    // Coastal Lands
-    'coastal tower', 'salt marsh', 'urborg volcano', 'shivan oasis', 'elfhame palace',
+  // Reveal Lands (ETB tapped unless matching land type is revealed from hand)
+  const REVEAL_LANDS = new Set(landNamesWithFlag('isReveal'));
 
-    // Wedge Tap Lands
-    'sandsteppe citadel', 'mystic monastery', 'opulent palace', 'nomad outpost', 'frontier bivouac',
+  // Check Lands (ETB tapped unless matching land type is already controlled)
+  const CHECK_LANDS = new Set(landNamesWithFlag('isCheck'));
 
-    // Bicycle Lands (Amonkhet)
-    'irrigated farmland', 'fetid pools', 'canyon slough', 'sheltered thicket', 'scattered groves',
+  // Fast Lands (ETB untapped only if 2 or fewer other lands are controlled)
+  const FAST_LANDS = new Set(landNamesWithFlag('isFast'));
 
-    // Temples (Theros)
-    'temple of enlightenment', 'temple of deceit', 'temple of malice', 'temple of abandon', 'temple of plenty',
-    'temple of silence', 'temple of epiphany', 'temple of malady', 'temple of triumph', 'temple of mystery',
+  // Pain Lands (always ETB untapped; deal 1 damage when tapped for colored mana)
+  const PAIN_LANDS = new Set(landNamesWithFlag('isPainLand'));
 
-    // Surveil Lands (Murders at Karlov Manor - have basic land types)
-    'meticulous archive', 'undercity sewers', 'raucous theater', 'commercial district', 'lush portico',
-    'shadowy backstreet', 'thundering falls', 'underground mortuary', 'elegant parlor', 'hedge maze',
+  // 5-Color Pain Lands (Mana Confluence, City of Brass — any color, 1 damage)
+  const FIVE_COLOR_PAIN_LANDS = new Set(landNamesWithFlag('isFiveColorPainLand'));
 
-    // Utility Lands that enter tapped
-    'path of ancestry',  // Produces any color, scry 1 when creature ETB
+  // Filter Lands (ETB untapped; {1},{T} to filter into 2 pips of chosen colors)
+  const FILTER_LANDS = new Set(landNamesWithFlag('isFilterLand'));
 
-    // Utility Lands (enter tapped)
-    'path of ancestry',  // Commander staple, produces any color
+  // Horizon Lands (ETB untapped; can sacrifice to draw a card)
+  const HORIZON_LANDS = new Set(landNamesWithFlag('isHorizonLand'));
 
-    // Refuges
-    'sejiri refuge', 'jwar isle refuge', 'akoum refuge', 'kazandu refuge', 'graypelt refuge',
+  // Man Lands (creature lands — always ETB tapped)
+  const MAN_LANDS = new Set(landNamesWithFlag('isManLand'));
 
-    // Guildgates
-    'azorius guildgate', 'dimir guildgate', 'rakdos guildgate', 'gruul guildgate', 'selesnya guildgate',
-    'orzhov guildgate', 'izzet guildgate', 'golgari guildgate', 'boros guildgate', 'simic guildgate',
+  // Storage Lands (ETB tapped; accumulate storage counters for mana)
+  const STORAGE_LANDS = new Set(landNamesWithFlag('isStorageLand'));
 
-    // Bounce Lands (Ravnica Karoos) - Enter tapped AND bounce
-    'azorius chancery', 'dimir aqueduct', 'rakdos carnarium', 'gruul turf', 'selesnya sanctuary',
-    'orzhov basilica', 'izzet boilerworks', 'golgari rot farm', 'boros garrison', 'simic growth chamber',
+  // Crowd / Bond Lands (ETB tapped unless 2+ opponents exist)
+  const CROWD_LANDS = new Set(landNamesWithFlag('isCrowd'));
 
-    // Slow Lands (Midnight Hunt/Crimson Vow)
-    'deserted beach', 'haunted ridge', 'overgrown farmland', 'rockfall vale', 'shipwreck marsh',
+  // Utility Lands that always ETB untapped (Command Tower, Reliquary Tower, etc.)
+  const UTILITY_LANDS_UNTAPPED = new Set(landNamesWithFlag('isUtilityUntapped'));
 
-    // Tango/Battle Lands (Battle for Zendikar) - Usually tapped unless 2+ basics
-    'prairie stream', 'sunken hollow', 'smoldering marsh', 'cinder glade', 'canopy vista',
+  // Odyssey / Fallout Filter Lands (ETB untapped; {1},{T} produces 2 pips of color)
+  const ODYSSEY_FILTER_LANDS = new Set(landNamesWithFlag('isOdysseyFilter'));
 
-    // Pathway Lands (back side enters tapped)
-    // Note: Front side enters untapped, back side tapped - handled separately
-
-    // Snow Tap Lands
-    'arctic flats', 'boreal shelf', 'frost marsh', 'highland weald', 'tresserhorn sinks',
-
-    // Various Other Tap Lands
-    'crystal grotto', 'survivor\'s encampment', 'holdout settlement', 'painted bluffs', 'shimmerdrift vale',
-    'gateway plaza', 'rupture spire', 'transguild promenade', 'gond gate', 'baldur\'s gate',
-
-    // Thriving Lands
-    'thriving bluff', 'thriving grove', 'thriving heath', 'thriving isle', 'thriving moor',
-
-    // Special fetches that enter tapped
-    'myriad landscape'
-  ]);
-
-  // Bounce Lands (return a land to hand)
-  const BOUNCE_LANDS = new Set([
-    'azorius chancery', 'dimir aqueduct', 'rakdos carnarium', 'gruul turf', 'selesnya sanctuary',
-    'orzhov basilica', 'izzet boilerworks', 'golgari rot farm', 'boros garrison', 'simic growth chamber',
-    'coral atoll', 'dormant volcano', 'everglades', 'jungle basin', 'karoo',
-    'slippery karst', 'smoldering crater', 'polluted mire', 'remote isle', 'drifting meadow'
-  ]);
-
-  // Reveal Lands (enter tapped unless you reveal appropriate land from hand)
-  const REVEAL_LANDS = new Set([
-    'port town', 'choked estuary', 'foreboding ruins', 'game trail', 'fortified village'
-  ]);
-
-  // Check Lands (enter tapped unless you control appropriate land type)
-  const CHECK_LANDS = new Set([
-    'glacial fortress', 'drowned catacomb', 'dragonskull summit', 'rootbound crag', 'sunpetal grove',
-    'isolated chapel', 'sulfur falls', 'woodland cemetery', 'clifftop retreat', 'hinterland harbor'
-  ]);
-
-  // Fast Lands (enter untapped if you control 2 or fewer other lands)
-  const FAST_LANDS = new Set([
-    'seachrome coast', 'darkslick shores', 'blackcleave cliffs', 'copperline gorge', 'razorverge thicket',
-    'concealed courtyard', 'spirebluff canal', 'blooming marsh', 'inspiring vantage', 'botanical sanctum'
-  ]);
-
-  // Pain Lands (always enter untapped, can tap for colorless or pay 1 life for color)
-  const PAIN_LANDS = new Set([
-    'adarkar wastes', 'underground river', 'sulfurous springs', 'karplusan forest', 'brushland',
-    'caves of koilos', 'shivan reef', 'llanowar wastes', 'battlefield forge', 'yavimaya coast'
-  ]);
-
-  // 5-Color Pain Lands (produce any color, 1 damage when tapped)
-  const FIVE_COLOR_PAIN_LANDS = new Set([
-    'mana confluence',
-    'city of brass'
-  ]);
-
-  // Filter Lands (enter tapped, can filter mana)
-  const FILTER_LANDS = new Set([
-    'mystic gate', 'sunken ruins', 'graven cairns', 'fire-lit thicket', 'wooded bastion',
-    'fetid heath', 'cascade bluffs', 'twilight mire', 'rugged prairie', 'flooded grove'
-  ]);
-
-  // Horizon Lands (enter untapped, can be cycled)
-  const HORIZON_LANDS = new Set([
-    'horizon canopy', 'grove of the burnwillows', 'nimbus maze', 'river of tears', 'graven cairns'
-  ]);
-
-  // Man Lands (creature lands - enter tapped)
-  const MAN_LANDS = new Set([
-    'celestial colonnade', 'creeping tar pit', 'lavaclaw reaches', 'raging ravine', 'stirring wildwood',
-    'shambling vent', 'wandering fumarole', 'hissing quagmire', 'needle spires', 'lumbering falls'
-  ]);
-
-  // Storage Lands (enter tapped)
-  const STORAGE_LANDS = new Set([
-    'calciform pools', 'dreadship reef', 'molten slagheap', 'fungal reaches', 'saltcrusted steppe'
-  ]);
-
-  // Crowd Lands (enter tapped unless opponent has 2+)
-  const CROWD_LANDS = new Set([
-    'luxury suite', 'morphic pool', 'spire garden', 'bountiful promenade', 'sea of clouds',
-    'spectator seating', 'undergrowth stadium', 'training center', 'vault of champions', 'rejuvenating springs'
-  ]);
-
-  // Utility Lands (always enter untapped, special effects)
-  const UTILITY_LANDS_UNTAPPED = new Set([
-    'reliquary tower',    // No maximum hand size
-    'command tower'       // Produces colors in commander's identity
-    // Starting Town has special turn-based logic (see below)
-  ]);
-
-  // Odyssey/Fallout Filter Lands (enter untapped, {1} for colored mana)
-  const ODYSSEY_FILTER_LANDS = new Set([
-    // Odyssey cycle
-    'darkwater catacombs', 'shadowblood ridge', 'mossfire valley', 'skycloud expanse', 'sungrass prairie',
-    // Fallout cycle (same mechanics)
-    'desolate mire', 'ferrous lake', 'viridescent bog', 'sunscorched divide', 'overflowing basin'
-  ]);
-
-  // Hideaway Lands (Streets of New Capenna - enter tapped)
+  // Hideaway Lands — Lorwyn utility hideaways + SNC auto-sacrifice fetch lands
   const HIDEAWAY_LANDS = new Set([
-    'obscura storefront', 'maestros theater', 'riveteers overlook', 'cabaretti courtyard', 'brokers hideout'
+    ...landNamesWithFlag('isHideawayFetch'),
+    ...(() => {
+      const names = [];
+      for (const [name, entry] of LAND_DATA.entries()) {
+        if (entry.cycleName === 'Hideaway Lands') names.push(name);
+      }
+      return names;
+    })(),
   ]);
 
-  // Conditional Lands that enter tapped (opponent life total, etc.)
-  const CONDITIONAL_LIFE_LANDS = new Set([
-    'raucous carnival' // Enters tapped unless opponent has 13 or less life
-  ]);
+  // Conditional Life Lands (ETB tapped unless an opponent condition is met)
+  const CONDITIONAL_LIFE_LANDS = new Set(landNamesWithFlag('isConditionalLife'));
 
-  // Battle Lands / Tango Lands (enter tapped unless you control 2+ basic lands)
-  const BATTLE_LANDS = new Set([
-    'prairie stream', 'sunken hollow', 'smoldering marsh', 'cinder glade', 'canopy vista',
-    'port town', 'choked estuary', 'foreboding ruins', 'game trail', 'fortified village' // These are reveal lands but similar
-  ]);
+  // Battle / Tango Lands (ETB tapped unless 2+ basic lands are controlled)
+  const BATTLE_LANDS = new Set(landNamesWithFlag('isBattleLand'));
 
-  // Pathway Lands (MDFC - front side enters untapped, back side enters tapped)
-  // Note: These are handled in processLand as MDFCs
-  const PATHWAY_LANDS = new Set([
-    // Zendikar Rising
-    'needleverge pathway', 'pillarverge pathway', 'riverglide pathway', 'lavaglide pathway',
-    'cragcrown pathway', 'timbercrown pathway', 'branchloft pathway', 'boulderloft pathway',
-    'brightclimb pathway', 'grimclimb pathway', 'clearwater pathway', 'murkwater pathway',
-    // Kaldheim
-    'hengegate pathway', 'mistgate pathway', 'darkbore pathway', 'slitherbore pathway',
-    'blightstep pathway', 'searstep pathway', 'barkchannel pathway', 'tidechannel pathway',
-    'snowfield pathway', 'alpine pathway'
-  ]);
+  // Pathway Lands (MDFC — both faces always ETB untapped)
+  const PATHWAY_LANDS = new Set(landNamesWithFlag('isPathway'));
 
   // Card processing functions
   const processCardData = (data) => {
@@ -739,7 +771,9 @@ const MTGMonteCarloAnalyzer = () => {
     }
 
     // Detect fetch land
-    const isFetch = KNOWN_FETCH_LANDS.has(name) ||
+    // Check the data map first (authoritative), then fall back to oracle-text heuristics.
+    const knownFetch = FETCH_LAND_DATA.get(name);
+    const isFetch = !!knownFetch ||
       (oracleText.includes('search your library') &&
         oracleText.includes('land card') &&
         oracleText.includes('battlefield'));
@@ -760,105 +794,55 @@ const MTGMonteCarloAnalyzer = () => {
     let isPathway = false;
 
     if (isFetch) {
-      // Check for hideaway fetch (enters tapped, sacrifices itself, fetches basic)
-      if (HIDEAWAY_LANDS.has(name)) {
-        fetchType = 'hideaway';
-        isHideawayFetch = true;
-        fetchesOnlyBasics = true;
-
-        // Hideaway lands fetch basics of their color(s)
-        // Parse from the card's mana production
-        if (oracleText.includes('{T}: Add')) {
-          const manaSymbols = oracleText.match(/\{[WUBRGC]\}/g);
-          if (manaSymbols) {
-            const colorToType = {
-              'W': 'Plains', 'U': 'Island', 'B': 'Swamp', 'R': 'Mountain', 'G': 'Forest'
-            };
-            const colors = [...new Set(manaSymbols.map(s => s.replace(/[{}]/g, '')))];
-            fetchColors = colors.map(c => colorToType[c] || c).filter(Boolean);
-          }
-        }
-      }
-      // Myriad Landscape: Special - fetches TWO basics of same type
-      else if (name === 'myriad landscape') {
-        fetchType = 'mana_cost';
-        fetchesOnlyBasics = true;
-        fetchesTwoLands = true;
-        fetchcost = 2;
-        entersTappedAlways = true;
-        fetchedLandEntersTapped = true; // Lands enter tapped
-        // Can fetch any basic type (all 5 colors)
-        fetchColors = ['W', 'U', 'B', 'R', 'G'];
-      }
-      // Warped Landscape: Similar to Myriad but different cost
-      else if (name === 'warped landscape') {
-        fetchType = 'free_slow'; // Free activation
-        fetchesOnlyBasics = true;
-        fetchedLandEntersTapped = true; // Lands enter tapped
-        // Can fetch any basic type (all 5 colors)
-        fetchColors = ['W', 'U', 'B', 'R', 'G'];
-      }
-      // Panorama cycle: {1}, T, Sacrifice: Search for basic land of specific types
-      else if (name.includes('panorama')) {
-        fetchType = 'mana_cost';
-        fetchesOnlyBasics = true;
-        fetchcost = 1;
-        fetchedLandEntersTapped = true; // Lands enter tapped
-
-        // Parse which basic types from oracle text
-        const typeMatch = oracleText.match(/(Plains|Island|Swamp|Mountain|Forest)/g);
-        if (typeMatch) {
-          const typeToColor = {
-            'Plains': 'W', 'Island': 'U', 'Swamp': 'B', 'Mountain': 'R', 'Forest': 'G'
-          };
-          fetchColors = [...new Set(typeMatch.map(t => typeToColor[t]))];
-        }
-      }
-      // Landscape cycle (Modern Horizons 3): {1}, T, Sacrifice: Search for basic land of 2 specific types
-      else if ((name.includes('landscape')) &&
-        name !== 'myriad landscape' && name !== 'warped landscape' && name !== 'blasted landscape') {
-        fetchType = 'mana_cost';
-        fetchesOnlyBasics = true;
-        fetchcost = 1;
-        fetchedLandEntersTapped = true; // Lands enter tapped
-
-        // Parse which basic types from oracle text
-        const typeMatch = oracleText.match(/(Plains|Island|Swamp|Mountain|Forest)/g);
-        if (typeMatch) {
-          const typeToColor = {
-            'Plains': 'W', 'Island': 'U', 'Swamp': 'B', 'Mountain': 'R', 'Forest': 'G'
-          };
-          fetchColors = [...new Set(typeMatch.map(t => typeToColor[t]))];
-        }
-      }
-      // Check for "basic land" in oracle text (Terramorphic Expanse, Evolving Wilds, etc.)
-      else if (oracleText.toLowerCase().includes('basic land')) {
-        fetchType = 'free_slow';
-        fetchesOnlyBasics = true;
-        fetchedLandEntersTapped = true; // These fetches put lands in tapped
-
-        // These can fetch any basic (all 5 colors)
-        fetchColors = ['W', 'U', 'B', 'R', 'G'];
-      }
-      // Regular fetch land detection
-      else if (oracleText.toLowerCase().includes('pay 1 life') && !oracleText.toLowerCase().includes('tapped')) {
-        fetchType = 'classic';
-      } else if (oracleText.toLowerCase().includes('pay 1 life') && oracleText.toLowerCase().includes('tapped')) {
-        fetchType = 'slow';
-      } else if (oracleText.match(/\{[0-9]+\}/)) {
-        fetchType = 'mana_cost';
+      if (knownFetch) {
+        // ── Data-map lookup (authoritative) ───────────────────────────────────
+        fetchType             = knownFetch.fetchType;
+        fetchColors           = knownFetch.fetchColors;
+        fetchesOnlyBasics     = knownFetch.fetchesOnlyBasics;
+        fetchesTwoLands       = knownFetch.fetchesTwoLands;
+        fetchedLandEntersTapped = knownFetch.fetchedLandEntersTapped;
+        isHideawayFetch       = knownFetch.isHideawayFetch ?? false;
+        fetchcost             = knownFetch.fetchcost ?? 0;
+        // entersTappedAlways is handled below in the tapped-detection block;
+        // seed it from the map so it can be further overridden if needed.
+        if (knownFetch.entersTappedAlways) entersTappedAlways = true;
       } else {
-        fetchType = 'free_slow';
-      }
+        // ── Oracle-text fallback for unknown fetch lands ───────────────────────
+        if (HIDEAWAY_LANDS.has(name)) {
+          // Legacy hideaway lands not yet in the data map
+          fetchType = 'hideaway';
+          isHideawayFetch = true;
+          fetchesOnlyBasics = true;
+          if (oracleText.includes('{T}: Add')) {
+            const manaSymbols = oracleText.match(/\{[WUBRGC]\}/g);
+            if (manaSymbols) {
+              const colorToType = { 'W': 'Plains', 'U': 'Island', 'B': 'Swamp', 'R': 'Mountain', 'G': 'Forest' };
+              const colors = [...new Set(manaSymbols.map(s => s.replace(/[{}]/g, '')))];
+              fetchColors = colors.map(c => colorToType[c] || c).filter(Boolean);
+            }
+          }
+        } else if (oracleText.toLowerCase().includes('basic land')) {
+          fetchType = 'free_slow';
+          fetchesOnlyBasics = true;
+          fetchedLandEntersTapped = true;
+          fetchColors = ['W', 'U', 'B', 'R', 'G'];
+        } else if (oracleText.toLowerCase().includes('pay 1 life') && !oracleText.toLowerCase().includes('tapped')) {
+          fetchType = 'classic';
+        } else if (oracleText.toLowerCase().includes('pay 1 life') && oracleText.toLowerCase().includes('tapped')) {
+          fetchType = 'slow';
+        } else if (oracleText.match(/\{[0-9]+\}/)) {
+          fetchType = 'mana_cost';
+        } else {
+          fetchType = 'free_slow';
+        }
 
-      // Extract fetch colors for non-hideaway fetches that don't only fetch basics
-      if (!isHideawayFetch && !fetchesOnlyBasics) {
-        const typeMatch = oracleText.match(/(Plains|Island|Swamp|Mountain|Forest)/g);
-        if (typeMatch) {
-          const typeToColor = {
-            'Plains': 'W', 'Island': 'U', 'Swamp': 'B', 'Mountain': 'R', 'Forest': 'G'
-          };
-          fetchColors = [...new Set(typeMatch.map(t => typeToColor[t]))];
+        // Extract fetch colors from oracle text for unknown non-basic fetches
+        if (!isHideawayFetch && !fetchesOnlyBasics) {
+          const typeMatch = oracleText.match(/(Plains|Island|Swamp|Mountain|Forest)/g);
+          if (typeMatch) {
+            const typeToColor = { 'Plains': 'W', 'Island': 'U', 'Swamp': 'B', 'Mountain': 'R', 'Forest': 'G' };
+            fetchColors = [...new Set(typeMatch.map(t => typeToColor[t]))];
+          }
         }
       }
     }
@@ -923,16 +907,21 @@ const MTGMonteCarloAnalyzer = () => {
     let hasInternalLogic = false;
 
     // Check if land is in any special set (has hardcoded logic)
+    // Also flag any land present in LAND_DATA (from Lands.json) as having known logic.
     if (FIVE_COLOR_PAIN_LANDS.has(name) || HIDEAWAY_LANDS.has(name) || KNOWN_FETCH_LANDS.has(name) ||
       CONDITIONAL_LIFE_LANDS.has(name) || BOUNCE_LANDS.has(name) ||
       BATTLE_LANDS.has(name) || PATHWAY_LANDS.has(name) || CHECK_LANDS.has(name) ||
       FAST_LANDS.has(name) || CROWD_LANDS.has(name) || ODYSSEY_FILTER_LANDS.has(name) ||
-      PAIN_LANDS.has(name) || name === 'starting town' || name === 'ancient tomb' ||
+      PAIN_LANDS.has(name) || LAND_DATA.has(name) ||
+      name === 'starting town' || name === 'ancient tomb' ||
       name === 'city of traitors') {
       hasInternalLogic = true;
     }
 
     if (LANDS_ENTER_TAPPED_ALWAYS.has(name)) {
+      entersTappedAlways = true;
+    } else if (knownFetch?.entersTappedAlways) {
+      // Fetch land ETB-tapped flag comes from FETCH_LAND_DATA (already seeded above, re-affirm here)
       entersTappedAlways = true;
     } else if (HIDEAWAY_LANDS.has(name)) {
       entersTappedAlways = true;
@@ -946,7 +935,8 @@ const MTGMonteCarloAnalyzer = () => {
       // Battle lands: enter tapped unless you control 2+ basic lands
       isBattleLand = true;
     } else if (PATHWAY_LANDS.has(name)) {
-      // Pathway lands are MDFCs - front enters untapped
+      // Pathway lands always enter untapped — both sides are lands that ETB untapped.
+      // entersTappedAlways remains false.
       isPathway = true;
     } else if (REVEAL_LANDS.has(name)) {
       // Reveal lands: enter tapped unless you reveal appropriate land
@@ -1852,15 +1842,16 @@ const MTGMonteCarloAnalyzer = () => {
           const manaAvailable = calculateManaAvailability(battlefield);
           const fetchCost = fetchPermanent.card.fetchcost || 0;
 
-          // For free fetches (fetchcost = 0), no mana needed
-          // For mana_cost fetches, we need to pay with mana
+          // For free fetches (fetchcost = 0), no mana needed regardless of fetchType.
+          // classic / slow / auto_sacrifice / colorless_or_fetch all cost 0 and are free to activate.
+          // For mana_cost fetches we need to have enough total mana.
           let canAffordFetch = false;
-          
-          if (fetchPermanent.card.fetchType === 'free_slow') {
-            // Free activation, just tap it
+
+          if (fetchCost === 0) {
+            // No activation cost — classic fetches, Evolving Wilds, hideaway auto-sacrifices, etc.
             canAffordFetch = true;
           } else if (fetchCost > 0 && manaAvailable.total >= fetchCost) {
-            // Can afford the mana cost
+            // Can afford the generic mana cost (panoramas, landscapes, Myriad Landscape, etc.)
             canAffordFetch = true;
           }
 
@@ -1916,17 +1907,20 @@ const MTGMonteCarloAnalyzer = () => {
               battlefield[battlefield.length - 1].tapped = false;
               battlefield[battlefield.length - 1].enteredTapped = false;
               cumulativeLifeLoss += 2;
+              turnLog.lifeLoss += 2;
             }
 
-            // Fetch land cost (life loss for damage fetches like Scalding Tarn)
-            if (fetchPermanent.card.fetchType === 'classic' || fetchPermanent.card.fetchType === 'slow') {
+            // Fetch land cost (life loss for classic fetches only: Onslaught/Zendikar 10 + Prismatic Vista)
+            // Slow fetches (Mirage: Flood Plain, Bad River, etc.) do NOT pay life.
+            if (fetchPermanent.card.fetchType === 'classic') {
               cumulativeLifeLoss += 1;
               turnLog.lifeLoss += 1;
             }
 
             if (turnLog) {
               const finalState = battlefield[battlefield.length - 1]?.tapped ? 'tapped' : 'untapped';
-              turnLog.actions.push(`Fetched ${fetchedLand.name} (${finalState}) [Mana: ${fetchCost}]`);
+              const lifeCost = fetchPermanent.card.fetchType === 'classic' ? ' [-1 life]' : '';
+              turnLog.actions.push(`Fetched ${fetchedLand.name} (${finalState})${lifeCost}`);
             }
           }
         }
@@ -2685,14 +2679,18 @@ const MTGMonteCarloAnalyzer = () => {
           tapManaSources(rampSpell, battlefield);
 
           // Sacrifice a land if required (Harrow-style)
+          // Priority: basic > dual (non-basic, non-fetch, non-bounce) > bounce. Never sacrifice a fetch land.
           let sacrificedLandName = null;
           if (rampSpell.sacrificeLand) {
-            const nonFetchLand = battlefield.find(p => p.card.isLand && !p.card.isFetch);
-            if (nonFetchLand) {
-              sacrificedLandName = nonFetchLand.card.name;
-              const bfIdx = battlefield.indexOf(nonFetchLand);
-              battlefield.splice(bfIdx, 1);
-              graveyard.push(nonFetchLand.card);
+            const candidates = battlefield.filter(p => p.card.isLand && !p.card.isFetch);
+            const basics    = candidates.filter(p => p.card.isBasic);
+            const duals     = candidates.filter(p => !p.card.isBasic && !p.card.isBounce);
+            const bounces   = candidates.filter(p => p.card.isBounce);
+            const toSacrifice = basics[0] ?? duals[0] ?? bounces[0] ?? null;
+            if (toSacrifice) {
+              sacrificedLandName = toSacrifice.card.name;
+              battlefield.splice(battlefield.indexOf(toSacrifice), 1);
+              graveyard.push(toSacrifice.card);
             }
           }
 

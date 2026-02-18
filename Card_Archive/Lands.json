@@ -1,10 +1,12 @@
 {
-  "database_name": "MTG_Commander_Master_Land_Cycles_Types_Modes",
-  "version": "2026.03.05",
+  "database_name": "MTG_Commander_Land_Cycles",
+  "version": "18.02.2026",
+  "format_support": "Commander/EDH",
   "cycles": [
     {
       "name": "Original Duals (ABUR)",
       "behavior": { "etb_tapped": false, "has_basic_types": true, "searchable": true },
+      "sim_flags": { "entersTappedAlways": false },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Tundra", "color_identity": ["W", "U"], "types": ["Plains", "Island"] },
@@ -22,6 +24,7 @@
     {
       "name": "Shock Lands",
       "behavior": { "etb_tapped": true, "untap_condition": "pay_life", "untap_cost": { "life": 2 }, "has_basic_types": true, "searchable": true },
+      "sim_flags": { "isShockLand": true, "entersTappedAlways": false },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Hallowed Fountain", "color_identity": ["W", "U"], "types": ["Plains", "Island"] },
@@ -37,25 +40,9 @@
       ]
     },
     {
-      "name": "Fetch Lands",
-      "behavior": { "etb_tapped": false, "logic": "tutor_basic_subtype" },
-      "mana_abilities": [{ "cost": "{T}, Pay 1 Life, Sacrifice", "produces": "Search Library for [Subtype A] or [Subtype B]" }],
-      "lands": [
-        { "name": "Flooded Strand", "color_identity": ["W", "U"], "fetches": ["Plains", "Island"] },
-        { "name": "Polluted Delta", "color_identity": ["U", "B"], "fetches": ["Island", "Swamp"] },
-        { "name": "Bloodstained Mire", "color_identity": ["B", "R"], "fetches": ["Swamp", "Mountain"] },
-        { "name": "Wooded Foothills", "color_identity": ["R", "G"], "fetches": ["Mountain", "Forest"] },
-        { "name": "Windswept Heath", "color_identity": ["G", "W"], "fetches": ["Forest", "Plains"] },
-        { "name": "Marsh Flats", "color_identity": ["W", "B"], "fetches": ["Plains", "Swamp"] },
-        { "name": "Scalding Tarn", "color_identity": ["U", "R"], "fetches": ["Island", "Mountain"] },
-        { "name": "Verdant Catacombs", "color_identity": ["B", "G"], "fetches": ["Swamp", "Forest"] },
-        { "name": "Arid Mesa", "color_identity": ["R", "W"], "fetches": ["Mountain", "Plains"] },
-        { "name": "Misty Rainforest", "color_identity": ["G", "U"], "fetches": ["Forest", "Island"] }
-      ]
-    },
-    {
       "name": "Filter Lands",
       "behavior": { "etb_tapped": false, "logic": "filter_mana" },
+      "sim_flags": { "isFilterLand": true, "entersTappedAlways": false },
       "mana_abilities": [
         { "mode": 1, "cost": "{T}", "produces": "{C}" },
         { "mode": 2, "cost": "{1}, {T}", "produces": "Choice of {A}{A}, {A}{B}, or {B}{B}" }
@@ -76,6 +63,7 @@
     {
       "name": "Triomes",
       "behavior": { "etb_tapped": true, "has_basic_types": true, "searchable": true, "cycling": true },
+      "sim_flags": { "entersTappedAlways": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A], [Color B], or [Color C]" }],
       "lands": [
         { "name": "Savai Triome", "color_identity": ["R", "W", "B"], "types": ["Mountain", "Plains", "Swamp"] },
@@ -93,6 +81,7 @@
     {
       "name": "Battle Lands (Tango Lands)",
       "behavior": { "etb_tapped": true, "untap_condition": "control_2_plus_basics", "has_basic_types": true, "searchable": true },
+      "sim_flags": { "isBattleLand": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Prairie Stream", "color_identity": ["W", "U"], "types": ["Plains", "Island"] },
@@ -105,6 +94,7 @@
     {
       "name": "Surveil Lands (MKM)",
       "behavior": { "etb_tapped": true, "etb_trigger": "surveil_1", "has_basic_types": true, "searchable": true },
+      "sim_flags": { "entersTappedAlways": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Meticulous Archive", "color_identity": ["W", "U"], "types": ["Plains", "Island"] },
@@ -122,6 +112,7 @@
     {
       "name": "Reveal Lands (Show Lands)",
       "behavior": { "etb_tapped": true, "untap_condition": "reveal_land_type_from_hand", "has_basic_types": false },
+      "sim_flags": { "isReveal": true, "entersTappedAlways": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Port Town", "color_identity": ["W", "U"], "reveals": ["Plains", "Island"] },
@@ -139,6 +130,7 @@
     {
       "name": "Hideaway Lands",
       "behavior": { "etb_tapped": true, "keyword": "Hideaway 4", "has_basic_types": false },
+      "sim_flags": { "entersTappedAlways": true },
       "mana_abilities": [
         { "mode": 1, "cost": "{T}", "produces": "[Color A]" },
         { "mode": 2, "cost": "{A}, {T}", "produces": "Cast exiled card without paying mana cost", "condition": "specific_game_state_met" }
@@ -154,6 +146,7 @@
     {
       "name": "Pain Lands",
       "behavior": { "etb_tapped": false, "logic": "choice_damage_or_colorless" },
+      "sim_flags": { "isPainLand": true, "entersTappedAlways": false },
       "mana_abilities": [
         { "mode": 1, "cost": "{T}", "produces": "{C}" },
         { "mode": 2, "cost": "{T}, Pay 1 Life", "produces": "Choice of [Color A] or [Color B]" }
@@ -174,6 +167,7 @@
     {
       "name": "Check Lands",
       "behavior": { "etb_tapped": true, "untap_condition": "control_basic_land_type_of_colors" },
+      "sim_flags": { "isCheck": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Glacial Fortress", "color_identity": ["W", "U"], "checks": ["Plains", "Island"] },
@@ -191,6 +185,7 @@
     {
       "name": "Bond Lands (Crowd Lands)",
       "behavior": { "etb_tapped": true, "untap_condition": "opponent_count_ge_2", "has_basic_types": false },
+      "sim_flags": { "isCrowd": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Sea of Clouds", "color_identity": ["W", "U"] },
@@ -208,6 +203,7 @@
     {
       "name": "Slow Lands",
       "behavior": { "etb_tapped": true, "untap_condition": "control_lands_ge_2", "has_basic_types": false },
+      "sim_flags": { "entersTappedAlways": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Deserted Beach", "color_identity": ["W", "U"] },
@@ -225,6 +221,7 @@
     {
       "name": "Fast Lands",
       "behavior": { "etb_tapped": true, "untap_condition": "control_lands_le_2", "has_basic_types": false },
+      "sim_flags": { "isFast": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Seachrome Coast", "color_identity": ["W", "U"] },
@@ -242,6 +239,7 @@
     {
       "name": "Lair Lands",
       "behavior": { "etb_tapped": false, "logic": "bounce_non_lair_on_etb" },
+      "sim_flags": { "isBounce": true, "entersTappedAlways": false },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A], [Color B], or [Color C]" }],
       "lands": [
         { "name": "Dromar's Cavern", "color_identity": ["W", "U", "B"] },
@@ -254,6 +252,7 @@
     {
       "name": "Bounce Lands (Karoos)",
       "behavior": { "etb_tapped": true, "logic": "return_land_on_etb" },
+      "sim_flags": { "isBounce": true, "entersTappedAlways": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "{A}{B}" }],
       "lands": [
         { "name": "Azorius Chancery", "color_identity": ["W", "U"] },
@@ -272,6 +271,7 @@
     {
       "name": "Gate Cycle",
       "behavior": { "etb_tapped": true, "subtype": "Gate" },
+      "sim_flags": { "entersTappedAlways": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Azorius Guildgate", "color_identity": ["W", "U"] },
@@ -283,12 +283,15 @@
         { "name": "Izzet Guildgate", "color_identity": ["U", "R"] },
         { "name": "Golgari Guildgate", "color_identity": ["B", "G"] },
         { "name": "Boros Guildgate", "color_identity": ["R", "W"] },
-        { "name": "Simic Guildgate", "color_identity": ["G", "U"] }
+        { "name": "Simic Guildgate", "color_identity": ["G", "U"] },
+        { "name": "Gateway Plaza", "color_identity": ["C"], "behavior": { "cost": "{1} or sacrifice" }, "mana_abilities": [{ "cost": "{T}", "produces": "Any Color" }] },
+        { "name": "Heap Gate", "color_identity": ["C"], "mana_abilities": [{ "cost": "{T}", "produces": "{C}" }, { "cost": "{1}, {T}", "produces": "Create Treasure" }] }
       ]
     },
     {
       "name": "Tri-Lands (Shard/Wedge)",
       "behavior": { "etb_tapped": true },
+      "sim_flags": { "entersTappedAlways": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A], [Color B], or [Color C]" }],
       "lands": [
         { "name": "Mystic Monastery", "color_identity": ["U", "R", "W"] },
@@ -306,6 +309,7 @@
     {
       "name": "Scry Lands",
       "behavior": { "etb_tapped": true, "etb_trigger": "scry_1" },
+      "sim_flags": { "entersTappedAlways": true },
       "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
       "lands": [
         { "name": "Temple of Enlightenment", "color_identity": ["W", "U"] },
@@ -323,6 +327,7 @@
     {
       "name": "Vivid Lands",
       "behavior": { "etb_tapped": true, "logic": "charge_counters" },
+      "sim_flags": { "entersTappedAlways": true },
       "mana_abilities": [
         { "mode": 1, "cost": "{T}", "produces": "[Primary Color]" },
         { "mode": 2, "cost": "{T}, Remove charge counter", "produces": "Any Color" }
@@ -338,23 +343,37 @@
     {
       "name": "Pathway Lands",
       "behavior": { "is_modal": true, "etb_tapped": false, "logic": "choose_side_on_play" },
+      "sim_flags": { "isPathway": true, "entersTappedAlways": false },
       "mana_abilities": [{ "cost": "{T}", "produces": "Color of chosen face" }],
       "lands": [
-        { "name": "Hengegate Pathway", "back_face": "Mistgate Pathway", "color_identity": ["W", "U"] },
-        { "name": "Clearwater Pathway", "back_face": "Murkwater Pathway", "color_identity": ["U", "B"] },
-        { "name": "Blightstep Pathway", "back_face": "Searstep Pathway", "color_identity": ["B", "R"] },
-        { "name": "Cragcrown Pathway", "back_face": "Timbercrown Pathway", "color_identity": ["R", "G"] },
-        { "name": "Branchloft Pathway", "back_face": "Boulderloft Pathway", "color_identity": ["G", "W"] },
-        { "name": "Brightclimb Pathway", "back_face": "Grimclimb Pathway", "color_identity": ["W", "B"] },
-        { "name": "Riverglide Pathway", "back_face": "Lavaglide Pathway", "color_identity": ["U", "R"] },
-        { "name": "Darkbore Pathway", "back_face": "Slitherbore Pathway", "color_identity": ["B", "G"] },
+        { "name": "Hengegate Pathway",   "back_face": "Mistgate Pathway",    "color_identity": ["W", "U"] },
+        { "name": "Mistgate Pathway",    "back_face": "Hengegate Pathway",   "color_identity": ["W", "U"] },
+        { "name": "Clearwater Pathway",  "back_face": "Murkwater Pathway",   "color_identity": ["U", "B"] },
+        { "name": "Murkwater Pathway",   "back_face": "Clearwater Pathway",  "color_identity": ["U", "B"] },
+        { "name": "Blightstep Pathway",  "back_face": "Searstep Pathway",    "color_identity": ["B", "R"] },
+        { "name": "Searstep Pathway",    "back_face": "Blightstep Pathway",  "color_identity": ["B", "R"] },
+        { "name": "Cragcrown Pathway",   "back_face": "Timbercrown Pathway", "color_identity": ["R", "G"] },
+        { "name": "Timbercrown Pathway", "back_face": "Cragcrown Pathway",   "color_identity": ["R", "G"] },
+        { "name": "Branchloft Pathway",  "back_face": "Boulderloft Pathway", "color_identity": ["G", "W"] },
+        { "name": "Boulderloft Pathway", "back_face": "Branchloft Pathway",  "color_identity": ["G", "W"] },
+        { "name": "Brightclimb Pathway", "back_face": "Grimclimb Pathway",   "color_identity": ["W", "B"] },
+        { "name": "Grimclimb Pathway",   "back_face": "Brightclimb Pathway", "color_identity": ["W", "B"] },
+        { "name": "Riverglide Pathway",  "back_face": "Lavaglide Pathway",   "color_identity": ["U", "R"] },
+        { "name": "Lavaglide Pathway",   "back_face": "Riverglide Pathway",  "color_identity": ["U", "R"] },
+        { "name": "Darkbore Pathway",    "back_face": "Slitherbore Pathway", "color_identity": ["B", "G"] },
+        { "name": "Slitherbore Pathway", "back_face": "Darkbore Pathway",    "color_identity": ["B", "G"] },
         { "name": "Needleverge Pathway", "back_face": "Pillarverge Pathway", "color_identity": ["R", "W"] },
-        { "name": "Barkchannel Pathway", "back_face": "Tidechannel Pathway", "color_identity": ["G", "U"] }
+        { "name": "Pillarverge Pathway", "back_face": "Needleverge Pathway", "color_identity": ["R", "W"] },
+        { "name": "Barkchannel Pathway", "back_face": "Tidechannel Pathway", "color_identity": ["G", "U"] },
+        { "name": "Tidechannel Pathway", "back_face": "Barkchannel Pathway", "color_identity": ["G", "U"] },
+        { "name": "Snowfield Snarl",     "back_face": "Alpine Meadow",       "color_identity": ["W", "U"] },
+        { "name": "Alpine Meadow",       "back_face": "Snowfield Snarl",     "color_identity": ["W", "U"] }
       ]
     },
     {
       "name": "Legendary Ramp Utility",
       "behavior": { "logic": "scaling_mana" },
+      "sim_flags": { "entersTappedAlways": false },
       "lands": [
         { 
           "name": "Nykthos, Shrine to Nyx", 
@@ -393,11 +412,17 @@
           "mana_abilities": [
             { "mode": 1, "cost": "{T}, Take 2 damage", "produces": "{C}{C}" }
           ]
+        },
+        {
+          "name": "Temple of the False God",
+          "color_identity": ["C"],
+          "mana_abilities": [{ "cost": "{T}", "produces": "{C}{C}", "condition": "Control 5 or more lands" }]
         }
       ]
     },
     {
       "name": "Verge Lands (2024-2026)",
+      "sim_flags": { "entersTappedAlways": false },
       "behavior": { "etb_tapped": false, "logic": "primary_always_secondary_requires_basic_type", "has_basic_types": false },
       "mana_abilities": [
         { "mode": 1, "cost": "{T}", "produces": "[Primary Color]" },
@@ -417,12 +442,26 @@
       ]
     },
     {
+      "name": "Road Lands (Aetherdrift Cycle)",
+      "sim_flags": { "entersTappedAlways": true, "isRoadLand": true },
+      "behavior": { "etb_tapped": true, "untap_condition": "control_artifact_or_vehicle", "logic": "synergy_check" },
+      "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
+      "lands": [
+        { "name": "Country Roads", "color_identity": ["G", "W"] },
+        { "name": "Foul Roads", "color_identity": ["B", "G"] },
+        { "name": "Reef Roads", "color_identity": ["U", "R"] },
+        { "name": "Rocky Roads", "color_identity": ["R", "W"] },
+        { "name": "Wild Roads", "color_identity": ["R", "G"] }
+      ]
+    },
+    {
       "name": "Specific Utility & Rainbow",
       "behavior": { "logic": "utility" },
+      "sim_flags": { "entersTappedAlways": false, "isUtilityUntapped": true },
       "lands": [
-        { "name": "Command Tower", "color_identity": ["W", "U", "B", "R", "G"], "mana_abilities": [{ "cost": "{T}", "produces": "Any color in Commander's Identity" }] },
-        { "name": "Mana Confluence", "color_identity": ["W", "U", "B", "R", "G"], "mana_abilities": [{ "cost": "{T}, Pay 1 Life", "produces": "Any Color" }] },
-        { "name": "City of Brass", "color_identity": ["W", "U", "B", "R", "G"], "mana_abilities": [{ "cost": "{T}", "produces": "Any Color (Deal 1 damage)" }] },
+        { "name": "Command Tower", "color_identity": ["W", "U", "B", "R", "G"], "sim_flags": { "isUtilityUntapped": true }, "mana_abilities": [{ "cost": "{T}", "produces": "Any color in Commander's Identity" }] },
+        { "name": "Mana Confluence", "color_identity": ["W", "U", "B", "R", "G"], "sim_flags": { "isFiveColorPainLand": true }, "mana_abilities": [{ "cost": "{T}, Pay 1 Life", "produces": "Any Color" }] },
+        { "name": "City of Brass", "color_identity": ["W", "U", "B", "R", "G"], "sim_flags": { "isFiveColorPainLand": true }, "mana_abilities": [{ "cost": "{T}", "produces": "Any Color (Deal 1 damage)" }] },
         { "name": "Reflecting Pool", "color_identity": ["W", "U", "B", "R", "G"], "mana_abilities": [{ "cost": "{T}", "produces": "Any color a land you control could produce" }] },
         { "name": "Exotic Orchard", "color_identity": ["W", "U", "B", "R", "G"], "mana_abilities": [{ "cost": "{T}", "produces": "Any color an opponent's land could produce" }] },
         { "name": "Forbidden Orchard", "color_identity": ["W", "U", "B", "R", "G"], "mana_abilities": [{ "cost": "{T}", "produces": "Any Color", "effect": "Target opponent creates 1/1 Spirit" }] },
@@ -430,12 +469,15 @@
         { "name": "Cavern of Souls", "color_identity": ["C"], "mana_abilities": [{ "cost": "{T}", "produces": "{C}" }, { "cost": "{T}", "produces": "Any Color (Creature Type Only, Uncounterable)" }] },
         { "name": "Unclaimed Territory", "color_identity": ["C"], "mana_abilities": [{ "cost": "{T}", "produces": "{C}" }, { "cost": "{T}", "produces": "Any Color (Creature Type Only)" }] },
         { "name": "Secluded Courtyard", "color_identity": ["C"], "mana_abilities": [{ "cost": "{T}", "produces": "{C}" }, { "cost": "{T}", "produces": "Any Color (Creature Type spell or ability)" }] },
-        { "name": "Starting Town", "color_identity": ["W", "U", "B", "R", "G"], "behavior": { "etb_tapped": "conditional" }, "mana_abilities": [{ "cost": "{T}", "produces": "{C}" }, { "cost": "{T}, Pay 1 Life", "produces": "Any Color" }] }
+        { "name": "Starting Town", "color_identity": ["W", "U", "B", "R", "G"], "behavior": { "etb_tapped": "conditional" }, "mana_abilities": [{ "cost": "{T}", "produces": "{C}" }, { "cost": "{T}, Pay 1 Life", "produces": "Any Color" }] },
+        { "name": "Reliquary Tower", "color_identity": ["C"], "sim_flags": { "isUtilityUntapped": true }, "mana_abilities": [{ "cost": "{T}", "produces": "{C}" }], "passive": "No maximum hand size" },
+        { "name": "Tarnished Citadel", "color_identity": ["C"], "mana_abilities": [{ "cost": "{T}", "produces": "{C}" }, { "cost": "{T}, Pay 3 Life", "produces": "Any Color" }] }
       ]
     },
     {
       "name": "MDFCs & Modal Lands",
       "behavior": { "is_mdfc": true, "face_logic": "spell_front_land_back" },
+      "sim_flags": { "isMDFCLand": true, "entersTappedAlways": false },
       "mana_abilities": [{ "cost": "{T}", "produces": "[Single Color]" }],
       "lands": [
         { "name": "Agadeem's Awakening", "color_identity": ["B"], "back_face": "Agadeem, the Undercrypt", "untap_cost": { "life": 3 } },
@@ -446,6 +488,272 @@
         { "name": "Sink into Stupor", "color_identity": ["U"], "back_face": "Soporific Springs", "untap_cost": { "life": 3 } },
         { "name": "Fell the Profane", "color_identity": ["B"], "back_face": "Fell Mire", "untap_cost": { "life": 3 } },
         { "name": "Bala Ged Recovery", "color_identity": ["G"], "back_face": "Bala Ged Sanctuary", "etb_tapped": true }
+      ]
+    },
+    {
+      "name": "Tron Lands",
+      "behavior": { "etb_tapped": false, "logic": "assemble_3_for_7_mana" },
+      "sim_flags": { "entersTappedAlways": false },
+      "mana_abilities": [
+        { "cost": "{T}", "produces": "{C}" },
+        { "cost": "{T}", "produces": "{C}{C} or {C}{C}{C}", "condition": "Control Mine, Power Plant, and Tower" }
+      ],
+      "lands": [
+        { "name": "Urza's Tower", "color_identity": ["C"] },
+        { "name": "Urza's Mine", "color_identity": ["C"] },
+        { "name": "Urza's Power Plant", "color_identity": ["C"] }
+      ]
+    },
+    {
+      "name": "Bicycle Lands (Amonkhet)",
+      "behavior": { "etb_tapped": true, "cycling": true, "has_basic_types": true, "searchable": true },
+      "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
+      "sim_flags": { "entersTappedAlways": true },
+      "lands": [
+        { "name": "Irrigated Farmland",  "color_identity": ["W", "U"], "types": ["Plains", "Island"] },
+        { "name": "Fetid Pools",         "color_identity": ["U", "B"], "types": ["Island", "Swamp"] },
+        { "name": "Canyon Slough",       "color_identity": ["B", "R"], "types": ["Swamp", "Mountain"] },
+        { "name": "Sheltered Thicket",   "color_identity": ["R", "G"], "types": ["Mountain", "Forest"] },
+        { "name": "Scattered Groves",    "color_identity": ["G", "W"], "types": ["Forest", "Plains"] }
+      ]
+    },
+    {
+      "name": "Snarl Lands (Strixhaven)",
+      "behavior": { "etb_tapped": true, "untap_condition": "reveal_land_type_from_hand", "has_basic_types": false },
+      "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
+      "sim_flags": { "isReveal": true, "entersTappedAlways": true },
+      "lands": [
+        { "name": "Shineshadow Snarl",   "color_identity": ["W", "B"], "reveals": ["Plains", "Swamp"] },
+        { "name": "Frostboil Snarl",     "color_identity": ["U", "R"], "reveals": ["Island", "Mountain"] },
+        { "name": "Necroblossom Snarl",  "color_identity": ["B", "G"], "reveals": ["Swamp", "Forest"] },
+        { "name": "Furycalm Snarl",      "color_identity": ["R", "W"], "reveals": ["Mountain", "Plains"] },
+        { "name": "Vineglimmer Snarl",   "color_identity": ["G", "U"], "reveals": ["Forest", "Island"] }
+      ]
+    },
+    {
+      "name": "Gain Lands (KTK / Core Set)",
+      "behavior": { "etb_tapped": true, "etb_trigger": "gain_1_life" },
+      "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
+      "sim_flags": { "entersTappedAlways": true },
+      "lands": [
+        { "name": "Tranquil Cove",       "color_identity": ["W", "U"] },
+        { "name": "Dismal Backwater",    "color_identity": ["U", "B"] },
+        { "name": "Bloodfell Caves",     "color_identity": ["B", "R"] },
+        { "name": "Rugged Highlands",    "color_identity": ["R", "G"] },
+        { "name": "Blossoming Sands",    "color_identity": ["G", "W"] },
+        { "name": "Scoured Barrens",     "color_identity": ["W", "B"] },
+        { "name": "Swiftwater Cliffs",   "color_identity": ["U", "R"] },
+        { "name": "Jungle Hollow",       "color_identity": ["B", "G"] },
+        { "name": "Wind-Scarred Crag",   "color_identity": ["R", "W"] },
+        { "name": "Thornwood Falls",     "color_identity": ["G", "U"] }
+      ]
+    },
+    {
+      "name": "Refuge Lands (Zendikar)",
+      "behavior": { "etb_tapped": true, "etb_trigger": "gain_1_life" },
+      "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
+      "sim_flags": { "entersTappedAlways": true },
+      "lands": [
+        { "name": "Sejiri Refuge",    "color_identity": ["W", "U"] },
+        { "name": "Jwar Isle Refuge", "color_identity": ["U", "B"] },
+        { "name": "Akoum Refuge",     "color_identity": ["B", "R"] },
+        { "name": "Kazandu Refuge",   "color_identity": ["R", "G"] },
+        { "name": "Graypelt Refuge",  "color_identity": ["G", "W"] }
+      ]
+    },
+    {
+      "name": "Coastal Lands (Invasion)",
+      "behavior": { "etb_tapped": true },
+      "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
+      "sim_flags": { "entersTappedAlways": true },
+      "lands": [
+        { "name": "Coastal Tower",    "color_identity": ["W", "U"] },
+        { "name": "Salt Marsh",       "color_identity": ["U", "B"] },
+        { "name": "Urborg Volcano",   "color_identity": ["B", "R"] },
+        { "name": "Shivan Oasis",     "color_identity": ["R", "G"] },
+        { "name": "Elfhame Palace",   "color_identity": ["G", "W"] }
+      ]
+    },
+    {
+      "name": "Depletion Lands (Mercadian Masques)",
+      "behavior": { "etb_tapped": true, "logic": "depletion_counters" },
+      "mana_abilities": [{ "cost": "{T}, Remove depletion counter", "produces": "[Color A] or [Color B]" }],
+      "sim_flags": { "entersTappedAlways": true },
+      "lands": [
+        { "name": "Saprazzan Skerry",  "color_identity": ["W", "U"] },
+        { "name": "Remote Farm",       "color_identity": ["U", "B"] },
+        { "name": "Rushwood Grove",    "color_identity": ["R", "G"] },
+        { "name": "Sandstone Needle",  "color_identity": ["B", "R"] },
+        { "name": "Hickory Woodlot",   "color_identity": ["G", "W"] },
+        { "name": "Peat Bog",          "color_identity": ["B"] },
+        { "name": "Timberline Ridge",  "color_identity": ["G"] },
+        { "name": "Caldera Lake",      "color_identity": ["R"] },
+        { "name": "Hollow Trees",      "color_identity": ["W"] },
+        { "name": "Everglades",        "color_identity": ["U"], "sim_flags": { "isBounce": true, "entersTappedAlways": true } }
+      ]
+    },
+    {
+      "name": "Snow Dual Tap Lands (Ice Age)",
+      "behavior": { "etb_tapped": true, "supertype": "Snow" },
+      "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
+      "sim_flags": { "entersTappedAlways": true },
+      "lands": [
+        { "name": "Arctic Flats",      "color_identity": ["W", "U"] },
+        { "name": "Boreal Shelf",      "color_identity": ["W", "U"] },
+        { "name": "Frost Marsh",       "color_identity": ["U", "B"] },
+        { "name": "Highland Weald",    "color_identity": ["R", "G"] },
+        { "name": "Tresserhorn Sinks", "color_identity": ["U", "B"] }
+      ]
+    },
+    {
+      "name": "Thriving Lands (Commander Legends)",
+      "behavior": { "etb_tapped": true, "etb_trigger": "choose_color_on_etb" },
+      "mana_abilities": [{ "cost": "{T}", "produces": "[Primary Color] or chosen color" }],
+      "sim_flags": { "entersTappedAlways": true },
+      "lands": [
+        { "name": "Thriving Bluff",  "color_identity": ["R"] },
+        { "name": "Thriving Grove",  "color_identity": ["G"] },
+        { "name": "Thriving Heath",  "color_identity": ["W"] },
+        { "name": "Thriving Isle",   "color_identity": ["U"] },
+        { "name": "Thriving Moor",   "color_identity": ["B"] }
+      ]
+    },
+    {
+      "name": "Horizon Lands",
+      "behavior": { "etb_tapped": false, "logic": "can_sacrifice_draw" },
+      "mana_abilities": [{ "cost": "{T}", "produces": "[Color A] or [Color B]" }],
+      "sim_flags": { "entersTappedAlways": false },
+      "lands": [
+        { "name": "Horizon Canopy",           "color_identity": ["G", "W"] },
+        { "name": "Grove of the Burnwillows", "color_identity": ["R", "G"] },
+        { "name": "Nimbus Maze",              "color_identity": ["W", "U"] },
+        { "name": "River of Tears",           "color_identity": ["U", "B"] },
+        { "name": "Firepond",                 "color_identity": ["U", "R"] },
+        { "name": "Sunbaked Canyon",          "color_identity": ["R", "W"] },
+        { "name": "Nurturing Peatland",       "color_identity": ["B", "G"] },
+        { "name": "Silent Clearing",          "color_identity": ["W", "B"] },
+        { "name": "Fiery Islet",              "color_identity": ["U", "R"] },
+        { "name": "Waterlogged Grove",        "color_identity": ["G", "U"] }
+      ]
+    },
+    {
+      "name": "Man Lands (Creature Lands)",
+      "behavior": { "etb_tapped": true, "logic": "can_animate_as_creature" },
+      "mana_abilities": [{ "cost": "{T}", "produces": "Choice of [Color A] or [Color B]" }],
+      "sim_flags": { "entersTappedAlways": true, "isManLand": true },
+      "lands": [
+        { "name": "Celestial Colonnade", "color_identity": ["W", "U"] },
+        { "name": "Creeping Tar Pit",    "color_identity": ["U", "B"] },
+        { "name": "Lavaclaw Reaches",    "color_identity": ["B", "R"] },
+        { "name": "Raging Ravine",       "color_identity": ["R", "G"] },
+        { "name": "Stirring Wildwood",   "color_identity": ["G", "W"] },
+        { "name": "Shambling Vent",      "color_identity": ["W", "B"] },
+        { "name": "Wandering Fumarole",  "color_identity": ["U", "R"] },
+        { "name": "Hissing Quagmire",    "color_identity": ["B", "G"] },
+        { "name": "Needle Spires",       "color_identity": ["R", "W"] },
+        { "name": "Lumbering Falls",     "color_identity": ["G", "U"] }
+      ]
+    },
+    {
+      "name": "Storage Lands",
+      "behavior": { "etb_tapped": true, "logic": "storage_counters" },
+      "mana_abilities": [{ "cost": "{T}, Remove storage counter(s)", "produces": "[Color A] per counter removed" }],
+      "sim_flags": { "entersTappedAlways": true },
+      "lands": [
+        { "name": "Calciform Pools",   "color_identity": ["W", "U"] },
+        { "name": "Dreadship Reef",    "color_identity": ["U", "B"] },
+        { "name": "Molten Slagheap",   "color_identity": ["B", "R"] },
+        { "name": "Fungal Reaches",    "color_identity": ["R", "G"] },
+        { "name": "Saltcrusted Steppe","color_identity": ["G", "W"] }
+      ]
+    },
+    {
+      "name": "Odyssey Filter Lands",
+      "behavior": { "etb_tapped": false, "logic": "filter_mana_1_generic" },
+      "mana_abilities": [
+        { "mode": 1, "cost": "{T}", "produces": "{C}" },
+        { "mode": 2, "cost": "{1}, {T}", "produces": "Choice of {A}{A}, {A}{B}, or {B}{B}" }
+      ],
+      "sim_flags": { "entersTappedAlways": false },
+      "lands": [
+        { "name": "Darkwater Catacombs", "color_identity": ["U", "B"] },
+        { "name": "Shadowblood Ridge",   "color_identity": ["B", "R"] },
+        { "name": "Mossfire Valley",     "color_identity": ["R", "G"] },
+        { "name": "Skycloud Expanse",    "color_identity": ["W", "U"] },
+        { "name": "Sungrass Prairie",    "color_identity": ["G", "W"] }
+      ]
+    },
+    {
+      "name": "Fallout Filter Lands",
+      "behavior": { "etb_tapped": false, "logic": "filter_mana_1_generic" },
+      "mana_abilities": [
+        { "mode": 1, "cost": "{T}", "produces": "{C}" },
+        { "mode": 2, "cost": "{1}, {T}", "produces": "Choice of {A}{A}, {A}{B}, or {B}{B}" }
+      ],
+      "sim_flags": { "entersTappedAlways": false },
+      "lands": [
+        { "name": "Desolate Mire",      "color_identity": ["U", "B"] },
+        { "name": "Ferrous Lake",       "color_identity": ["B", "R"] },
+        { "name": "Viridescent Bog",    "color_identity": ["R", "G"] },
+        { "name": "Sunscorched Divide", "color_identity": ["W", "U"] },
+        { "name": "Overflowing Basin",  "color_identity": ["G", "W"] }
+      ]
+    },
+    {
+      "name": "SNC Hideaway Fetch Lands (Streets of New Capenna)",
+      "behavior": { "etb_tapped": false, "logic": "etb_auto_sacrifice_fetch_basic_tapped" },
+      "mana_abilities": [],
+      "sim_flags": { "entersTappedAlways": false, "isHideawayFetch": true },
+      "lands": [
+        { "name": "Brokers Hideout",      "color_identity": ["G", "W", "U"] },
+        { "name": "Obscura Storefront",   "color_identity": ["W", "U", "B"] },
+        { "name": "Maestros Theater",     "color_identity": ["U", "B", "R"] },
+        { "name": "Riveteers Overlook",   "color_identity": ["B", "R", "G"] },
+        { "name": "Cabaretti Courtyard",  "color_identity": ["R", "G", "W"] }
+      ]
+    },
+    {
+      "name": "Extra Bounce Lands",
+      "behavior": { "etb_tapped": true, "logic": "return_land_on_etb" },
+      "mana_abilities": [{ "cost": "{T}", "produces": "[Color]" }],
+      "sim_flags": { "entersTappedAlways": true, "isBounce": true },
+      "lands": [
+        { "name": "Coral Atoll",      "color_identity": ["U"] },
+        { "name": "Dormant Volcano",  "color_identity": ["R"] },
+        { "name": "Jungle Basin",     "color_identity": ["G"] },
+        { "name": "Karoo",            "color_identity": ["W"] },
+        { "name": "Slippery Karst",   "color_identity": ["G"] },
+        { "name": "Smoldering Crater","color_identity": ["R"] },
+        { "name": "Polluted Mire",    "color_identity": ["B"] },
+        { "name": "Remote Isle",      "color_identity": ["U"] },
+        { "name": "Drifting Meadow",  "color_identity": ["W"] }
+      ]
+    },
+    {
+      "name": "Various Utility Tap Lands",
+      "behavior": { "etb_tapped": true },
+      "mana_abilities": [{ "cost": "{T}", "produces": "Any color" }],
+      "sim_flags": { "entersTappedAlways": true },
+      "lands": [
+        { "name": "Path of Ancestry",   "color_identity": ["W", "U", "B", "R", "G"] },
+        { "name": "Rupture Spire",      "color_identity": ["W", "U", "B", "R", "G"] },
+        { "name": "Transguild Promenade","color_identity": ["W", "U", "B", "R", "G"] },
+        { "name": "Gond Gate",          "color_identity": ["W", "U", "B", "R", "G"] },
+        { "name": "Baldur's Gate",      "color_identity": ["W", "U", "B", "R", "G"] },
+        { "name": "Crystal Grotto",     "color_identity": ["W", "U", "B", "R", "G"] },
+        { "name": "Painted Bluffs",     "color_identity": ["W", "U", "B", "R", "G"] },
+        { "name": "Shimmerdrift Vale",  "color_identity": ["W", "U", "B", "R", "G"] },
+        { "name": "Survivor's Encampment","color_identity": ["W", "U", "B", "R", "G"] },
+        { "name": "Holdout Settlement", "color_identity": ["W", "U", "B", "R", "G"] }
+      ]
+    },
+    {
+      "name": "Conditional Life Lands",
+      "behavior": { "etb_tapped": true, "untap_condition": "opponent_life_condition" },
+      "mana_abilities": [{ "cost": "{T}", "produces": "[Color]" }],
+      "sim_flags": { "entersTappedAlways": true, "isConditionalLife": true },
+      "lands": [
+        { "name": "Raucous Carnival", "color_identity": ["R"], "condition": "opponent_life_le_13" }
       ]
     }
   ]
