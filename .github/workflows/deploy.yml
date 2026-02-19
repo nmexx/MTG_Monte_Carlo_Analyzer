@@ -37,19 +37,16 @@ jobs:
       - name: Build (Vite)
         run: npm run build
 
-      # ── 7. Deploy via FTPS ──────────────────────────────────────────────────
+      # ── 7. Deploy via SFTP (SCP over SSH port 22) ──────────────────────────
       #  Secrets are set in: GitHub repo → Settings → Secrets → Actions
-      #  Required secrets:  FTP_HOST  FTP_USER  FTP_PASSWORD
-      #  Optional secrets:  FTP_REMOTE  (defaults to /)
-      - name: Deploy to FTPS server
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      #  Required secrets:  FTP_HOST  FTP_USER  FTP_PASSWORD  FTP_REMOTE
+      - name: Deploy to server via SCP
+        uses: appleboy/scp-action@v0.1.7
         with:
-          server: ${{ secrets.FTP_HOST }}
+          host: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_REMOTE || '/' }}
-          local-dir: ./dist/
-          protocol: ftps-legacy
-          port: 21
-          # Only uploads changed files — much faster than a full re-upload
-          dangerous-clean-slate: false
+          port: 22
+          source: 'dist/*'
+          target: ${{ secrets.FTP_REMOTE }}
+          strip_components: 1
