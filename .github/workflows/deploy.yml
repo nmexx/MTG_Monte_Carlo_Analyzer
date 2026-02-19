@@ -37,11 +37,11 @@ jobs:
       - name: Build (Vite)
         run: npm run build
 
-      # ── 7. Deploy via FTP ───────────────────────────────────────────────────
+      # ── 7. Deploy via SFTP ──────────────────────────────────────────────────
       #  Secrets are set in: GitHub repo → Settings → Secrets → Actions
       #  Required secrets:  FTP_HOST  FTP_USER  FTP_PASSWORD
-      #  Optional secrets:  FTP_REMOTE  (defaults to /)  FTP_SECURE (true/false)
-      - name: Deploy to FTP server
+      #  Optional secrets:  FTP_REMOTE  (defaults to /)
+      - name: Deploy to SFTP server
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
@@ -49,6 +49,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: ${{ secrets.FTP_REMOTE || '/' }}
           local-dir: ./dist/
-          security: strict
+          protocol: sftp
+          port: 22
           # Only uploads changed files — much faster than a full re-upload
           dangerous-clean-slate: false
