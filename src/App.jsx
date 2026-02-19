@@ -1,4 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+  BarChart, Bar,
+  XAxis, YAxis,
+  CartesianGrid, Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 
 // ─── Simulation & Parsing ─────────────────────────────────────────────────────
 import { monteCarlo }     from './simulation/monteCarlo.js';
@@ -37,37 +44,51 @@ const loadHtml2Canvas = () =>
   });
 
 // =============================================================================
+// localStorage persistence helpers
+// =============================================================================
+const STORAGE_KEY = 'mtg_mca_state';
+
+const getSaved = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+// =============================================================================
 const MTGMonteCarloAnalyzer = () => {
   // ── Data source ────────────────────────────────────────────────────────────
-  const [apiMode,        setApiMode]        = useState('local');
+  const [apiMode,        setApiMode]        = useState(() => getSaved().apiMode        ?? 'local');
   const [cardsDatabase,  setCardsDatabase]  = useState(null);
   const [cardLookupMap,  setCardLookupMap]  = useState(new Map());
 
   // ── Deck input & parsing ───────────────────────────────────────────────────
-  const [deckText,   setDeckText]   = useState('');
+  const [deckText,   setDeckText]   = useState(() => getSaved().deckText   ?? '');
   const [parsedDeck, setParsedDeck] = useState(null);
   const [error,      setError]      = useState('');
 
   // ── Key-card selection ─────────────────────────────────────────────────────
-  const [selectedKeyCards, setSelectedKeyCards] = useState(new Set());
+  const [selectedKeyCards, setSelectedKeyCards] = useState(() => new Set(getSaved().selectedKeyCards ?? []));
 
   // ── Card-type include/exclude toggles ─────────────────────────────────────
-  const [includeArtifacts,    setIncludeArtifacts]    = useState(true);
-  const [disabledArtifacts,   setDisabledArtifacts]   = useState(new Set());
-  const [includeCreatures,    setIncludeCreatures]    = useState(true);
-  const [disabledCreatures,   setDisabledCreatures]   = useState(new Set());
-  const [includeExploration,  setIncludeExploration]  = useState(true);
-  const [disabledExploration, setDisabledExploration] = useState(new Set());
-  const [includeRampSpells,   setIncludeRampSpells]   = useState(true);
-  const [disabledRampSpells,  setDisabledRampSpells]  = useState(new Set());
-  const [includeRituals,      setIncludeRituals]      = useState(true);
-  const [disabledRituals,     setDisabledRituals]     = useState(new Set());
+  const [includeArtifacts,    setIncludeArtifacts]    = useState(() => getSaved().includeArtifacts    ?? true);
+  const [disabledArtifacts,   setDisabledArtifacts]   = useState(() => new Set(getSaved().disabledArtifacts   ?? []));
+  const [includeCreatures,    setIncludeCreatures]    = useState(() => getSaved().includeCreatures    ?? true);
+  const [disabledCreatures,   setDisabledCreatures]   = useState(() => new Set(getSaved().disabledCreatures   ?? []));
+  const [includeExploration,  setIncludeExploration]  = useState(() => getSaved().includeExploration  ?? true);
+  const [disabledExploration, setDisabledExploration] = useState(() => new Set(getSaved().disabledExploration ?? []));
+  const [includeRampSpells,   setIncludeRampSpells]   = useState(() => getSaved().includeRampSpells   ?? true);
+  const [disabledRampSpells,  setDisabledRampSpells]  = useState(() => new Set(getSaved().disabledRampSpells  ?? []));
+  const [includeRituals,      setIncludeRituals]      = useState(() => getSaved().includeRituals      ?? true);
+  const [disabledRituals,     setDisabledRituals]     = useState(() => new Set(getSaved().disabledRituals     ?? []));
 
   // ── Mulligan settings ──────────────────────────────────────────────────────
-  const [enableMulligans,    setEnableMulligans]    = useState(false);
-  const [mulliganRule,       setMulliganRule]       = useState('london');
-  const [mulliganStrategy,   setMulliganStrategy]   = useState('balanced');
-  const [customMulliganRules, setCustomMulliganRules] = useState({
+  const [enableMulligans,    setEnableMulligans]    = useState(() => getSaved().enableMulligans  ?? false);
+  const [mulliganRule,       setMulliganRule]       = useState(() => getSaved().mulliganRule     ?? 'london');
+  const [mulliganStrategy,   setMulliganStrategy]   = useState(() => getSaved().mulliganStrategy ?? 'balanced');
+  const [customMulliganRules, setCustomMulliganRules] = useState(() => getSaved().customMulliganRules ?? {
     mulligan0Lands:        true,
     mulligan7Lands:        true,
     mulliganNoPlaysByTurn: false,
@@ -79,12 +100,12 @@ const MTGMonteCarloAnalyzer = () => {
   });
 
   // ── Simulation settings ────────────────────────────────────────────────────
-  const [iterations,               setIterations]               = useState(10000);
-  const [turns,                    setTurns]                    = useState(7);
-  const [handSize,                 setHandSize]                 = useState(7);
-  const [maxSequences,             setMaxSequences]             = useState(1);
-  const [selectedTurnForSequences, setSelectedTurnForSequences] = useState(3);
-  const [commanderMode,            setCommanderMode]            = useState(false);
+  const [iterations,               setIterations]               = useState(() => getSaved().iterations               ?? 10000);
+  const [turns,                    setTurns]                    = useState(() => getSaved().turns                    ?? 7);
+  const [handSize,                 setHandSize]                 = useState(() => getSaved().handSize                 ?? 7);
+  const [maxSequences,             setMaxSequences]             = useState(() => getSaved().maxSequences             ?? 1);
+  const [selectedTurnForSequences, setSelectedTurnForSequences] = useState(() => getSaved().selectedTurnForSequences ?? 3);
+  const [commanderMode,            setCommanderMode]            = useState(() => getSaved().commanderMode            ?? false);
 
   // ── Simulation results ─────────────────────────────────────────────────────
   const [simulationResults, setSimulationResults] = useState(null);
@@ -92,6 +113,49 @@ const MTGMonteCarloAnalyzer = () => {
 
   // ── Derived chart data ─────────────────────────────────────────────────────
   const chartData = simulationResults ? prepareChartData(simulationResults, turns) : null;
+
+  // ── Persist settings & deck text to localStorage ──────────────────────────
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        deckText,
+        apiMode,
+        includeArtifacts,
+        disabledArtifacts:   [...disabledArtifacts],
+        includeCreatures,
+        disabledCreatures:   [...disabledCreatures],
+        includeExploration,
+        disabledExploration: [...disabledExploration],
+        includeRampSpells,
+        disabledRampSpells:  [...disabledRampSpells],
+        includeRituals,
+        disabledRituals:     [...disabledRituals],
+        selectedKeyCards:    [...selectedKeyCards],
+        iterations,
+        turns,
+        handSize,
+        maxSequences,
+        selectedTurnForSequences,
+        commanderMode,
+        enableMulligans,
+        mulliganRule,
+        mulliganStrategy,
+        customMulliganRules,
+      }));
+    } catch (err) {
+      console.warn('localStorage save failed:', err);
+    }
+  }, [
+    deckText, apiMode,
+    includeArtifacts, disabledArtifacts,
+    includeCreatures, disabledCreatures,
+    includeExploration, disabledExploration,
+    includeRampSpells, disabledRampSpells,
+    includeRituals, disabledRituals,
+    selectedKeyCards,
+    iterations, turns, handSize, maxSequences, selectedTurnForSequences,
+    commanderMode, enableMulligans, mulliganRule, mulliganStrategy, customMulliganRules,
+  ]);
 
   // ============================================================================
   // File upload — builds the cardLookupMap from a local Scryfall Default Cards JSON
@@ -449,6 +513,277 @@ const MTGMonteCarloAnalyzer = () => {
                   ? ((parsedDeck.landCount / parsedDeck.totalCards) * 100).toFixed(1)
                   : 0}%)
               </p>
+
+              {/* Derived stats block */}
+              {(() => {
+                const nonLandCards = [
+                  ...(parsedDeck.spells      || []),
+                  ...(parsedDeck.creatures   || []),
+                  ...(parsedDeck.artifacts   || []),
+                  ...(parsedDeck.rituals     || []),
+                  ...(parsedDeck.rampSpells  || []),
+                  ...(parsedDeck.exploration || []),
+                ];
+
+                // Average CMC (weighted by quantity)
+                let totalCmcSum = 0;
+                let totalNonLandQty = 0;
+                for (const card of nonLandCards) {
+                  const qty = card.quantity || 1;
+                  totalCmcSum += (typeof card.cmc === 'number' ? card.cmc : 0) * qty;
+                  totalNonLandQty += qty;
+                }
+                const avgCmc = totalNonLandQty > 0 ? (totalCmcSum / totalNonLandQty).toFixed(2) : '—';
+
+                // Ramp pieces
+                const rampCount =
+                  (parsedDeck.artifacts   || []).reduce((s, c) => s + (c.quantity || 1), 0) +
+                  (parsedDeck.creatures   || []).reduce((s, c) => s + (c.quantity || 1), 0) +
+                  (parsedDeck.rampSpells  || []).reduce((s, c) => s + (c.quantity || 1), 0) +
+                  (parsedDeck.rituals     || []).reduce((s, c) => s + (c.quantity || 1), 0) +
+                  (parsedDeck.exploration || []).reduce((s, c) => s + (c.quantity || 1), 0);
+                const rampPct = parsedDeck.totalCards > 0
+                  ? ((rampCount / parsedDeck.totalCards) * 100).toFixed(1)
+                  : '0';
+
+                // Land ETB status
+                const lands = parsedDeck.lands || [];
+                let tappedCount = 0, untappedCount = 0, fetchCount = 0, conditionalCount = 0;
+                for (const land of lands) {
+                  const qty = land.quantity || 1;
+                  if (land.isFetch) { fetchCount += qty; continue; }
+                  if (land.entersTappedAlways === true)      tappedCount     += qty;
+                  else if (land.entersTappedAlways === false) untappedCount  += qty;
+                  else                                        conditionalCount += qty;
+                }
+
+                return (
+                  <>
+                    <p>Avg. CMC (non-land): <strong>{avgCmc}</strong></p>
+                    <p>
+                      Ramp &amp; Acceleration: <strong>{rampCount}</strong>{' '}
+                      <span style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '0.85em' }}>
+                        ({rampPct}% of deck)
+                      </span>
+                    </p>
+                    {lands.length > 0 && (
+                      <p style={{ lineHeight: 1.8 }}>
+                        Lands — Untapped: <strong>{untappedCount + fetchCount}</strong>
+                        {' · '}Tapped: <strong>{tappedCount}</strong>
+                        {conditionalCount > 0 && <>{' · '}Conditional: <strong>{conditionalCount}</strong></>}
+                        {' · '}Fetches: <strong>{fetchCount}</strong>
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Mana Curve Chart */}
+              {(() => {
+                const nonLandCards = [
+                  ...(parsedDeck.spells      || []),
+                  ...(parsedDeck.creatures   || []),
+                  ...(parsedDeck.artifacts   || []),
+                  ...(parsedDeck.rituals     || []),
+                  ...(parsedDeck.rampSpells  || []),
+                  ...(parsedDeck.exploration || []),
+                ];
+                if (nonLandCards.length === 0) return null;
+
+                // Build CMC → count map
+                const cmcMap = new Map();
+                for (const card of nonLandCards) {
+                  const cmc = typeof card.cmc === 'number' ? card.cmc : 0;
+                  const qty = card.quantity || 1;
+                  cmcMap.set(cmc, (cmcMap.get(cmc) || 0) + qty);
+                }
+
+                const maxCmc = Math.max(...cmcMap.keys());
+                const curveData = Array.from(
+                  { length: maxCmc + 1 },
+                  (_, i) => ({ cmc: i, count: cmcMap.get(i) || 0 })
+                );
+
+                const BAR_COLORS = ['#667eea','#7c3aed','#a855f7','#ec4899','#f87171','#fb923c','#facc15','#4ade80','#34d399','#60a5fa'];
+
+                return (
+                  <div style={{ marginTop: '1rem' }}>
+                    <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary, #94a3b8)' }}>Mana Curve</h4>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <BarChart data={curveData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="cmc"
+                          tick={{ fontSize: 11 }}
+                          label={{ value: 'CMC', position: 'insideBottom', offset: -2, fontSize: 11 }}
+                        />
+                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                        <RechartsTooltip
+                          formatter={(value) => [value, 'Cards']}
+                          labelFormatter={(label) => `CMC ${label}`}
+                        />
+                        <Bar dataKey="count" radius={[3, 3, 0, 0]}>
+                          {curveData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
+
+              {/* Color Pip Demand Chart */}
+              {(() => {
+                const nonLandCards = [
+                  ...(parsedDeck.spells      || []),
+                  ...(parsedDeck.creatures   || []),
+                  ...(parsedDeck.artifacts   || []),
+                  ...(parsedDeck.rituals     || []),
+                  ...(parsedDeck.rampSpells  || []),
+                  ...(parsedDeck.exploration || []),
+                ];
+                if (nonLandCards.length === 0) return null;
+
+                const pipCounts = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+                for (const card of nonLandCards) {
+                  if (!card.manaCost) continue;
+                  const qty = card.quantity || 1;
+                  const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
+                  for (const sym of symbols) {
+                    const s = sym.replace(/[{}]/g, '').toUpperCase();
+                    if (pipCounts[s] !== undefined) pipCounts[s] += qty;
+                  }
+                }
+
+                const colorConfig = {
+                  W: { label: 'White', fill: '#fcd34d' },
+                  U: { label: 'Blue',  fill: '#60a5fa' },
+                  B: { label: 'Black', fill: '#a1a1aa' },
+                  R: { label: 'Red',   fill: '#f87171' },
+                  G: { label: 'Green', fill: '#4ade80' },
+                };
+                const pipData = Object.entries(pipCounts)
+                  .filter(([, v]) => v > 0)
+                  .map(([k, v]) => ({ color: k, label: colorConfig[k].label, pips: v, fill: colorConfig[k].fill }));
+
+                if (pipData.length === 0) return null;
+
+                return (
+                  <div style={{ marginTop: '1rem' }}>
+                    <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary, #94a3b8)' }}>Color Pip Demand</h4>
+                    <ResponsiveContainer width="100%" height={120}>
+                      <BarChart data={pipData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                        <RechartsTooltip
+                          formatter={(value) => [value, 'Pips']}
+                          labelFormatter={(label) => label}
+                        />
+                        <Bar dataKey="pips" radius={[3, 3, 0, 0]}>
+                          {pipData.map((entry) => (
+                            <Cell key={entry.color} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
+
+              {/* Color Pip Creation Chart */}
+              {(() => {
+                const colorConfig = {
+                  W: { label: 'White', fill: '#fcd34d' },
+                  U: { label: 'Blue',  fill: '#60a5fa' },
+                  B: { label: 'Black', fill: '#a1a1aa' },
+                  R: { label: 'Red',   fill: '#f87171' },
+                  G: { label: 'Green', fill: '#4ade80' },
+                };
+                const sources = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+
+                const addProduces = (card) => {
+                  const qty = card.quantity || 1;
+                  const colors = card.produces || [];
+                  for (const c of colors) {
+                    if (sources[c] !== undefined) sources[c] += qty;
+                  }
+                };
+
+                // Lands: use produces for non-fetches; fetches use fetchColors
+                for (const land of (parsedDeck.lands || [])) {
+                  const qty = land.quantity || 1;
+                  if (land.isFetch) {
+                    for (const c of (land.fetchColors || [])) {
+                      if (sources[c] !== undefined) sources[c] += qty;
+                    }
+                  } else {
+                    for (const c of (land.produces || [])) {
+                      if (sources[c] !== undefined) sources[c] += qty;
+                    }
+                  }
+                }
+
+                // Artifacts & creatures (mana dorks)
+                for (const card of (parsedDeck.artifacts || [])) addProduces(card);
+                for (const card of (parsedDeck.creatures || [])) addProduces(card);
+
+                // Rituals use ritualColors
+                for (const card of (parsedDeck.rituals || [])) {
+                  const qty = card.quantity || 1;
+                  for (const c of (card.ritualColors || [])) {
+                    if (sources[c] !== undefined) sources[c] += qty;
+                  }
+                }
+
+                // Only show colors that are actually demanded by non-land mana costs
+                const demandedColors = new Set();
+                const nonLandCards = [
+                  ...(parsedDeck.spells      || []),
+                  ...(parsedDeck.creatures   || []),
+                  ...(parsedDeck.artifacts   || []),
+                  ...(parsedDeck.rituals     || []),
+                  ...(parsedDeck.rampSpells  || []),
+                  ...(parsedDeck.exploration || []),
+                ];
+                for (const card of nonLandCards) {
+                  if (!card.manaCost) continue;
+                  const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
+                  for (const sym of symbols) {
+                    const s = sym.replace(/[{}]/g, '').toUpperCase();
+                    if (colorConfig[s]) demandedColors.add(s);
+                  }
+                }
+
+                const creationData = Object.entries(sources)
+                  .filter(([k, v]) => v > 0 && demandedColors.has(k))
+                  .map(([k, v]) => ({ color: k, label: colorConfig[k].label, sources: v, fill: colorConfig[k].fill }));
+
+                if (creationData.length === 0) return null;
+
+                return (
+                  <div style={{ marginTop: '1rem' }}>
+                    <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary, #94a3b8)' }}>Color Pip Creation</h4>
+                    <ResponsiveContainer width="100%" height={120}>
+                      <BarChart data={creationData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                        <RechartsTooltip
+                          formatter={(value) => [value, 'Sources']}
+                          labelFormatter={(label) => label}
+                        />
+                        <Bar dataKey="sources" radius={[3, 3, 0, 0]}>
+                          {creationData.map((entry) => (
+                            <Cell key={entry.color} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

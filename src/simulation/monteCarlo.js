@@ -54,6 +54,13 @@ const average = (arr) => {
   return arr.length > 0 ? sum / arr.length : 0;
 };
 
+const stdDev = (arr) => {
+  if (!arr || arr.length < 2) return 0;
+  const avg = average(arr);
+  const variance = arr.reduce((s, v) => (v != null && !isNaN(v) ? s + (v - avg) ** 2 : s), 0) / arr.length;
+  return Math.sqrt(variance);
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // buildCompleteDeck
 //   Assembles the flat array of card objects that will be shuffled each
@@ -502,6 +509,17 @@ export const monteCarlo = (deckToParse, config = {}) => {
       });
     } // end turn loop
   } // end iteration loop
+
+  // Capture standard deviations before collapsing arrays to averages
+  results.landsPerTurnStdDev        = results.landsPerTurn.map(arr => stdDev(arr));
+  results.untappedLandsPerTurnStdDev = results.untappedLandsPerTurn.map(arr => stdDev(arr));
+  results.totalManaPerTurnStdDev    = results.totalManaPerTurn.map(arr => stdDev(arr));
+  results.lifeLossPerTurnStdDev     = results.lifeLossPerTurn.map(arr => stdDev(arr));
+  results.colorsByTurnStdDev        = results.colorsByTurn.map(colorObj => {
+    const out = {};
+    Object.keys(colorObj).forEach(color => { out[color] = stdDev(colorObj[color]); });
+    return out;
+  });
 
   // Calculate averages
   for (let t = 0; t < turns; t++) {

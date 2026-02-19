@@ -22,7 +22,7 @@
    - Multiple `// comparison mode` placeholder comments already exist throughout the file.
    - Run two decks side-by-side with diff'd charts — the largest incomplete feature.
 
-5. **Mana Curve Chart**
+5. **Mana Curve Chart** --------DONE
    - No CMC distribution chart exists.
    - Show spells grouped by CMC (standard deckbuilding metric); trivially added with existing Recharts infrastructure.
 
@@ -38,7 +38,7 @@
    - Non-commander mode already skips the draw on turn 0 (on the play).
    - An explicit toggle would let users measure the concrete impact of going second.
 
-9. **LocalStorage deck persistence**
+9. **LocalStorage deck persistence** --------DONE
    - The deck text and all settings are lost on page refresh.
    - Saving to `localStorage` is a quick, high-value UX improvement.
 

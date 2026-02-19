@@ -100,15 +100,31 @@ export const prepareChartData = (simulationResults, turns) => {
   const keyCardsData   = [];
 
   for (let i = 0; i < turns; i++) {
+    const landsAvg      = simulationResults.landsPerTurn?.[i] || 0;
+    const landsSd       = simulationResults.landsPerTurnStdDev?.[i] || 0;
+    const untappedAvg   = simulationResults.untappedLandsPerTurn?.[i] || 0;
+    const untappedSd    = simulationResults.untappedLandsPerTurnStdDev?.[i] || 0;
+    const manaAvg       = simulationResults.totalManaPerTurn?.[i] || 0;
+    const manaSd        = simulationResults.totalManaPerTurnStdDev?.[i] || 0;
+
     landsData.push({
       turn: i + 1,
-      'Total Lands':   safeToFixed(simulationResults.landsPerTurn?.[i], 2),
-      'Untapped Lands': safeToFixed(simulationResults.untappedLandsPerTurn?.[i], 2),
+      'Total Lands':        safeToFixed(landsAvg, 2),
+      'Untapped Lands':     safeToFixed(untappedAvg, 2),
+      'Total Lands Lo':     safeToFixed(Math.max(0, landsAvg - landsSd), 2),
+      'Total Lands Hi':     safeToFixed(landsAvg + landsSd, 2),
+      'Untapped Lands Lo':  safeToFixed(Math.max(0, untappedAvg - untappedSd), 2),
+      'Untapped Lands Hi':  safeToFixed(untappedAvg + untappedSd, 2),
+      '_landsSd':           safeToFixed(landsSd, 2),
+      '_untappedSd':        safeToFixed(untappedSd, 2),
     });
 
     manaByColorData.push({
       turn: i + 1,
-      'Total Mana': safeToFixed(simulationResults.totalManaPerTurn?.[i], 2),
+      'Total Mana':     safeToFixed(manaAvg, 2),
+      'Total Mana Lo':  safeToFixed(Math.max(0, manaAvg - manaSd), 2),
+      'Total Mana Hi':  safeToFixed(manaAvg + manaSd, 2),
+      '_manaSd':        safeToFixed(manaSd, 2),
       W: safeToFixed(simulationResults.colorsByTurn?.[i]?.W, 2),
       U: safeToFixed(simulationResults.colorsByTurn?.[i]?.U, 2),
       B: safeToFixed(simulationResults.colorsByTurn?.[i]?.B, 2),
@@ -116,9 +132,14 @@ export const prepareChartData = (simulationResults, turns) => {
       G: safeToFixed(simulationResults.colorsByTurn?.[i]?.G, 2),
     });
 
+    const lifeLossAvg = simulationResults.lifeLossPerTurn?.[i] || 0;
+    const lifeLossSd  = simulationResults.lifeLossPerTurnStdDev?.[i] || 0;
     lifeLossData.push({
       turn: i + 1,
-      'Life Loss': safeToFixed(simulationResults.lifeLossPerTurn?.[i], 2),
+      'Life Loss':    safeToFixed(lifeLossAvg, 2),
+      'Life Loss Lo': safeToFixed(Math.max(0, lifeLossAvg - lifeLossSd), 2),
+      'Life Loss Hi': safeToFixed(lifeLossAvg + lifeLossSd, 2),
+      '_lifeLossSd':  safeToFixed(lifeLossSd, 2),
     });
 
     const keyCardRow = { turn: i + 1 };
