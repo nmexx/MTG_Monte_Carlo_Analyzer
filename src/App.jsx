@@ -28,8 +28,9 @@ import ExplorationPanel        from './components/ExplorationPanel.jsx';
 import RampSpellsPanel         from './components/RampSpellsPanel.jsx';
 import RitualsPanel            from './components/RitualsPanel.jsx';
 import SpellsPanel             from './components/SpellsPanel.jsx';
-import SimulationSettingsPanel from './components/SimulationSettingsPanel.jsx';
-import ResultsPanel            from './components/ResultsPanel.jsx';
+import SimulationSettingsPanel    from './components/SimulationSettingsPanel.jsx';
+import ResultsPanel                from './components/ResultsPanel.jsx';
+import ComparisonResultsPanel      from './components/ComparisonResultsPanel.jsx';
 
 // ─── html2canvas (lazy CDN loader) ────────────────────────────────────────────
 const loadHtml2Canvas = () =>
@@ -58,31 +59,128 @@ const getSaved = () => {
 };
 
 // =============================================================================
+// Deck slot — all per-deck mutable state in one object
+// =============================================================================
+const defaultDeckSlot = (saved = {}) => ({
+  deckText:            saved.deckText            ?? '',
+  parsedDeck:          null,
+  selectedKeyCards:    new Set(saved.selectedKeyCards    ?? []),
+  includeArtifacts:    saved.includeArtifacts    ?? true,
+  disabledArtifacts:   new Set(saved.disabledArtifacts   ?? []),
+  includeCreatures:    saved.includeCreatures    ?? true,
+  disabledCreatures:   new Set(saved.disabledCreatures   ?? []),
+  includeExploration:  saved.includeExploration  ?? true,
+  disabledExploration: new Set(saved.disabledExploration ?? []),
+  includeRampSpells:   saved.includeRampSpells   ?? true,
+  disabledRampSpells:  new Set(saved.disabledRampSpells  ?? []),
+  includeRituals:      saved.includeRituals      ?? true,
+  disabledRituals:     new Set(saved.disabledRituals     ?? []),
+  simulationResults:   null,
+});
+
+const serializeDeckSlot = (slot) => ({
+  deckText:            slot.deckText,
+  selectedKeyCards:    [...slot.selectedKeyCards],
+  includeArtifacts:    slot.includeArtifacts,
+  disabledArtifacts:   [...slot.disabledArtifacts],
+  includeCreatures:    slot.includeCreatures,
+  disabledCreatures:   [...slot.disabledCreatures],
+  includeExploration:  slot.includeExploration,
+  disabledExploration: [...slot.disabledExploration],
+  includeRampSpells:   slot.includeRampSpells,
+  disabledRampSpells:  [...slot.disabledRampSpells],
+  includeRituals:      slot.includeRituals,
+  disabledRituals:     [...slot.disabledRituals],
+});
+
+// =============================================================================
 const MTGMonteCarloAnalyzer = () => {
   // ── Data source ────────────────────────────────────────────────────────────
   const [apiMode,        setApiMode]        = useState(() => getSaved().apiMode        ?? 'local');
   const [cardsDatabase,  setCardsDatabase]  = useState(null);
   const [cardLookupMap,  setCardLookupMap]  = useState(new Map());
 
-  // ── Deck input & parsing ───────────────────────────────────────────────────
-  const [deckText,   setDeckText]   = useState(() => getSaved().deckText   ?? '');
-  const [parsedDeck, setParsedDeck] = useState(null);
-  const [error,      setError]      = useState('');
+  // ── Comparison mode ────────────────────────────────────────────────────────
+  const [comparisonMode, setComparisonMode] = useState(() => getSaved().comparisonMode ?? false);
+  const [labelA,         setLabelA]         = useState(() => getSaved().labelA ?? 'Deck A');
+  const [labelB,         setLabelB]         = useState(() => getSaved().labelB ?? 'Deck B');
 
-  // ── Key-card selection ─────────────────────────────────────────────────────
-  const [selectedKeyCards, setSelectedKeyCards] = useState(() => new Set(getSaved().selectedKeyCards ?? []));
+  // ── Shared slot-setter factory ───────────────────────────────────────────
+  const makeSetterForSlot = (setSlot) => (key) => (valOrFn) =>
+    setSlot(prev => ({
+      ...prev,
+      [key]: typeof valOrFn === 'function' ? valOrFn(prev[key]) : valOrFn,
+    }));
 
-  // ── Card-type include/exclude toggles ─────────────────────────────────────
-  const [includeArtifacts,    setIncludeArtifacts]    = useState(() => getSaved().includeArtifacts    ?? true);
-  const [disabledArtifacts,   setDisabledArtifacts]   = useState(() => new Set(getSaved().disabledArtifacts   ?? []));
-  const [includeCreatures,    setIncludeCreatures]    = useState(() => getSaved().includeCreatures    ?? true);
-  const [disabledCreatures,   setDisabledCreatures]   = useState(() => new Set(getSaved().disabledCreatures   ?? []));
-  const [includeExploration,  setIncludeExploration]  = useState(() => getSaved().includeExploration  ?? true);
-  const [disabledExploration, setDisabledExploration] = useState(() => new Set(getSaved().disabledExploration ?? []));
-  const [includeRampSpells,   setIncludeRampSpells]   = useState(() => getSaved().includeRampSpells   ?? true);
-  const [disabledRampSpells,  setDisabledRampSpells]  = useState(() => new Set(getSaved().disabledRampSpells  ?? []));
-  const [includeRituals,      setIncludeRituals]      = useState(() => getSaved().includeRituals      ?? true);
-  const [disabledRituals,     setDisabledRituals]     = useState(() => new Set(getSaved().disabledRituals     ?? []));
+  // ── Deck Slot A ───────────────────────────────────────────────────────────
+  const [deckSlotA, setDeckSlotA] = useState(() => {
+    const saved = getSaved();
+    return defaultDeckSlot(saved.slotA ?? saved); // fallback reads old flat schema
+  });
+  const makeSlotSetterA = makeSetterForSlot(setDeckSlotA);
+
+  const setDeckText            = makeSlotSetterA('deckText');
+  const setParsedDeck          = makeSlotSetterA('parsedDeck');
+  const setSelectedKeyCards    = makeSlotSetterA('selectedKeyCards');
+  const setIncludeArtifacts    = makeSlotSetterA('includeArtifacts');
+  const setDisabledArtifacts   = makeSlotSetterA('disabledArtifacts');
+  const setIncludeCreatures    = makeSlotSetterA('includeCreatures');
+  const setDisabledCreatures   = makeSlotSetterA('disabledCreatures');
+  const setIncludeExploration  = makeSlotSetterA('includeExploration');
+  const setDisabledExploration = makeSlotSetterA('disabledExploration');
+  const setIncludeRampSpells   = makeSlotSetterA('includeRampSpells');
+  const setDisabledRampSpells  = makeSlotSetterA('disabledRampSpells');
+  const setIncludeRituals      = makeSlotSetterA('includeRituals');
+  const setDisabledRituals     = makeSlotSetterA('disabledRituals');
+  const setSimulationResults   = makeSlotSetterA('simulationResults');
+
+  const {
+    deckText, parsedDeck, selectedKeyCards,
+    includeArtifacts,    disabledArtifacts,
+    includeCreatures,    disabledCreatures,
+    includeExploration,  disabledExploration,
+    includeRampSpells,   disabledRampSpells,
+    includeRituals,      disabledRituals,
+    simulationResults,
+  } = deckSlotA;
+
+  // ── Deck Slot B ───────────────────────────────────────────────────────────
+  const [deckSlotB, setDeckSlotB] = useState(() => defaultDeckSlot(getSaved().slotB ?? {}));
+  const makeSlotSetterB = makeSetterForSlot(setDeckSlotB);
+
+  const setDeckTextB            = makeSlotSetterB('deckText');
+  const setParsedDeckB          = makeSlotSetterB('parsedDeck');
+  const setSelectedKeyCardsB    = makeSlotSetterB('selectedKeyCards');
+  const setIncludeArtifactsB    = makeSlotSetterB('includeArtifacts');
+  const setDisabledArtifactsB   = makeSlotSetterB('disabledArtifacts');
+  const setIncludeCreaturesB    = makeSlotSetterB('includeCreatures');
+  const setDisabledCreaturesB   = makeSlotSetterB('disabledCreatures');
+  const setIncludeExplorationB  = makeSlotSetterB('includeExploration');
+  const setDisabledExplorationB = makeSlotSetterB('disabledExploration');
+  const setIncludeRampSpellsB   = makeSlotSetterB('includeRampSpells');
+  const setDisabledRampSpellsB  = makeSlotSetterB('disabledRampSpells');
+  const setIncludeRitualsB      = makeSlotSetterB('includeRituals');
+  const setDisabledRitualsB     = makeSlotSetterB('disabledRituals');
+  const setSimulationResultsB   = makeSlotSetterB('simulationResults');
+
+  const {
+    deckText:            deckTextB,
+    parsedDeck:          parsedDeckB,
+    selectedKeyCards:    selectedKeyCardsB,
+    includeArtifacts:    includeArtifactsB,
+    disabledArtifacts:   disabledArtifactsB,
+    includeCreatures:    includeCreaturesB,
+    disabledCreatures:   disabledCreaturesB,
+    includeExploration:  includeExplorationB,
+    disabledExploration: disabledExplorationB,
+    includeRampSpells:   includeRampSpellsB,
+    disabledRampSpells:  disabledRampSpellsB,
+    includeRituals:      includeRitualsB,
+    disabledRituals:     disabledRitualsB,
+    simulationResults:   simulationResultsB,
+  } = deckSlotB;
+
+  const [error,        setError]        = useState('');
 
   // ── Mulligan settings ──────────────────────────────────────────────────────
   const [enableMulligans,    setEnableMulligans]    = useState(() => getSaved().enableMulligans  ?? false);
@@ -107,30 +205,22 @@ const MTGMonteCarloAnalyzer = () => {
   const [selectedTurnForSequences, setSelectedTurnForSequences] = useState(() => getSaved().selectedTurnForSequences ?? 3);
   const [commanderMode,            setCommanderMode]            = useState(() => getSaved().commanderMode            ?? false);
 
-  // ── Simulation results ─────────────────────────────────────────────────────
-  const [simulationResults, setSimulationResults] = useState(null);
-  const [isSimulating,      setIsSimulating]      = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   // ── Derived chart data ─────────────────────────────────────────────────────
-  const chartData = simulationResults ? prepareChartData(simulationResults, turns) : null;
+  const chartData  = simulationResults  ? prepareChartData(simulationResults,  turns) : null;
+  const chartDataB = simulationResultsB ? prepareChartData(simulationResultsB, turns) : null;
 
   // ── Persist settings & deck text to localStorage ──────────────────────────
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        deckText,
         apiMode,
-        includeArtifacts,
-        disabledArtifacts:   [...disabledArtifacts],
-        includeCreatures,
-        disabledCreatures:   [...disabledCreatures],
-        includeExploration,
-        disabledExploration: [...disabledExploration],
-        includeRampSpells,
-        disabledRampSpells:  [...disabledRampSpells],
-        includeRituals,
-        disabledRituals:     [...disabledRituals],
-        selectedKeyCards:    [...selectedKeyCards],
+        comparisonMode,
+        labelA,
+        labelB,
+        slotA: serializeDeckSlot(deckSlotA),
+        slotB: serializeDeckSlot(deckSlotB),
         iterations,
         turns,
         handSize,
@@ -146,13 +236,7 @@ const MTGMonteCarloAnalyzer = () => {
       console.warn('localStorage save failed:', err);
     }
   }, [
-    deckText, apiMode,
-    includeArtifacts, disabledArtifacts,
-    includeCreatures, disabledCreatures,
-    includeExploration, disabledExploration,
-    includeRampSpells, disabledRampSpells,
-    includeRituals, disabledRituals,
-    selectedKeyCards,
+    deckSlotA, deckSlotB, apiMode, comparisonMode, labelA, labelB,
     iterations, turns, handSize, maxSequences, selectedTurnForSequences,
     commanderMode, enableMulligans, mulliganRule, mulliganStrategy, customMulliganRules,
   ]);
@@ -277,40 +361,57 @@ const MTGMonteCarloAnalyzer = () => {
     }
   };
 
+  const handleParseDeckB = async () => {
+    const deck = await parseDeckList(deckTextB, { cardLookupMap, apiMode, lookupCard });
+    if (deck) {
+      setParsedDeckB(deck);
+      setError(deck.errors && deck.errors.length > 0 ? deck.errors.join(', ') : '');
+    } else {
+      setParsedDeckB(null);
+      setError('Parsing failed (Deck B)');
+    }
+  };
+
   // ============================================================================
   // Run Monte Carlo simulation — calls the extracted monteCarlo module
   // ============================================================================
+  const buildSimConfig = (slot) => ({
+    iterations,
+    turns,
+    handSize,
+    maxSequences,
+    commanderMode,
+    enableMulligans,
+    mulliganRule,
+    mulliganStrategy,
+    customMulliganRules,
+    selectedKeyCards:    slot.selectedKeyCards,
+    includeExploration:  slot.includeExploration,
+    disabledExploration: slot.disabledExploration,
+    includeRampSpells:   slot.includeRampSpells,
+    disabledRampSpells:  slot.disabledRampSpells,
+    includeArtifacts:    slot.includeArtifacts,
+    disabledArtifacts:   slot.disabledArtifacts,
+    includeCreatures:    slot.includeCreatures,
+    disabledCreatures:   slot.disabledCreatures,
+    includeRituals:      slot.includeRituals,
+    disabledRituals:     slot.disabledRituals,
+  });
+
   const runSimulation = () => {
     if (!parsedDeck) { setError('Please parse a deck first'); return; }
+
+    // In comparison mode require both decks to be parsed
+    if (comparisonMode && !parsedDeckB) { setError('Please parse Deck B first'); return; }
 
     setIsSimulating(true);
     setError('');
 
     setTimeout(() => {
       try {
-        const results = monteCarlo(parsedDeck, {
-          iterations,
-          turns,
-          handSize,
-          maxSequences,
-          commanderMode,
-          enableMulligans,
-          mulliganRule,
-          mulliganStrategy,
-          customMulliganRules,
-          selectedKeyCards,
-          includeExploration,
-          disabledExploration,
-          includeRampSpells,
-          disabledRampSpells,
-          includeArtifacts,
-          disabledArtifacts,
-          includeCreatures,
-          disabledCreatures,
-          includeRituals,
-          disabledRituals,
-        });
-        setSimulationResults(results);
+        setSimulationResults(monteCarlo(parsedDeck, buildSimConfig(deckSlotA)));
+        if (comparisonMode)
+          setSimulationResultsB(monteCarlo(parsedDeckB, buildSimConfig(deckSlotB)));
         setIsSimulating(false);
       } catch (err) {
         setError('Simulation error: ' + err.message);
@@ -366,38 +467,55 @@ const MTGMonteCarloAnalyzer = () => {
   };
 
   // ============================================================================
-  // Export results as CSV
+  // Export results as CSV — comparison-aware
   // ============================================================================
   const exportResultsAsCSV = () => {
-    if (!chartData) return;
-
-    const { landsData, manaByColorData, lifeLossData, keyCardsData } = chartData;
-    const turns = landsData.length;
-
-    const rows = [];
-    for (let i = 0; i < turns; i++) {
-      const row = {
-        Turn:             landsData[i].turn,
-        'Total Lands':    landsData[i]['Total Lands'],
-        'Untapped Lands': landsData[i]['Untapped Lands'],
-        'Total Mana':     manaByColorData[i]['Total Mana'],
-        'W Mana':         manaByColorData[i].W,
-        'U Mana':         manaByColorData[i].U,
-        'B Mana':         manaByColorData[i].B,
-        'R Mana':         manaByColorData[i].R,
-        'G Mana':         manaByColorData[i].G,
-        'Life Loss':      lifeLossData[i]['Life Loss'],
-      };
-      // Append any key-card playability columns
-      const keyRow = keyCardsData[i];
-      Object.keys(keyRow).forEach(k => {
-        if (k !== 'turn') row[k] = keyRow[k];
+    const buildRows = (cd) => {
+      if (!cd) return [];
+      const { landsData, manaByColorData, lifeLossData, keyCardsData } = cd;
+      return Array.from({ length: landsData.length }, (_, i) => {
+        const row = {
+          Turn:             landsData[i].turn,
+          'Total Lands':    landsData[i]['Total Lands'],
+          'Untapped Lands': landsData[i]['Untapped Lands'],
+          'Total Mana':     manaByColorData[i]['Total Mana'],
+          'W Mana':         manaByColorData[i].W,
+          'U Mana':         manaByColorData[i].U,
+          'B Mana':         manaByColorData[i].B,
+          'R Mana':         manaByColorData[i].R,
+          'G Mana':         manaByColorData[i].G,
+          'Life Loss':      lifeLossData[i]['Life Loss'],
+        };
+        const keyRow = keyCardsData[i];
+        Object.keys(keyRow).forEach(k => { if (k !== 'turn') row[k] = keyRow[k]; });
+        return row;
       });
-      rows.push(row);
+    };
+
+    const rowsA = buildRows(chartData);
+    const rowsB = buildRows(chartDataB);
+
+    if (!rowsA.length && !rowsB.length) return;
+
+    let rows, headers;
+    if (comparisonMode && rowsA.length && rowsB.length) {
+      // Merge: prefix all columns with deck label
+      const headersA = Object.keys(rowsA[0]).map(k => k === 'Turn' ? 'Turn' : `${labelA}: ${k}`);
+      const headersB = Object.keys(rowsB[0]).filter(k => k !== 'Turn').map(k => `${labelB}: ${k}`);
+      headers = [...headersA, ...headersB];
+      rows = rowsA.map((ra, i) => {
+        const rb = rowsB[i] || {};
+        const merged = {};
+        Object.keys(ra).forEach((k, j) => { merged[headersA[j]] = ra[k]; });
+        Object.keys(rb).filter(k => k !== 'Turn').forEach(k => { merged[`${labelB}: ${k}`] = rb[k]; });
+        return merged;
+      });
+    } else {
+      rows = rowsA.length ? rowsA : rowsB;
+      headers = Object.keys(rows[0]);
     }
 
-    const headers = Object.keys(rows[0]);
-    const escape  = v => {
+    const escape = v => {
       const s = String(v ?? '');
       return s.includes(',') || s.includes('"') || s.includes('\n')
         ? `"${s.replace(/"/g, '""')}"` : s;
@@ -419,6 +537,9 @@ const MTGMonteCarloAnalyzer = () => {
   };
 
   // ============================================================================
+  // Render helpers — per-slot deck panels (reused for both A and B columns)
+  // ============================================================================
+  // ============================================================================
   // Render
   // ============================================================================
   return (
@@ -432,7 +553,7 @@ const MTGMonteCarloAnalyzer = () => {
       {/* Data Source */}
       <div className="panel">
         <h3>⚙️ Data Source</h3>
-        <div className="radio-group">
+        <div className="radio-group" style={{ marginBottom: 12 }}>
           <label className="radio-label">
             <input type="radio" checked={apiMode === 'local'} onChange={() => setApiMode('local')} />
             Local JSON File
@@ -450,11 +571,7 @@ const MTGMonteCarloAnalyzer = () => {
               <ol>
                 <li>
                   Visit{' '}
-                  <a
-                    href="https://scryfall.com/docs/api/bulk-data"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
+                  <a href="https://scryfall.com/docs/api/bulk-data" target="_blank" rel="noopener noreferrer">
                     Scryfall Bulk Data
                   </a>
                 </li>
@@ -465,455 +582,634 @@ const MTGMonteCarloAnalyzer = () => {
             </div>
             <input type="file" accept=".json" onChange={handleFileUpload} className="file-input" />
             {cardsDatabase && (
-              <p className="loaded-success">
-                ✓ Loaded {cardsDatabase.length.toLocaleString()} cards
-              </p>
+              <p className="loaded-success">✓ Loaded {cardsDatabase.length.toLocaleString()} cards</p>
             )}
           </div>
         )}
-      </div>
 
-      {/* Deck Input */}
-      <div className="panel">
-        <div className="panel-header-row">
-          <h3>📝 Deck List</h3>
+        {/* Mode toggle */}
+        <div style={{ marginTop: 16 }}>
+          <div className="mode-toggle">
+            <button
+              className={`mode-toggle__btn${!comparisonMode ? ' mode-toggle__btn--active' : ''}`}
+              onClick={() => setComparisonMode(false)}
+            >
+              🃏 Single Deck
+            </button>
+            <button
+              className={`mode-toggle__btn${comparisonMode ? ' mode-toggle__btn--active' : ''}`}
+              onClick={() => setComparisonMode(true)}
+            >
+              ⚔️ Compare Two Decks
+            </button>
+          </div>
         </div>
-        <div>
-          <div className="deck-section-label">Deck</div>
-          <textarea
-            value={deckText}
-            onChange={(e) => setDeckText(e.target.value)}
-            placeholder={
-              'Paste your deck list here (MTG Arena format)\nExample:\n4 Lightning Bolt\n4 Island\n3 Counterspell'
-            }
-            className="deck-textarea"
-          />
-        </div>
-        <button onClick={handleParseDeck} className="btn-primary">
-          Parse Deck
-        </button>
       </div>
 
       {/* Error */}
-      {error && (
-        <div className="error-banner">⚠️ {error}</div>
-      )}
+      {error && <div className="error-banner">⚠️ {error}</div>}
 
-      {/* Parsed Deck panels */}
-      {parsedDeck && (
-        <div>
-          {/* Deck Statistics */}
-          <div className="panel-grid">
-            <div className="panel">
-              <h3>📊 Deck Statistics</h3>
-              <p>Total Cards: {parsedDeck.totalCards}</p>
-              <p>
-                Lands: {parsedDeck.landCount}{' '}
-                ({parsedDeck.totalCards > 0
-                  ? ((parsedDeck.landCount / parsedDeck.totalCards) * 100).toFixed(1)
-                  : 0}%)
-              </p>
-
-              {/* Derived stats block */}
-              {(() => {
-                const nonLandCards = [
-                  ...(parsedDeck.spells      || []),
-                  ...(parsedDeck.creatures   || []),
-                  ...(parsedDeck.artifacts   || []),
-                  ...(parsedDeck.rituals     || []),
-                  ...(parsedDeck.rampSpells  || []),
-                  ...(parsedDeck.exploration || []),
-                ];
-
-                // Average CMC (weighted by quantity)
-                let totalCmcSum = 0;
-                let totalNonLandQty = 0;
-                for (const card of nonLandCards) {
-                  const qty = card.quantity || 1;
-                  totalCmcSum += (typeof card.cmc === 'number' ? card.cmc : 0) * qty;
-                  totalNonLandQty += qty;
-                }
-                const avgCmc = totalNonLandQty > 0 ? (totalCmcSum / totalNonLandQty).toFixed(2) : '—';
-
-                // Ramp pieces
-                const rampCount =
-                  (parsedDeck.artifacts   || []).reduce((s, c) => s + (c.quantity || 1), 0) +
-                  (parsedDeck.creatures   || []).reduce((s, c) => s + (c.quantity || 1), 0) +
-                  (parsedDeck.rampSpells  || []).reduce((s, c) => s + (c.quantity || 1), 0) +
-                  (parsedDeck.rituals     || []).reduce((s, c) => s + (c.quantity || 1), 0) +
-                  (parsedDeck.exploration || []).reduce((s, c) => s + (c.quantity || 1), 0);
-                const rampPct = parsedDeck.totalCards > 0
-                  ? ((rampCount / parsedDeck.totalCards) * 100).toFixed(1)
-                  : '0';
-
-                // Land ETB status
-                const lands = parsedDeck.lands || [];
-                let tappedCount = 0, untappedCount = 0, fetchCount = 0, conditionalCount = 0;
-                for (const land of lands) {
-                  const qty = land.quantity || 1;
-                  if (land.isFetch) { fetchCount += qty; continue; }
-                  if (land.entersTappedAlways === true)      tappedCount     += qty;
-                  else if (land.entersTappedAlways === false) untappedCount  += qty;
-                  else                                        conditionalCount += qty;
-                }
-
-                return (
-                  <>
-                    <p>Avg. CMC (non-land): <strong>{avgCmc}</strong></p>
-                    <p>
-                      Ramp &amp; Acceleration: <strong>{rampCount}</strong>{' '}
-                      <span style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '0.85em' }}>
-                        ({rampPct}% of deck)
-                      </span>
-                    </p>
-                    {lands.length > 0 && (
-                      <p style={{ lineHeight: 1.8 }}>
-                        Lands — Untapped: <strong>{untappedCount + fetchCount}</strong>
-                        {' · '}Tapped: <strong>{tappedCount}</strong>
-                        {conditionalCount > 0 && <>{' · '}Conditional: <strong>{conditionalCount}</strong></>}
-                        {' · '}Fetches: <strong>{fetchCount}</strong>
-                      </p>
-                    )}
-                  </>
-                );
-              })()}
-
-              {/* Mana Curve Chart */}
-              {(() => {
-                const nonLandCards = [
-                  ...(parsedDeck.spells      || []),
-                  ...(parsedDeck.creatures   || []),
-                  ...(parsedDeck.artifacts   || []),
-                  ...(parsedDeck.rituals     || []),
-                  ...(parsedDeck.rampSpells  || []),
-                  ...(parsedDeck.exploration || []),
-                ];
-                if (nonLandCards.length === 0) return null;
-
-                // Build CMC → count map
-                const cmcMap = new Map();
-                for (const card of nonLandCards) {
-                  const cmc = typeof card.cmc === 'number' ? card.cmc : 0;
-                  const qty = card.quantity || 1;
-                  cmcMap.set(cmc, (cmcMap.get(cmc) || 0) + qty);
-                }
-
-                const maxCmc = Math.max(...cmcMap.keys());
-                const curveData = Array.from(
-                  { length: maxCmc + 1 },
-                  (_, i) => ({ cmc: i, count: cmcMap.get(i) || 0 })
-                );
-
-                const BAR_COLORS = ['#667eea','#7c3aed','#a855f7','#ec4899','#f87171','#fb923c','#facc15','#4ade80','#34d399','#60a5fa'];
-
-                return (
-                  <div style={{ marginTop: '1rem' }}>
-                    <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary, #94a3b8)' }}>Mana Curve</h4>
-                    <ResponsiveContainer width="100%" height={160}>
-                      <BarChart data={curveData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis
-                          dataKey="cmc"
-                          tick={{ fontSize: 11 }}
-                          label={{ value: 'CMC', position: 'insideBottom', offset: -2, fontSize: 11 }}
-                        />
-                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                        <RechartsTooltip
-                          formatter={(value) => [value, 'Cards']}
-                          labelFormatter={(label) => `CMC ${label}`}
-                        />
-                        <Bar dataKey="count" radius={[3, 3, 0, 0]}>
-                          {curveData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                );
-              })()}
-
-              {/* Color Pip Demand Chart */}
-              {(() => {
-                const nonLandCards = [
-                  ...(parsedDeck.spells      || []),
-                  ...(parsedDeck.creatures   || []),
-                  ...(parsedDeck.artifacts   || []),
-                  ...(parsedDeck.rituals     || []),
-                  ...(parsedDeck.rampSpells  || []),
-                  ...(parsedDeck.exploration || []),
-                ];
-                if (nonLandCards.length === 0) return null;
-
-                const pipCounts = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-                for (const card of nonLandCards) {
-                  if (!card.manaCost) continue;
-                  const qty = card.quantity || 1;
-                  const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
-                  for (const sym of symbols) {
-                    const s = sym.replace(/[{}]/g, '').toUpperCase();
-                    if (pipCounts[s] !== undefined) pipCounts[s] += qty;
-                  }
-                }
-
-                const colorConfig = {
-                  W: { label: 'White', fill: '#fcd34d' },
-                  U: { label: 'Blue',  fill: '#60a5fa' },
-                  B: { label: 'Black', fill: '#a1a1aa' },
-                  R: { label: 'Red',   fill: '#f87171' },
-                  G: { label: 'Green', fill: '#4ade80' },
-                };
-                const pipData = Object.entries(pipCounts)
-                  .filter(([, v]) => v > 0)
-                  .map(([k, v]) => ({ color: k, label: colorConfig[k].label, pips: v, fill: colorConfig[k].fill }));
-
-                if (pipData.length === 0) return null;
-
-                return (
-                  <div style={{ marginTop: '1rem' }}>
-                    <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary, #94a3b8)' }}>Color Pip Demand</h4>
-                    <ResponsiveContainer width="100%" height={120}>
-                      <BarChart data={pipData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                        <RechartsTooltip
-                          formatter={(value) => [value, 'Pips']}
-                          labelFormatter={(label) => label}
-                        />
-                        <Bar dataKey="pips" radius={[3, 3, 0, 0]}>
-                          {pipData.map((entry) => (
-                            <Cell key={entry.color} fill={entry.fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                );
-              })()}
-
-              {/* Color Pip Creation Chart */}
-              {(() => {
-                const colorConfig = {
-                  W: { label: 'White', fill: '#fcd34d' },
-                  U: { label: 'Blue',  fill: '#60a5fa' },
-                  B: { label: 'Black', fill: '#a1a1aa' },
-                  R: { label: 'Red',   fill: '#f87171' },
-                  G: { label: 'Green', fill: '#4ade80' },
-                };
-                const sources = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-
-                const addProduces = (card) => {
-                  const qty = card.quantity || 1;
-                  const colors = card.produces || [];
-                  for (const c of colors) {
-                    if (sources[c] !== undefined) sources[c] += qty;
-                  }
-                };
-
-                // Lands: use produces for non-fetches; fetches use fetchColors
-                for (const land of (parsedDeck.lands || [])) {
-                  const qty = land.quantity || 1;
-                  if (land.isFetch) {
-                    for (const c of (land.fetchColors || [])) {
-                      if (sources[c] !== undefined) sources[c] += qty;
-                    }
-                  } else {
-                    for (const c of (land.produces || [])) {
-                      if (sources[c] !== undefined) sources[c] += qty;
-                    }
-                  }
-                }
-
-                // Artifacts & creatures (mana dorks)
-                for (const card of (parsedDeck.artifacts || [])) addProduces(card);
-                for (const card of (parsedDeck.creatures || [])) addProduces(card);
-
-                // Rituals use ritualColors
-                for (const card of (parsedDeck.rituals || [])) {
-                  const qty = card.quantity || 1;
-                  for (const c of (card.ritualColors || [])) {
-                    if (sources[c] !== undefined) sources[c] += qty;
-                  }
-                }
-
-                // Only show colors that are actually demanded by non-land mana costs
-                const demandedColors = new Set();
-                const nonLandCards = [
-                  ...(parsedDeck.spells      || []),
-                  ...(parsedDeck.creatures   || []),
-                  ...(parsedDeck.artifacts   || []),
-                  ...(parsedDeck.rituals     || []),
-                  ...(parsedDeck.rampSpells  || []),
-                  ...(parsedDeck.exploration || []),
-                ];
-                for (const card of nonLandCards) {
-                  if (!card.manaCost) continue;
-                  const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
-                  for (const sym of symbols) {
-                    const s = sym.replace(/[{}]/g, '').toUpperCase();
-                    if (colorConfig[s]) demandedColors.add(s);
-                  }
-                }
-
-                const creationData = Object.entries(sources)
-                  .filter(([k, v]) => v > 0 && demandedColors.has(k))
-                  .map(([k, v]) => ({ color: k, label: colorConfig[k].label, sources: v, fill: colorConfig[k].fill }));
-
-                if (creationData.length === 0) return null;
-
-                return (
-                  <div style={{ marginTop: '1rem' }}>
-                    <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary, #94a3b8)' }}>Color Pip Creation</h4>
-                    <ResponsiveContainer width="100%" height={120}>
-                      <BarChart data={creationData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                        <RechartsTooltip
-                          formatter={(value) => [value, 'Sources']}
-                          labelFormatter={(label) => label}
-                        />
-                        <Bar dataKey="sources" radius={[3, 3, 0, 0]}>
-                          {creationData.map((entry) => (
-                            <Cell key={entry.color} fill={entry.fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                );
-              })()}
+      {/* ── Single-deck mode ─────────────────────────────────────────────── */}
+      {!comparisonMode && (
+        <>
+          {/* Deck Input */}
+          <div className="panel">
+            <div className="panel-header-row">
+              <h3>📝 Deck List</h3>
             </div>
+            <div>
+              <div className="deck-section-label">Deck</div>
+              <textarea
+                value={deckText}
+                onChange={(e) => setDeckText(e.target.value)}
+                placeholder={
+                  'Paste your deck list here (MTG Arena format)\nExample:\n4 Lightning Bolt\n4 Island\n3 Counterspell'
+                }
+                className="deck-textarea"
+              />
+            </div>
+            <button onClick={handleParseDeck} className="btn-primary">Parse Deck</button>
           </div>
 
-          {/* Lands */}
-          <div className="panel-grid">
-            <LandsPanel
-              parsedDeck={parsedDeck}
-              getManaSymbol={getManaSymbol}
-              getFetchSymbol={getFetchSymbol}
-            />
-          </div>
+          {/* Parsed Deck panels */}
+          {parsedDeck && (
+            <div>
+              {/* Deck Statistics */}
+              <div className="panel-grid">
+                <div className="panel">
+                  <h3>📊 Deck Statistics</h3>
+                  <p>Total Cards: {parsedDeck.totalCards}</p>
+                  <p>
+                    Lands: {parsedDeck.landCount}{' '}
+                    ({parsedDeck.totalCards > 0
+                      ? ((parsedDeck.landCount / parsedDeck.totalCards) * 100).toFixed(1)
+                      : 0}%)
+                  </p>
 
-          {/* Artifacts */}
-          {parsedDeck.artifacts.length > 0 && (
-            <div className="panel-grid">
-              <ArtifactsPanel
-                parsedDeck={parsedDeck}
-                includeArtifacts={includeArtifacts}
-                setIncludeArtifacts={setIncludeArtifacts}
-                disabledArtifacts={disabledArtifacts}
-                setDisabledArtifacts={setDisabledArtifacts}
-                getManaSymbol={getManaSymbol}
+                  {/* Derived stats block */}
+                  {(() => {
+                    const nonLandCards = [
+                      ...(parsedDeck.spells      || []),
+                      ...(parsedDeck.creatures   || []),
+                      ...(parsedDeck.artifacts   || []),
+                      ...(parsedDeck.rituals     || []),
+                      ...(parsedDeck.rampSpells  || []),
+                      ...(parsedDeck.exploration || []),
+                    ];
+                    let totalCmcSum = 0, totalNonLandQty = 0;
+                    for (const card of nonLandCards) {
+                      const qty = card.quantity || 1;
+                      totalCmcSum += (typeof card.cmc === 'number' ? card.cmc : 0) * qty;
+                      totalNonLandQty += qty;
+                    }
+                    const avgCmc = totalNonLandQty > 0 ? (totalCmcSum / totalNonLandQty).toFixed(2) : '—';
+                    const rampCount =
+                      (parsedDeck.artifacts   || []).reduce((s, c) => s + (c.quantity || 1), 0) +
+                      (parsedDeck.creatures   || []).reduce((s, c) => s + (c.quantity || 1), 0) +
+                      (parsedDeck.rampSpells  || []).reduce((s, c) => s + (c.quantity || 1), 0) +
+                      (parsedDeck.rituals     || []).reduce((s, c) => s + (c.quantity || 1), 0) +
+                      (parsedDeck.exploration || []).reduce((s, c) => s + (c.quantity || 1), 0);
+                    const rampPct = parsedDeck.totalCards > 0
+                      ? ((rampCount / parsedDeck.totalCards) * 100).toFixed(1) : '0';
+                    const lands = parsedDeck.lands || [];
+                    let tappedCount = 0, untappedCount = 0, fetchCount = 0, conditionalCount = 0;
+                    for (const land of lands) {
+                      const qty = land.quantity || 1;
+                      if (land.isFetch) { fetchCount += qty; continue; }
+                      if (land.entersTappedAlways === true)       tappedCount      += qty;
+                      else if (land.entersTappedAlways === false)  untappedCount   += qty;
+                      else                                          conditionalCount += qty;
+                    }
+                    return (
+                      <>
+                        <p>Avg. CMC (non-land): <strong>{avgCmc}</strong></p>
+                        <p>
+                          Ramp &amp; Acceleration: <strong>{rampCount}</strong>{' '}
+                          <span style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: '0.85em' }}>
+                            ({rampPct}% of deck)
+                          </span>
+                        </p>
+                        {lands.length > 0 && (
+                          <p style={{ lineHeight: 1.8 }}>
+                            Lands — Untapped: <strong>{untappedCount + fetchCount}</strong>
+                            {' · '}Tapped: <strong>{tappedCount}</strong>
+                            {conditionalCount > 0 && <>{' · '}Conditional: <strong>{conditionalCount}</strong></>}
+                            {' · '}Fetches: <strong>{fetchCount}</strong>
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+
+                  {/* Mana Curve */}
+                  {(() => {
+                    const nonLandCards = [
+                      ...(parsedDeck.spells || []), ...(parsedDeck.creatures || []),
+                      ...(parsedDeck.artifacts || []), ...(parsedDeck.rituals || []),
+                      ...(parsedDeck.rampSpells || []), ...(parsedDeck.exploration || []),
+                    ];
+                    if (nonLandCards.length === 0) return null;
+                    const cmcMap = new Map();
+                    for (const card of nonLandCards) {
+                      const cmc = typeof card.cmc === 'number' ? card.cmc : 0;
+                      cmcMap.set(cmc, (cmcMap.get(cmc) || 0) + (card.quantity || 1));
+                    }
+                    const maxCmc = Math.max(...cmcMap.keys());
+                    const curveData = Array.from({ length: maxCmc + 1 }, (_, i) => ({ cmc: i, count: cmcMap.get(i) || 0 }));
+                    const BAR_COLORS = ['#667eea','#7c3aed','#a855f7','#ec4899','#f87171','#fb923c','#facc15','#4ade80','#34d399','#60a5fa'];
+                    return (
+                      <div style={{ marginTop: '1rem' }}>
+                        <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary, #94a3b8)' }}>Mana Curve</h4>
+                        <ResponsiveContainer width="100%" height={160}>
+                          <BarChart data={curveData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="cmc" tick={{ fontSize: 11 }}
+                              label={{ value: 'CMC', position: 'insideBottom', offset: -2, fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                            <RechartsTooltip formatter={(v) => [v, 'Cards']} labelFormatter={(l) => `CMC ${l}`} />
+                            <Bar dataKey="count" radius={[3, 3, 0, 0]}>
+                              {curveData.map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Color Pip Demand */}
+                  {(() => {
+                    const nonLandCards = [
+                      ...(parsedDeck.spells || []), ...(parsedDeck.creatures || []),
+                      ...(parsedDeck.artifacts || []), ...(parsedDeck.rituals || []),
+                      ...(parsedDeck.rampSpells || []), ...(parsedDeck.exploration || []),
+                    ];
+                    if (nonLandCards.length === 0) return null;
+                    const pipCounts = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+                    for (const card of nonLandCards) {
+                      if (!card.manaCost) continue;
+                      const qty = card.quantity || 1;
+                      const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
+                      for (const sym of symbols) {
+                        const s = sym.replace(/[{}]/g, '').toUpperCase();
+                        if (pipCounts[s] !== undefined) pipCounts[s] += qty;
+                      }
+                    }
+                    const colorConfig = {
+                      W: { label: 'White', fill: '#fcd34d' }, U: { label: 'Blue',  fill: '#60a5fa' },
+                      B: { label: 'Black', fill: '#a1a1aa' }, R: { label: 'Red',   fill: '#f87171' },
+                      G: { label: 'Green', fill: '#4ade80' },
+                    };
+                    const pipData = Object.entries(pipCounts).filter(([, v]) => v > 0)
+                      .map(([k, v]) => ({ color: k, label: colorConfig[k].label, pips: v, fill: colorConfig[k].fill }));
+                    if (pipData.length === 0) return null;
+                    return (
+                      <div style={{ marginTop: '1rem' }}>
+                        <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary, #94a3b8)' }}>Color Pip Demand</h4>
+                        <ResponsiveContainer width="100%" height={120}>
+                          <BarChart data={pipData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                            <RechartsTooltip formatter={(v) => [v, 'Pips']} labelFormatter={(l) => l} />
+                            <Bar dataKey="pips" radius={[3, 3, 0, 0]}>
+                              {pipData.map((e) => <Cell key={e.color} fill={e.fill} />)}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Color Pip Creation */}
+                  {(() => {
+                    const colorConfig = {
+                      W: { label: 'White', fill: '#fcd34d' }, U: { label: 'Blue',  fill: '#60a5fa' },
+                      B: { label: 'Black', fill: '#a1a1aa' }, R: { label: 'Red',   fill: '#f87171' },
+                      G: { label: 'Green', fill: '#4ade80' },
+                    };
+                    const sources = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+                    const addProduces = (card) => {
+                      const qty = card.quantity || 1;
+                      for (const c of (card.produces || [])) { if (sources[c] !== undefined) sources[c] += qty; }
+                    };
+                    for (const land of (parsedDeck.lands || [])) {
+                      const qty = land.quantity || 1;
+                      if (land.isFetch) { for (const c of (land.fetchColors || [])) { if (sources[c] !== undefined) sources[c] += qty; } }
+                      else              { for (const c of (land.produces    || [])) { if (sources[c] !== undefined) sources[c] += qty; } }
+                    }
+                    for (const card of (parsedDeck.artifacts || [])) addProduces(card);
+                    for (const card of (parsedDeck.creatures || [])) addProduces(card);
+                    for (const card of (parsedDeck.rituals   || [])) {
+                      const qty = card.quantity || 1;
+                      for (const c of (card.ritualColors || [])) { if (sources[c] !== undefined) sources[c] += qty; }
+                    }
+                    const demandedColors = new Set();
+                    const nonLandCards = [
+                      ...(parsedDeck.spells || []), ...(parsedDeck.creatures || []),
+                      ...(parsedDeck.artifacts || []), ...(parsedDeck.rituals || []),
+                      ...(parsedDeck.rampSpells || []), ...(parsedDeck.exploration || []),
+                    ];
+                    for (const card of nonLandCards) {
+                      if (!card.manaCost) continue;
+                      const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
+                      for (const sym of symbols) {
+                        const s = sym.replace(/[{}]/g, '').toUpperCase();
+                        if (colorConfig[s]) demandedColors.add(s);
+                      }
+                    }
+                    const creationData = Object.entries(sources)
+                      .filter(([k, v]) => v > 0 && demandedColors.has(k))
+                      .map(([k, v]) => ({ color: k, label: colorConfig[k].label, sources: v, fill: colorConfig[k].fill }));
+                    if (creationData.length === 0) return null;
+                    return (
+                      <div style={{ marginTop: '1rem' }}>
+                        <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary, #94a3b8)' }}>Color Pip Creation</h4>
+                        <ResponsiveContainer width="100%" height={120}>
+                          <BarChart data={creationData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                            <RechartsTooltip formatter={(v) => [v, 'Sources']} labelFormatter={(l) => l} />
+                            <Bar dataKey="sources" radius={[3, 3, 0, 0]}>
+                              {creationData.map((e) => <Cell key={e.color} fill={e.fill} />)}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Lands */}
+              <div className="panel-grid">
+                <LandsPanel parsedDeck={parsedDeck} getManaSymbol={getManaSymbol} getFetchSymbol={getFetchSymbol} />
+              </div>
+
+              {parsedDeck.artifacts.length > 0 && (
+                <div className="panel-grid">
+                  <ArtifactsPanel
+                    parsedDeck={parsedDeck}
+                    includeArtifacts={includeArtifacts} setIncludeArtifacts={setIncludeArtifacts}
+                    disabledArtifacts={disabledArtifacts} setDisabledArtifacts={setDisabledArtifacts}
+                    getManaSymbol={getManaSymbol}
+                  />
+                </div>
+              )}
+
+              {parsedDeck.creatures.length > 0 && (
+                <div className="panel-grid">
+                  <CreaturesPanel
+                    parsedDeck={parsedDeck}
+                    includeCreatures={includeCreatures} setIncludeCreatures={setIncludeCreatures}
+                    disabledCreatures={disabledCreatures} setDisabledCreatures={setDisabledCreatures}
+                    getManaSymbol={getManaSymbol}
+                  />
+                </div>
+              )}
+
+              {parsedDeck.exploration?.length > 0 && (
+                <div className="panel-grid">
+                  <ExplorationPanel
+                    parsedDeck={parsedDeck}
+                    includeExploration={includeExploration} setIncludeExploration={setIncludeExploration}
+                    disabledExploration={disabledExploration} setDisabledExploration={setDisabledExploration}
+                  />
+                </div>
+              )}
+
+              {parsedDeck.rampSpells?.length > 0 && (
+                <div className="panel-grid">
+                  <RampSpellsPanel
+                    parsedDeck={parsedDeck}
+                    includeRampSpells={includeRampSpells} setIncludeRampSpells={setIncludeRampSpells}
+                    disabledRampSpells={disabledRampSpells} setDisabledRampSpells={setDisabledRampSpells}
+                    renderManaCost={renderManaCost}
+                  />
+                </div>
+              )}
+
+              {parsedDeck.rituals?.length > 0 && (
+                <div className="panel-grid">
+                  <RitualsPanel
+                    parsedDeck={parsedDeck}
+                    includeRituals={includeRituals} setIncludeRituals={setIncludeRituals}
+                    disabledRituals={disabledRituals} setDisabledRituals={setDisabledRituals}
+                    renderManaCost={renderManaCost}
+                  />
+                </div>
+              )}
+
+              {(parsedDeck.spells.length > 0 || parsedDeck.creatures.length > 0 ||
+                parsedDeck.artifacts.length > 0 || parsedDeck.rituals?.length > 0 ||
+                parsedDeck.rampSpells?.length > 0 || parsedDeck.exploration?.length > 0) && (
+                <SpellsPanel
+                  parsedDeck={parsedDeck}
+                  selectedKeyCards={selectedKeyCards} setSelectedKeyCards={setSelectedKeyCards}
+                  renderManaCost={renderManaCost}
+                />
+              )}
+
+              {/* Simulation Settings */}
+              <SimulationSettingsPanel
+                iterations={iterations}                 setIterations={setIterations}
+                turns={turns}                           setTurns={setTurns}
+                handSize={handSize}                     setHandSize={setHandSize}
+                maxSequences={maxSequences}             setMaxSequences={setMaxSequences}
+                selectedTurnForSequences={selectedTurnForSequences}
+                setSelectedTurnForSequences={setSelectedTurnForSequences}
+                commanderMode={commanderMode}           setCommanderMode={setCommanderMode}
+                enableMulligans={enableMulligans}       setEnableMulligans={setEnableMulligans}
+                mulliganRule={mulliganRule}             setMulliganRule={setMulliganRule}
+                mulliganStrategy={mulliganStrategy}     setMulliganStrategy={setMulliganStrategy}
+                customMulliganRules={customMulliganRules}
+                setCustomMulliganRules={setCustomMulliganRules}
+                runSimulation={runSimulation}
+                isSimulating={isSimulating}
               />
             </div>
           )}
 
-          {/* Creatures */}
-          {parsedDeck.creatures.length > 0 && (
-            <div className="panel-grid">
-              <CreaturesPanel
-                parsedDeck={parsedDeck}
-                includeCreatures={includeCreatures}
-                setIncludeCreatures={setIncludeCreatures}
-                disabledCreatures={disabledCreatures}
-                setDisabledCreatures={setDisabledCreatures}
-                getManaSymbol={getManaSymbol}
-              />
-            </div>
-          )}
-
-          {/* Exploration */}
-          {parsedDeck.exploration && parsedDeck.exploration.length > 0 && (
-            <div className="panel-grid">
-              <ExplorationPanel
-                parsedDeck={parsedDeck}
-                includeExploration={includeExploration}
-                setIncludeExploration={setIncludeExploration}
-                disabledExploration={disabledExploration}
-                setDisabledExploration={setDisabledExploration}
-              />
-            </div>
-          )}
-
-          {/* Ramp Spells */}
-          {parsedDeck.rampSpells && parsedDeck.rampSpells.length > 0 && (
-            <div className="panel-grid">
-              <RampSpellsPanel
-                parsedDeck={parsedDeck}
-                includeRampSpells={includeRampSpells}
-                setIncludeRampSpells={setIncludeRampSpells}
-                disabledRampSpells={disabledRampSpells}
-                setDisabledRampSpells={setDisabledRampSpells}
-                renderManaCost={renderManaCost}
-              />
-            </div>
-          )}
-
-          {/* Rituals */}
-          {parsedDeck.rituals && parsedDeck.rituals.length > 0 && (
-            <div className="panel-grid">
-              <RitualsPanel
-                parsedDeck={parsedDeck}
-                includeRituals={includeRituals}
-                setIncludeRituals={setIncludeRituals}
-                disabledRituals={disabledRituals}
-                setDisabledRituals={setDisabledRituals}
-                renderManaCost={renderManaCost}
-              />
-            </div>
-          )}
-
-          {/* Spells / Key-card selector */}
-          {(
-            parsedDeck.spells.length > 0 ||
-            parsedDeck.creatures.length > 0 ||
-            parsedDeck.artifacts.length > 0 ||
-            (parsedDeck.rituals && parsedDeck.rituals.length > 0) ||
-            (parsedDeck.rampSpells && parsedDeck.rampSpells.length > 0) ||
-            (parsedDeck.exploration && parsedDeck.exploration.length > 0)
-          ) && (
-            <SpellsPanel
-              parsedDeck={parsedDeck}
-              selectedKeyCards={selectedKeyCards}
-              setSelectedKeyCards={setSelectedKeyCards}
-              renderManaCost={renderManaCost}
-            />
-          )}
-
-          {/* Simulation Settings */}
-          <SimulationSettingsPanel
-            iterations={iterations}               setIterations={setIterations}
-            turns={turns}                         setTurns={setTurns}
-            handSize={handSize}                   setHandSize={setHandSize}
-            maxSequences={maxSequences}           setMaxSequences={setMaxSequences}
+          {/* Single-deck Results */}
+          <ResultsPanel
+            simulationResults={simulationResults}
+            chartData={chartData}
+            iterations={iterations}
+            enableMulligans={enableMulligans}
+            selectedKeyCards={selectedKeyCards}
             selectedTurnForSequences={selectedTurnForSequences}
-            setSelectedTurnForSequences={setSelectedTurnForSequences}
-            commanderMode={commanderMode}         setCommanderMode={setCommanderMode}
-            enableMulligans={enableMulligans}     setEnableMulligans={setEnableMulligans}
-            mulliganRule={mulliganRule}           setMulliganRule={setMulliganRule}
-            mulliganStrategy={mulliganStrategy}   setMulliganStrategy={setMulliganStrategy}
-            customMulliganRules={customMulliganRules}
-            setCustomMulliganRules={setCustomMulliganRules}
-            runSimulation={runSimulation}
-            isSimulating={isSimulating}
+            exportResultsAsPNG={exportResultsAsPNG}
+            exportResultsAsCSV={exportResultsAsCSV}
+            renderSequenceBody={renderSequenceBody}
           />
-        </div>
+        </>
       )}
 
-      {/* Results */}
-      <ResultsPanel
-        simulationResults={simulationResults}
-        chartData={chartData}
-        iterations={iterations}
-        enableMulligans={enableMulligans}
-        selectedKeyCards={selectedKeyCards}
-        selectedTurnForSequences={selectedTurnForSequences}
-        exportResultsAsPNG={exportResultsAsPNG}
-        exportResultsAsCSV={exportResultsAsCSV}
-        renderSequenceBody={renderSequenceBody}
-      />
+      {/* ── Comparison mode ───────────────────────────────────────────────── */}
+      {comparisonMode && (
+        <>
+          {/* Row: Deck inputs */}
+          <div className="deck-columns">
+            <div className="panel">
+              <div className="deck-column-header deck-column-header--a">{labelA}</div>
+              <input
+                className="deck-label-input"
+                value={labelA}
+                onChange={(e) => setLabelA(e.target.value)}
+                placeholder="Deck A name"
+              />
+              <textarea
+                value={deckText}
+                onChange={(e) => setDeckText(e.target.value)}
+                placeholder="Paste deck list here (MTG Arena format)"
+                className="deck-textarea"
+                style={{ height: 180 }}
+              />
+              <button onClick={handleParseDeck} className="btn-primary">Parse Deck</button>
+            </div>
+            <div className="panel">
+              <div className="deck-column-header deck-column-header--b">{labelB}</div>
+              <input
+                className="deck-label-input"
+                value={labelB}
+                onChange={(e) => setLabelB(e.target.value)}
+                placeholder="Deck B name"
+              />
+              <textarea
+                value={deckTextB}
+                onChange={(e) => setDeckTextB(e.target.value)}
+                placeholder="Paste deck list here (MTG Arena format)"
+                className="deck-textarea"
+                style={{ height: 180 }}
+              />
+              <button onClick={handleParseDeckB} className="btn-primary">Parse Deck</button>
+            </div>
+          </div>
+
+          {/* Row: Lands — shown once either deck is parsed */}
+          {(parsedDeck || parsedDeckB) && (
+            <div className="deck-columns">
+              <div>
+                {parsedDeck
+                  ? <LandsPanel parsedDeck={parsedDeck} getManaSymbol={getManaSymbol} getFetchSymbol={getFetchSymbol} />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+              <div>
+                {parsedDeckB
+                  ? <LandsPanel parsedDeck={parsedDeckB} getManaSymbol={getManaSymbol} getFetchSymbol={getFetchSymbol} />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+            </div>
+          )}
+
+          {/* Row: Artifacts */}
+          {(parsedDeck?.artifacts?.length > 0 || parsedDeckB?.artifacts?.length > 0) && (
+            <div className="deck-columns">
+              <div>
+                {parsedDeck?.artifacts?.length > 0
+                  ? <ArtifactsPanel
+                      parsedDeck={parsedDeck}
+                      includeArtifacts={includeArtifacts}   setIncludeArtifacts={setIncludeArtifacts}
+                      disabledArtifacts={disabledArtifacts} setDisabledArtifacts={setDisabledArtifacts}
+                      getManaSymbol={getManaSymbol}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+              <div>
+                {parsedDeckB?.artifacts?.length > 0
+                  ? <ArtifactsPanel
+                      parsedDeck={parsedDeckB}
+                      includeArtifacts={includeArtifactsB}   setIncludeArtifacts={setIncludeArtifactsB}
+                      disabledArtifacts={disabledArtifactsB} setDisabledArtifacts={setDisabledArtifactsB}
+                      getManaSymbol={getManaSymbol}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+            </div>
+          )}
+
+          {/* Row: Creatures */}
+          {(parsedDeck?.creatures?.length > 0 || parsedDeckB?.creatures?.length > 0) && (
+            <div className="deck-columns">
+              <div>
+                {parsedDeck?.creatures?.length > 0
+                  ? <CreaturesPanel
+                      parsedDeck={parsedDeck}
+                      includeCreatures={includeCreatures}   setIncludeCreatures={setIncludeCreatures}
+                      disabledCreatures={disabledCreatures} setDisabledCreatures={setDisabledCreatures}
+                      getManaSymbol={getManaSymbol}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+              <div>
+                {parsedDeckB?.creatures?.length > 0
+                  ? <CreaturesPanel
+                      parsedDeck={parsedDeckB}
+                      includeCreatures={includeCreaturesB}   setIncludeCreatures={setIncludeCreaturesB}
+                      disabledCreatures={disabledCreaturesB} setDisabledCreatures={setDisabledCreaturesB}
+                      getManaSymbol={getManaSymbol}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+            </div>
+          )}
+
+          {/* Row: Exploration */}
+          {(parsedDeck?.exploration?.length > 0 || parsedDeckB?.exploration?.length > 0) && (
+            <div className="deck-columns">
+              <div>
+                {parsedDeck?.exploration?.length > 0
+                  ? <ExplorationPanel
+                      parsedDeck={parsedDeck}
+                      includeExploration={includeExploration}   setIncludeExploration={setIncludeExploration}
+                      disabledExploration={disabledExploration} setDisabledExploration={setDisabledExploration}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+              <div>
+                {parsedDeckB?.exploration?.length > 0
+                  ? <ExplorationPanel
+                      parsedDeck={parsedDeckB}
+                      includeExploration={includeExplorationB}   setIncludeExploration={setIncludeExplorationB}
+                      disabledExploration={disabledExplorationB} setDisabledExploration={setDisabledExplorationB}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+            </div>
+          )}
+
+          {/* Row: Ramp Spells */}
+          {(parsedDeck?.rampSpells?.length > 0 || parsedDeckB?.rampSpells?.length > 0) && (
+            <div className="deck-columns">
+              <div>
+                {parsedDeck?.rampSpells?.length > 0
+                  ? <RampSpellsPanel
+                      parsedDeck={parsedDeck}
+                      includeRampSpells={includeRampSpells}   setIncludeRampSpells={setIncludeRampSpells}
+                      disabledRampSpells={disabledRampSpells} setDisabledRampSpells={setDisabledRampSpells}
+                      renderManaCost={renderManaCost}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+              <div>
+                {parsedDeckB?.rampSpells?.length > 0
+                  ? <RampSpellsPanel
+                      parsedDeck={parsedDeckB}
+                      includeRampSpells={includeRampSpellsB}   setIncludeRampSpells={setIncludeRampSpellsB}
+                      disabledRampSpells={disabledRampSpellsB} setDisabledRampSpells={setDisabledRampSpellsB}
+                      renderManaCost={renderManaCost}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+            </div>
+          )}
+
+          {/* Row: Rituals */}
+          {(parsedDeck?.rituals?.length > 0 || parsedDeckB?.rituals?.length > 0) && (
+            <div className="deck-columns">
+              <div>
+                {parsedDeck?.rituals?.length > 0
+                  ? <RitualsPanel
+                      parsedDeck={parsedDeck}
+                      includeRituals={includeRituals}   setIncludeRituals={setIncludeRituals}
+                      disabledRituals={disabledRituals} setDisabledRituals={setDisabledRituals}
+                      renderManaCost={renderManaCost}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+              <div>
+                {parsedDeckB?.rituals?.length > 0
+                  ? <RitualsPanel
+                      parsedDeck={parsedDeckB}
+                      includeRituals={includeRitualsB}   setIncludeRituals={setIncludeRitualsB}
+                      disabledRituals={disabledRitualsB} setDisabledRituals={setDisabledRitualsB}
+                      renderManaCost={renderManaCost}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+            </div>
+          )}
+
+          {/* Row: Spells / Key-card selector */}
+          {((parsedDeck && (parsedDeck.spells.length > 0 || parsedDeck.creatures.length > 0 ||
+              parsedDeck.artifacts.length > 0 || parsedDeck.rituals?.length > 0 ||
+              parsedDeck.rampSpells?.length > 0 || parsedDeck.exploration?.length > 0)) ||
+            (parsedDeckB && (parsedDeckB.spells.length > 0 || parsedDeckB.creatures.length > 0 ||
+              parsedDeckB.artifacts.length > 0 || parsedDeckB.rituals?.length > 0 ||
+              parsedDeckB.rampSpells?.length > 0 || parsedDeckB.exploration?.length > 0))) && (
+            <div className="deck-columns">
+              <div>
+                {(parsedDeck && (parsedDeck.spells.length > 0 || parsedDeck.creatures.length > 0 ||
+                  parsedDeck.artifacts.length > 0 || parsedDeck.rituals?.length > 0 ||
+                  parsedDeck.rampSpells?.length > 0 || parsedDeck.exploration?.length > 0))
+                  ? <SpellsPanel
+                      parsedDeck={parsedDeck}
+                      selectedKeyCards={selectedKeyCards} setSelectedKeyCards={setSelectedKeyCards}
+                      renderManaCost={renderManaCost}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+              <div>
+                {(parsedDeckB && (parsedDeckB.spells.length > 0 || parsedDeckB.creatures.length > 0 ||
+                  parsedDeckB.artifacts.length > 0 || parsedDeckB.rituals?.length > 0 ||
+                  parsedDeckB.rampSpells?.length > 0 || parsedDeckB.exploration?.length > 0))
+                  ? <SpellsPanel
+                      parsedDeck={parsedDeckB}
+                      selectedKeyCards={selectedKeyCardsB} setSelectedKeyCards={setSelectedKeyCardsB}
+                      renderManaCost={renderManaCost}
+                    />
+                  : <div className="comparison-empty-panel" />}
+              </div>
+            </div>
+          )}
+
+          {/* Shared simulation settings */}
+          {(parsedDeck || parsedDeckB) && (
+            <SimulationSettingsPanel
+              iterations={iterations}                 setIterations={setIterations}
+              turns={turns}                           setTurns={setTurns}
+              handSize={handSize}                     setHandSize={setHandSize}
+              maxSequences={maxSequences}             setMaxSequences={setMaxSequences}
+              selectedTurnForSequences={selectedTurnForSequences}
+              setSelectedTurnForSequences={setSelectedTurnForSequences}
+              commanderMode={commanderMode}           setCommanderMode={setCommanderMode}
+              enableMulligans={enableMulligans}       setEnableMulligans={setEnableMulligans}
+              mulliganRule={mulliganRule}             setMulliganRule={setMulliganRule}
+              mulliganStrategy={mulliganStrategy}     setMulliganStrategy={setMulliganStrategy}
+              customMulliganRules={customMulliganRules}
+              setCustomMulliganRules={setCustomMulliganRules}
+              runSimulation={runSimulation}
+              isSimulating={isSimulating}
+            />
+          )}
+
+          {/* Comparison Results */}
+          {chartData && chartDataB ? (
+            <ComparisonResultsPanel
+              chartDataA={chartData}
+              chartDataB={chartDataB}
+              simulationResultsA={simulationResults}
+              simulationResultsB={simulationResultsB}
+              iterations={iterations}
+              enableMulligans={enableMulligans}
+              selectedKeyCardsA={selectedKeyCards}
+              selectedKeyCardsB={selectedKeyCardsB}
+              labelA={labelA}
+              labelB={labelB}
+              exportResultsAsPNG={exportResultsAsPNG}
+              exportResultsAsCSV={exportResultsAsCSV}
+            />
+          ) : (chartData || chartDataB) ? (
+            <div className="panel">
+              <p className="card-meta">
+                {chartData
+                  ? `${labelA} has results. Parse and simulate ${labelB} to see the comparison.`
+                  : `${labelB} has results. Parse and simulate ${labelA} to see the comparison.`}
+              </p>
+            </div>
+          ) : null}
+        </>
+      )}
 
       {/* Footer */}
       <div className="app-footer">

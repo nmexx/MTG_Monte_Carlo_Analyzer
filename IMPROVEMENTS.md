@@ -10,7 +10,7 @@
    - The file is 4000+ lines and mixes simulation engine, data processing, and UI.
    - Extract: `SimulationEngine.js`, `DeckParser.js`, and separate panel components (`LandsPanel`, `ResultsPanel`, `SequencesPanel`, etc.)
 
-3. **`useMemo`/`useCallback` for expensive recalculations**
+3. **`useMemo`/`useCallback` for expensive recalculations** --------DONE
    - `prepareChartData()`, `buildCompleteDeck()`, and the `LAND_DATA` Sets all run on every render.
    - Memoizing them would eliminate needless recalculations on unrelated state updates.
 
@@ -18,7 +18,7 @@
 
 ## Missing Features
 
-4. **Deck Comparison Mode (A/B)**
+4. **Deck Comparison Mode (A/B)** --------DONE
    - Multiple `// comparison mode` placeholder comments already exist throughout the file.
    - Run two decks side-by-side with diff'd charts — the largest incomplete feature.
 
@@ -30,7 +30,7 @@
    - For each key card, show the earliest turn where playability crosses configurable thresholds (e.g. 50%, 80%, 95%).
    - Complements the full per-turn chart with a quick-read summary.
 
-7. **Standard deviation bands on charts**
+7. **Standard deviation bands on charts** --------DONE
    - Only averages are currently reported.
    - Adding ± std. deviation to the lands/mana charts would show consistency vs. raw average.
 
@@ -46,11 +46,11 @@
 
 ## Simulation Accuracy
 
-10. **Color pip reliability analysis**
+10. **Color pip reliability analysis** --------DONE
     - `canPlayCard` checks total mana and single-pip counts but doesn't account for competing demands across the same mana sources (e.g. needing `{U}{U}` and `{B}` from the same Watery Grave).
     - A proper color-availability solver would improve accuracy for multicolor decks.
 
-11. **Scry / cantrip modeling**
+11. **Scry / cantrip modeling** 
     - Cards like Brainstorm, Ponder, Serum Visions meaningfully improve land-hit rates.
     - Even a simplified "look at top N cards, keep best land" heuristic would improve fidelity for blue decks.
 

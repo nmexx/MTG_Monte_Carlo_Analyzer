@@ -24,6 +24,7 @@ import {
   selectBestLand,
   findBestLandToFetch,
   calculateManaAvailability,
+  solveColorPips,
   canPlayCard,
   tapManaSources,
   playLand,
@@ -324,6 +325,7 @@ describe('calculateManaAvailability', () => {
     const result = calculateManaAvailability([]);
     expect(result.total).toBe(0);
     expect(result.colors).toEqual({ W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 });
+    expect(result.sources).toEqual([]);
   });
 
   it('counts a single untapped land', () => {
@@ -331,6 +333,8 @@ describe('calculateManaAvailability', () => {
     const result = calculateManaAvailability([perm(forest)]);
     expect(result.total).toBe(1);
     expect(result.colors.G).toBe(1);
+    expect(result.sources).toHaveLength(1);
+    expect(result.sources[0].produces).toEqual(['G']);
   });
 
   it('does not count tapped lands', () => {
@@ -376,6 +380,81 @@ describe('calculateManaAvailability', () => {
     const result = calculateManaAvailability([perm(tomb)]);
     expect(result.total).toBe(2);
     expect(result.colors.C).toBe(2);
+    // manaAmount=2 → two source entries so either can be used independently
+    expect(result.sources).toHaveLength(2);
+  });
+
+  it('builds a source entry per mana unit for a dual land (Watery Grave)', () => {
+    const wg     = makeLand({ name: 'Watery Grave', produces: ['U', 'B'], isBasic: false });
+    const result = calculateManaAvailability([perm(wg)]);
+    expect(result.total).toBe(1);
+    expect(result.sources).toHaveLength(1);
+    expect(result.sources[0].produces).toContain('U');
+    expect(result.sources[0].produces).toContain('B');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// solveColorPips
+// ─────────────────────────────────────────────────────────────────────────────
+describe('solveColorPips', () => {
+  const src = (colors) => ({ produces: colors });
+
+  it('returns true when there are no pip requirements', () => {
+    expect(solveColorPips([], [src(['G'])])).toBe(true);
+  });
+
+  it('returns true when sources exactly satisfy pips', () => {
+    // Island + Swamp → {U}{B}
+    expect(solveColorPips(['U', 'B'], [src(['U']), src(['B'])])).toBe(true);
+  });
+
+  it('returns false when there are not enough sources', () => {
+    // only one source for two pips
+    expect(solveColorPips(['U', 'U'], [src(['U'])])).toBe(false);
+  });
+
+  it('returns true when a dual land satisfies one of two different pips (shared source)', () => {
+    // Watery Grave (U/B) + Island (U) → can cast {U}{B}?
+    // WG → B, Island → U  ✓
+    expect(solveColorPips(['U', 'B'], [src(['U', 'B']), src(['U'])])).toBe(true);
+  });
+
+  it('correctly rejects when a single dual land cannot satisfy two different-colour pips alone', () => {
+    // Watery Grave (U/B) alone cannot pay {U}{B} (CMC=2 from one source)
+    // The total check already prevents this, but the pip solver also enforces it if called
+    // directly: two pips, one source → no matching
+    expect(solveColorPips(['U', 'B'], [src(['U', 'B'])])).toBe(false);
+  });
+
+  it('identifies the classic false-positive scenario: dual land double-counted', () => {
+    // Watery Grave (U/B) + Forest (G)
+    // Old code: colors.U=1, colors.B=1 → passes for {U}{B}, but WG can only give ONE mana
+    // Pip solver: 2 pips, 2 sources (WG and Forest) — Forest can't satisfy U or B
+    //             → only WG qualifies, but 1 source cannot fill 2 different-colour pips
+    expect(solveColorPips(['U', 'B'], [src(['U', 'B']), src(['G'])])).toBe(false);
+  });
+
+  it('handles same-colour double pips with two matching sources', () => {
+    expect(solveColorPips(['G', 'G'], [src(['G']), src(['G'])])).toBe(true);
+  });
+
+  it('honours the wildcard "*" produces (e.g. City of Brass style lands)', () => {
+    expect(solveColorPips(['U', 'B', 'R'], [
+      src(['*']), src(['*']), src(['*']),
+    ])).toBe(true);
+  });
+
+  it('handles five-colour pips against one source per colour', () => {
+    expect(solveColorPips(
+      ['W', 'U', 'B', 'R', 'G'],
+      [src(['W']), src(['U']), src(['B']), src(['R']), src(['G'])],
+    )).toBe(true);
+  });
+
+  it('returns false when one colour pip is unserviceable', () => {
+    // Need {W} but only have {U} and {B} sources
+    expect(solveColorPips(['W'], [src(['U']), src(['B'])])).toBe(false);
   });
 });
 
@@ -418,6 +497,86 @@ describe('canPlayCard', () => {
     const card = { cmc: 3, manaCost: '{1}{U}{B}' };
     expect(canPlayCard(card, mana(3, { U: 1, B: 1 }))).toBe(true);
     expect(canPlayCard(card, mana(3, { U: 1, B: 0 }))).toBe(false);
+  });
+
+  // ── Competing-demand tests (precise path via manaAvailable.sources) ────────
+
+  it('rejects {U}{B} when only source is a Watery Grave+Forest (double-counting bug)', () => {
+    // Watery Grave (U|B) + Forest (G): colours look like U=1,B=1 but WG can only
+    // produce ONE colour per tap — the pip solver must reject this.
+    const card = { cmc: 2, manaCost: '{U}{B}' };
+    const available = {
+      total: 2,
+      colors: { W: 0, U: 1, B: 1, R: 0, G: 1, C: 0 },
+      sources: [
+        { produces: ['U', 'B'] }, // Watery Grave
+        { produces: ['G'] },      // Forest
+      ],
+    };
+    expect(canPlayCard(card, available)).toBe(false);
+  });
+
+  it('accepts {U}{B} when Watery Grave is paired with an Island', () => {
+    // WG covers B, Island covers U  ✓
+    const card = { cmc: 2, manaCost: '{U}{B}' };
+    const available = {
+      total: 2,
+      colors: { W: 0, U: 2, B: 1, R: 0, G: 0, C: 0 },
+      sources: [
+        { produces: ['U', 'B'] }, // Watery Grave
+        { produces: ['U'] },      // Island
+      ],
+    };
+    expect(canPlayCard(card, available)).toBe(true);
+  });
+
+  it('accepts {U}{U} when two Watery Graves are available', () => {
+    const card = { cmc: 2, manaCost: '{U}{U}' };
+    const available = {
+      total: 2,
+      colors: { W: 0, U: 2, B: 2, R: 0, G: 0, C: 0 },
+      sources: [
+        { produces: ['U', 'B'] }, // Watery Grave 1
+        { produces: ['U', 'B'] }, // Watery Grave 2
+      ],
+    };
+    expect(canPlayCard(card, available)).toBe(true);
+  });
+
+  it('rejects {U}{U} when only one Watery Grave is available', () => {
+    const card = { cmc: 2, manaCost: '{U}{U}' };
+    const available = {
+      total: 2,
+      colors: { W: 0, U: 1, B: 1, R: 0, G: 0, C: 0 },
+      sources: [
+        { produces: ['U', 'B'] }, // Watery Grave — counted toward U and B but only one tap
+        { produces: ['B'] },      // Swamp — cannot help with U
+      ],
+    };
+    expect(canPlayCard(card, available)).toBe(false);
+  });
+
+  it('accepts a 5-colour spell with one source per colour', () => {
+    const card = { cmc: 5, manaCost: '{W}{U}{B}{R}{G}' };
+    const available = {
+      total: 5,
+      colors: { W: 1, U: 1, B: 1, R: 1, G: 1, C: 0 },
+      sources: [
+        { produces: ['W'] },
+        { produces: ['U'] },
+        { produces: ['B'] },
+        { produces: ['R'] },
+        { produces: ['G'] },
+      ],
+    };
+    expect(canPlayCard(card, available)).toBe(true);
+  });
+
+  it('uses fallback aggregate check when sources array is absent', () => {
+    // Original mana() helper has no sources property — fallback path must work
+    const card = { cmc: 2, manaCost: '{U}{B}' };
+    expect(canPlayCard(card, mana(2, { U: 1, B: 1 }))).toBe(true);
+    expect(canPlayCard(card, mana(2, { U: 0, B: 1 }))).toBe(false);
   });
 });
 

@@ -8,6 +8,7 @@
  *   Parse Deck flow       – parseDeckList called, success path, failure path, error banner
  *   Run Simulation flow   – monteCarlo called, "Please parse a deck first" guard
  *   localStorage          – state persisted on change, state restored on mount
+ *   Comparison mode       – toggle, dual inputs, Deck B parse flow, simulation guards
  *
  * Run:  npm test
  */
@@ -131,7 +132,8 @@ describe('Data Source panel', () => {
 
   it('shows the file upload input in local mode', () => {
     render(<MTGMonteCarloAnalyzer />);
-    expect(screen.getByRole('button', { hidden: true }) || screen.queryByText(/How to get cards\.json/i)).toBeTruthy();
+    // Upload instructions heading is visible in local mode
+    expect(screen.getByText(/How to get cards\.json/i)).toBeInTheDocument();
     // The file input is present (accept=".json")
     const fileInput = document.querySelector('input[type="file"][accept=".json"]');
     expect(fileInput).not.toBeNull();
@@ -338,10 +340,10 @@ describe('localStorage persistence', () => {
       fireEvent.change(ta, { target: { value: '4 Lightning Bolt' } });
     });
 
-    // useEffect fires synchronously in testing environment after state update
+    // State is now stored under slotA.deckText (new schema)
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('mtg_mca_state') || '{}');
-      expect(saved.deckText).toBe('4 Lightning Bolt');
+      expect(saved.slotA.deckText).toBe('4 Lightning Bolt');
     });
   });
 
@@ -362,5 +364,206 @@ describe('localStorage persistence', () => {
     render(<MTGMonteCarloAnalyzer />);
     expect(screen.getByLabelText(/Local JSON File/i)).toBeChecked();
     expect(screen.getByRole('textbox').value).toBe('');
+  });
+
+  it('persists comparisonMode to localStorage', async () => {
+    render(<MTGMonteCarloAnalyzer />);
+    const compareBtn = screen.getByRole('button', { name: /compare two decks/i });
+
+    await act(async () => { fireEvent.click(compareBtn); });
+
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('mtg_mca_state') || '{}');
+      expect(saved.comparisonMode).toBe(true);
+    });
+  });
+
+  it('persists labelA to localStorage when changed in comparison mode', async () => {
+    render(<MTGMonteCarloAnalyzer />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+
+    const [labelInputA] = screen.getAllByPlaceholderText(/Deck [AB] name/i);
+    await act(async () => {
+      fireEvent.change(labelInputA, { target: { value: 'Stompy' } });
+    });
+
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('mtg_mca_state') || '{}');
+      expect(saved.labelA).toBe('Stompy');
+    });
+  });
+
+  it('restores comparisonMode from localStorage on mount', () => {
+    localStorage.setItem('mtg_mca_state', JSON.stringify({ comparisonMode: true }));
+    render(<MTGMonteCarloAnalyzer />);
+    expect(
+      screen.getByRole('button', { name: /compare two decks/i }).className
+    ).toMatch(/active/i);
+  });
+});
+
+// =============================================================================
+// 7 — Comparison mode
+// =============================================================================
+describe('Comparison mode', () => {
+  it('renders the Single Deck toggle button', () => {
+    render(<MTGMonteCarloAnalyzer />);
+    expect(screen.getByRole('button', { name: /single deck/i })).toBeInTheDocument();
+  });
+
+  it('renders the Compare Two Decks toggle button', () => {
+    render(<MTGMonteCarloAnalyzer />);
+    expect(screen.getByRole('button', { name: /compare two decks/i })).toBeInTheDocument();
+  });
+
+  it('defaults to single-deck mode (Single Deck button carries the active class)', () => {
+    render(<MTGMonteCarloAnalyzer />);
+    expect(screen.getByRole('button', { name: /single deck/i }).className).toMatch(/active/i);
+  });
+
+  it('clicking Compare Two Decks renders two deck textareas', async () => {
+    render(<MTGMonteCarloAnalyzer />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+    const textareas = document.querySelectorAll('textarea.deck-textarea');
+    expect(textareas.length).toBe(2);
+  });
+
+  it('comparison mode shows a Deck A label input with default value "Deck A"', async () => {
+    render(<MTGMonteCarloAnalyzer />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+    const labelInputs = screen.getAllByPlaceholderText(/Deck [AB] name/i);
+    expect(labelInputs[0].value).toBe('Deck A');
+  });
+
+  it('comparison mode shows a Deck B label input with default value "Deck B"', async () => {
+    render(<MTGMonteCarloAnalyzer />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+    const labelInputs = screen.getAllByPlaceholderText(/Deck [AB] name/i);
+    expect(labelInputs[1].value).toBe('Deck B');
+  });
+
+  it('clicking Single Deck after Compare reverts to single-deck mode', async () => {
+    render(<MTGMonteCarloAnalyzer />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /single deck/i }));
+    });
+    expect(screen.queryAllByPlaceholderText(/Deck [AB] name/i)).toHaveLength(0);
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+  });
+
+  it('first Parse Deck button in comparison mode calls parseDeckList for Deck A', async () => {
+    parseDeckList.mockResolvedValue(MOCK_PARSED_DECK);
+    render(<MTGMonteCarloAnalyzer />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+
+    const [parseBtnA] = screen.getAllByRole('button', { name: /parse deck/i });
+    await act(async () => { fireEvent.click(parseBtnA); });
+
+    expect(parseDeckList).toHaveBeenCalledTimes(1);
+  });
+
+  it('second Parse Deck button in comparison mode calls parseDeckList for Deck B', async () => {
+    parseDeckList.mockResolvedValue(MOCK_PARSED_DECK);
+    render(<MTGMonteCarloAnalyzer />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+
+    const [, parseBtnB] = screen.getAllByRole('button', { name: /parse deck/i });
+    await act(async () => { fireEvent.click(parseBtnB); });
+
+    expect(parseDeckList).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows "Parsing failed (Deck B)" when Deck B parse returns null', async () => {
+    parseDeckList.mockResolvedValue(null);
+    render(<MTGMonteCarloAnalyzer />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+
+    const [, parseBtnB] = screen.getAllByRole('button', { name: /parse deck/i });
+    await act(async () => { fireEvent.click(parseBtnB); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Parsing failed \(Deck B\)/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows guard error "Please parse Deck B first" when only Deck A is parsed', async () => {
+    parseDeckList.mockResolvedValue(MOCK_PARSED_DECK);
+    monteCarlo.mockReturnValue({
+      landsPerTurn: [], untappedPerTurn: [], colorsByTurn: [], manaByTurn: [],
+      lifeLossByTurn: [], stdDevByTurn: [], keyCardPlayability: {},
+      mulligans: 0, handsKept: 1, fastestPlaySequences: [], hasBurstCards: false,
+    });
+    render(<MTGMonteCarloAnalyzer />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+
+    // Parse only Deck A
+    const [parseBtnA] = screen.getAllByRole('button', { name: /parse deck/i });
+    await act(async () => { fireEvent.click(parseBtnA); });
+
+    // SimulationSettingsPanel should appear after Deck A is parsed
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /start simulation/i })).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /start simulation/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Please parse Deck B first/i)).toBeInTheDocument();
+    });
+  });
+
+  it('calls monteCarlo twice when both decks are parsed and simulation runs', async () => {
+    parseDeckList.mockResolvedValue(MOCK_PARSED_DECK);
+    monteCarlo.mockReturnValue({
+      landsPerTurn: [], untappedPerTurn: [], colorsByTurn: [], manaByTurn: [],
+      lifeLossByTurn: [], stdDevByTurn: [], keyCardPlayability: {},
+      mulligans: 0, handsKept: 1, fastestPlaySequences: [], hasBurstCards: false,
+    });
+    render(<MTGMonteCarloAnalyzer />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /compare two decks/i }));
+    });
+
+    // Parse both decks
+    const [parseBtnA, parseBtnB] = screen.getAllByRole('button', { name: /parse deck/i });
+    await act(async () => { fireEvent.click(parseBtnA); });
+    await act(async () => { fireEvent.click(parseBtnB); });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /start simulation/i })).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /start simulation/i }));
+    });
+
+    await waitFor(() => {
+      expect(monteCarlo).toHaveBeenCalledTimes(2);
+    }, { timeout: 500 });
   });
 });

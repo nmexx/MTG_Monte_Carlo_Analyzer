@@ -336,6 +336,8 @@ export const tapManaSources = (spell, battlefield) => {
 export const calculateManaAvailability = (battlefield, turn = 999) => {
   const colors = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
   let total    = 0;
+  // sources: one entry per mana unit available for bipartite pip-matching
+  const sources = [];
   const moxSimpleTurn = 2;
 
   battlefield.filter(p => !p.tapped).forEach(permanent => {
@@ -344,6 +346,7 @@ export const calculateManaAvailability = (battlefield, turn = 999) => {
       const amt = card.manaAmount || 1;
       total += amt;
       card.produces.forEach(color => { colors[color] = (colors[color] || 0) + amt; });
+      for (let i = 0; i < amt; i++) sources.push({ produces: [...card.produces] });
     } else if (card.isManaArtifact) {
       if (card.isMoxOpal && !(SIMPLIFY_MOX_CONDITIONS && turn >= moxSimpleTurn)) {
         const artCount = battlefield.filter(p =>
@@ -360,27 +363,94 @@ export const calculateManaAvailability = (battlefield, turn = 999) => {
       const amt = card.manaAmount || 1;
       total += amt;
       card.produces.forEach(color => { colors[color] = (colors[color] || 0) + amt; });
+      for (let i = 0; i < amt; i++) sources.push({ produces: [...card.produces] });
     } else if (card.isManaCreature && !permanent.summoningSick) {
       const amt = card.manaAmount || 1;
       total += amt;
       card.produces.forEach(color => { colors[color] = (colors[color] || 0) + amt; });
+      for (let i = 0; i < amt; i++) sources.push({ produces: [...card.produces] });
     }
   });
 
-  return { total, colors };
+  return { total, colors, sources };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// solveColorPips  –  bipartite-matching pip feasibility solver
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Returns true when every colored pip in `pips` can be assigned to a
+ * distinct source in `sources`, meaning no two pips compete for the same
+ * physical mana source (e.g. a single Watery Grave cannot satisfy both
+ * {U} and {B} simultaneously).
+ *
+ * Algorithm: augmenting-path bipartite matching (Hopcroft-Karp-style DFS).
+ *
+ * @param {string[]}                 pips    – e.g. ['U','U','B']
+ * @param {Array<{produces:string[]}>} sources – one entry per mana unit
+ * @returns {boolean}
+ */
+export const solveColorPips = (pips, sources) => {
+  // matchOf[srcIdx] = pipIdx currently matched to that source (-1 = free)
+  const matchOf = new Array(sources.length).fill(-1);
+
+  const dfs = (pipIdx, visited) => {
+    for (let s = 0; s < sources.length; s++) {
+      if (visited[s]) continue;
+      const src = sources[s];
+      // A source satisfies a pip when it produces that exact color or any color ('*')
+      if (!src.produces.includes(pips[pipIdx]) && !src.produces.includes('*')) continue;
+      visited[s] = true;
+      if (matchOf[s] === -1 || dfs(matchOf[s], visited)) {
+        matchOf[s] = pipIdx;
+        return true;
+      }
+    }
+    return false;
+  };
+
+  let matched = 0;
+  for (let i = 0; i < pips.length; i++) {
+    if (dfs(i, new Array(sources.length).fill(false))) matched++;
+  }
+  return matched === pips.length;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // canPlayCard
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Returns true when the available mana can pay for `card`.
+ *
+ * When `manaAvailable.sources` is present (populated by
+ * calculateManaAvailability) an exact bipartite-matching check is used so
+ * that dual-colored mana sources (e.g. Watery Grave producing {U} or {B})
+ * are never double-counted across competing pip requirements.
+ *
+ * When `sources` is absent the function falls back to the original
+ * per-color aggregate check, preserving backward-compatibility with
+ * callers that supply a hand-crafted manaAvailable object.
+ */
 export const canPlayCard = (card, manaAvailable) => {
   if (card.cmc > manaAvailable.total) return false;
-  const colorRequirements = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-  const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
+
+  const symbols  = card.manaCost.match(/\{([^}]+)\}/g) || [];
+  const colorPips = [];
   symbols.forEach(symbol => {
     const clean = symbol.replace(/[{}]/g, '');
-    if (['W', 'U', 'B', 'R', 'G'].includes(clean)) colorRequirements[clean]++;
+    if (['W', 'U', 'B', 'R', 'G'].includes(clean)) colorPips.push(clean);
   });
+
+  if (colorPips.length === 0) return true;
+
+  // Precise path: bipartite matching prevents double-counting shared sources
+  if (manaAvailable.sources) {
+    return solveColorPips(colorPips, manaAvailable.sources);
+  }
+
+  // Fallback: original per-color aggregate check
+  const colorRequirements = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+  colorPips.forEach(c => colorRequirements[c]++);
   for (const color in colorRequirements) {
     if (colorRequirements[color] > 0 && (manaAvailable.colors[color] || 0) < colorRequirements[color])
       return false;

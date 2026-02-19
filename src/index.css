@@ -621,3 +621,127 @@ body {
   border-radius: 11px;
   display: block;
 }
+
+/* ─── Comparison mode ────────────────────────────────────────────────────── */
+
+/* Mode toggle bar */
+.mode-toggle {
+  display: flex;
+  gap: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--clr-border);
+  width: fit-content;
+  margin-bottom: 20px;
+}
+
+.mode-toggle__btn {
+  padding: 8px 20px;
+  border: none;
+  background: var(--clr-bg-muted);
+  color: var(--clr-muted);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-toggle__btn--active {
+  background: linear-gradient(135deg, var(--clr-primary) 0%, var(--clr-primary-end) 100%);
+  color: white;
+}
+
+/* Two-deck column layout */
+.deck-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 900px) {
+  .deck-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Column labels */
+.deck-column-header {
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  letter-spacing: 0.03em;
+}
+
+.deck-column-header--a {
+  background: rgba(102, 126, 234, 0.12);
+  color: var(--clr-primary);
+  border-left: 3px solid var(--clr-primary);
+}
+
+.deck-column-header--b {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  border-left: 3px solid #f59e0b;
+}
+
+/* Deck label in panels */
+.deck-label-a { color: var(--clr-primary); margin: 0 0 8px; }
+.deck-label-b { color: #b45309;            margin: 0 0 8px; }
+
+/* Comparison summary grid (3 columns: A | B | delta) */
+.comparison-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .comparison-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.comparison-summary-col {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--clr-bg-muted);
+}
+
+.comparison-summary-col--delta {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px dashed var(--clr-border);
+}
+
+.comparison-summary-col p {
+  margin: 4px 0;
+  font-size: 0.875rem;
+}
+
+/* Delta badges */
+.delta-better { color: #15803d; font-weight: 600; }
+.delta-worse  { color: #b91c1c; font-weight: 600; }
+.delta-neutral { color: var(--clr-muted); font-weight: 500; }
+
+/* Deck name inputs */
+.deck-label-input {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--clr-border);
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  width: 140px;
+  margin-bottom: 10px;
+}
+
+/* Empty placeholder cell — keeps the opposing column's panel aligned */
+.comparison-empty-panel {
+  visibility: hidden;
+  pointer-events: none;
+  min-height: 1px;
+}

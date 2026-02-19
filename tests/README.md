@@ -11,7 +11,7 @@ npm run test:watch
 ```
 
 **Framework:** [Vitest](https://vitest.dev/)  
-**Test files:** 8 files · **378 tests** total (as of Feb 2026)
+**Test files:** 8 files · **393 tests** total (as of Feb 2026)
 
 ---
 
@@ -73,8 +73,9 @@ Covers all 10 exported pure simulation primitives.
 | `doesLandEnterTapped` | 9 | Basic (untapped), `entersTappedAlways`, shock, fast (≤2 / >2 lands), battle (≥2 / <2 basics), crowd (commander / non-commander), check (subtype present / absent) |
 | `selectBestLand` | 5 | No lands → `null`, single land, untapped preferred, bounce blocked on empty board, fetch preferred |
 | `findBestLandToFetch` | 4 | No targets → `null`, colour match, `fetchesOnlyBasics`, dual-land priority on early turns |
-| `calculateManaAvailability` | 8 | Empty board, untapped/tapped lands, artifacts, creatures with/without summoning sickness, multiple sources, `manaAmount > 1` |
-| `canPlayCard` | 6 | Total insufficient, satisfied, colour pips unsatisfied, zero-cost, monocolour, multicolour |
+| `calculateManaAvailability` | 10 | Empty board, untapped/tapped lands, artifacts, creatures with/without summoning sickness, multiple sources, `manaAmount > 1`, `sources` array populated (single land, dual land) |
+| `solveColorPips` | 9 | No pips, exact match, not enough sources, dual land covers one of two different pips, single dual land cannot cover two pips, classic double-counting false positive, same-colour double pips, wildcard `*`, 5-colour, unsatisfiable colour |
+| `canPlayCard` | 13 | Total insufficient, satisfied, colour pips unsatisfied, zero-cost, monocolour, multicolour; competing-demand (Watery Grave+Forest rejected, Watery Grave+Island accepted, two Watery Graves for `{U}{U}`, one Watery Grave Swamp rejected for `{U}{U}`, 5-colour, fallback aggregate path) |
 | `tapManaSources` | 5 | Coloured source, generic-cost, already-tapped ignored, exact count, zero-cost no-op |
 | `playLand` | 6 | Hand→battlefield, untapped/tapped entry, `turnLog` written, bounce returns a land, fetch placed, life-loss = 0 for basics |
 | `castSpells` | 7 | Mana creature cast, insufficient mana skip, artifact cast, Cultivate (lands-to-hand), `includeRampSpells=false`, disabled list, `turnLog` |
@@ -161,7 +162,7 @@ Runs in the **jsdom** environment (`// @vitest-environment jsdom`). Covers all 7
 
 ---
 
-### `App.test.jsx` — `src/App.jsx` (29 tests)
+### `App.test.jsx` — `src/App.jsx` (44 tests)
 
 Runs in the **jsdom** environment with `@testing-library/react`. Tests the top-level
 `MTGMonteCarloAnalyzer` component end-to-end, mocking the heavy-compute modules
@@ -174,7 +175,8 @@ Runs in the **jsdom** environment with `@testing-library/react`. Tests the top-l
 | `Deck List panel` | Textarea renders; placeholder references MTG Arena format; user input reflected in textarea value |
 | `Parse Deck flow` | `parseDeckList` called once on button click; deck text passed as first argument; deck statistics (total cards, land count) appear after a successful parse; error banner shown when `parseDeckList` returns `null`; per-card errors surfaced from `deck.errors`; prior error cleared on subsequent clean parse |
 | `Run Simulation flow` | After parsing a deck, "Start Simulation" button appears; clicking it invokes `monteCarlo` exactly once |
-| `localStorage persistence` | Deck text persisted to `localStorage` on change; saved deck text restored on re-mount; saved `apiMode` restored on re-mount; defaults used when `localStorage` is empty |
+| `localStorage persistence` | Deck text persisted to `localStorage.slotA.deckText` on change (new nested schema); saved deck text, `apiMode`, and `comparisonMode` all restored on re-mount; `labelA` persisted when changed in comparison mode; defaults used when `localStorage` is empty |
+| `Comparison mode` | "Single Deck" and "Compare Two Decks" toggle buttons render; single-deck is default (active class present); clicking Compare renders two `deck-textarea` elements; Deck A/B label inputs default to "Deck A" / "Deck B"; clicking Single Deck reverts to single-deck UI; both Parse Deck buttons independently call `parseDeckList`; "Parsing failed (Deck B)" shown on Deck B null parse; guard error "Please parse Deck B first" fires when only Deck A is parsed before simulation; `monteCarlo` called twice when both decks are parsed and simulation runs |
 
 > **Setup note:** `vite.config.js` now includes a `test` block (`globals: true`, `environment: 'jsdom'`,
 > `setupFiles: ['./tests/setup.js']`). The setup file extends vitest's `expect` with
@@ -193,8 +195,8 @@ Runs in the **jsdom** environment with `@testing-library/react`. Tests the top-l
 | `deckParser.test.js` | 30 |
 | `math.test.js` | 22 |
 | `uiHelpers.test.js` | 41 |
-| `App.test.jsx` | 29 |
-| **Total** | **378** |
+| `App.test.jsx` | 44 |
+| **Total** | **393** |
 
 ## What is not yet tested
 
