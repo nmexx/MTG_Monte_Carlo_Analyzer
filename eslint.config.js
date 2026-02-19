@@ -67,6 +67,8 @@ export default [
   {
     files: ['tests/**/*.{js,jsx}'],
     languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
       globals: {
         ...globals.browser,
         ...globals.node,
@@ -80,6 +82,9 @@ export default [
         beforeAll: 'readonly',
         afterAll: 'readonly',
         vi: 'readonly',
+      },
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
       },
     },
     rules: {

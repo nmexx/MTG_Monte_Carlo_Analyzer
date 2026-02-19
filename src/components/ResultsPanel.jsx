@@ -19,9 +19,15 @@
 import React from 'react';
 import CardTooltip from './CardTooltip';
 import {
-  ComposedChart, LineChart, Line, Area,
-  XAxis, YAxis,
-  CartesianGrid, Tooltip, Legend,
+  ComposedChart,
+  LineChart,
+  Line,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 
@@ -31,32 +37,42 @@ import {
  * Each average series is shown as "name: value ± σ".
  * Band-area entries (array values) and internal _* keys are hidden.
  */
-const makeStdTooltip = (sdMap = {}) => ({ active, payload, label }) => {
-  if (!active || !payload || !payload.length) return null;
-  const rows = payload.filter(p =>
-    !Array.isArray(p.value) &&
-    !(typeof p.name === 'string' && p.name.startsWith('_'))
-  );
-  if (!rows.length) return null;
-  return (
-    <div style={{
-      background: 'rgba(30,30,40,0.92)', border: '1px solid #555',
-      borderRadius: 6, padding: '8px 12px', fontSize: 13, color: '#e5e7eb',
-    }}>
-      <p style={{ margin: '0 0 6px', fontWeight: 600, color: '#cbd5e1' }}>Turn {label}</p>
-      {rows.map(p => {
-        const sdKey = sdMap[p.name];
-        const sd = sdKey != null ? p.payload?.[sdKey] : null;
-        const avg = typeof p.value === 'number' ? p.value.toFixed(2) : p.value;
-        return (
-          <p key={p.name} style={{ margin: '2px 0', color: p.color || '#e5e7eb' }}>
-            <span style={{ fontWeight: 500 }}>{p.name}:</span>{' '}
-            {avg}{sd != null ? <span style={{ opacity: 0.75 }}> ± {Number(sd).toFixed(2)}</span> : null}
-          </p>
-        );
-      })}
-    </div>
-  );
+const makeStdTooltip = (sdMap = {}) => {
+  const StdTooltip = ({ active, payload, label }) => {
+    if (!active || !payload || !payload.length) return null;
+    const rows = payload.filter(
+      p => !Array.isArray(p.value) && !(typeof p.name === 'string' && p.name.startsWith('_'))
+    );
+    if (!rows.length) return null;
+    return (
+      <div
+        style={{
+          background: 'rgba(30,30,40,0.92)',
+          border: '1px solid #555',
+          borderRadius: 6,
+          padding: '8px 12px',
+          fontSize: 13,
+          color: '#e5e7eb',
+        }}
+      >
+        <p style={{ margin: '0 0 6px', fontWeight: 600, color: '#cbd5e1' }}>Turn {label}</p>
+        {rows.map(p => {
+          const sdKey = sdMap[p.name];
+          const sd = sdKey != null ? p.payload?.[sdKey] : null;
+          const avg = typeof p.value === 'number' ? p.value.toFixed(2) : p.value;
+          return (
+            <p key={p.name} style={{ margin: '2px 0', color: p.color || '#e5e7eb' }}>
+              <span style={{ fontWeight: 500 }}>{p.name}:</span> {avg}
+              {sd != null ? (
+                <span style={{ opacity: 0.75 }}> ± {Number(sd).toFixed(2)}</span>
+              ) : null}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+  return StdTooltip;
 };
 
 const ResultsPanel = ({
@@ -82,9 +98,7 @@ const ResultsPanel = ({
         {enableMulligans && (
           <p>
             Mulligan Rate:{' '}
-            {iterations > 0
-              ? ((simulationResults.mulligans / iterations) * 100).toFixed(1)
-              : 0}%
+            {iterations > 0 ? ((simulationResults.mulligans / iterations) * 100).toFixed(1) : 0}%
           </p>
         )}
         <div className="export-buttons">
@@ -106,12 +120,17 @@ const ResultsPanel = ({
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="turn" label={{ value: 'Turn', position: 'insideBottom', offset: -5 }} />
             <YAxis label={{ value: 'Count', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={makeStdTooltip({ 'Total Lands': '_landsSd', 'Untapped Lands': '_untappedSd' })} />
+            <Tooltip
+              content={makeStdTooltip({
+                'Total Lands': '_landsSd',
+                'Untapped Lands': '_untappedSd',
+              })}
+            />
             <Legend />
             {/* ±1σ bands */}
             <Area
               type="monotone"
-              dataKey={(d) => [d['Total Lands Lo'], d['Total Lands Hi']]}
+              dataKey={d => [d['Total Lands Lo'], d['Total Lands Hi']]}
               fill="rgba(102,126,234,0.18)"
               stroke="none"
               name="Total Lands ±1σ"
@@ -121,7 +140,7 @@ const ResultsPanel = ({
             />
             <Area
               type="monotone"
-              dataKey={(d) => [d['Untapped Lands Lo'], d['Untapped Lands Hi']]}
+              dataKey={d => [d['Untapped Lands Lo'], d['Untapped Lands Hi']]}
               fill="rgba(34,197,94,0.18)"
               stroke="none"
               name="Untapped Lands ±1σ"
@@ -130,8 +149,20 @@ const ResultsPanel = ({
               dot={false}
             />
             {/* Average lines */}
-            <Line type="monotone" dataKey="Total Lands" stroke="#667eea" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="Untapped Lands" stroke="#22c55e" strokeWidth={2} dot={false} />
+            <Line
+              type="monotone"
+              dataKey="Total Lands"
+              stroke="#667eea"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="Untapped Lands"
+              stroke="#22c55e"
+              strokeWidth={2}
+              dot={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -139,7 +170,9 @@ const ResultsPanel = ({
       {/* Mana by Color */}
       <div className="panel">
         <h3>Available Mana by Color</h3>
-        <p className="card-meta">Shaded band on Total Mana shows ±1 standard deviation across simulations.</p>
+        <p className="card-meta">
+          Shaded band on Total Mana shows ±1 standard deviation across simulations.
+        </p>
         <ResponsiveContainer width="100%" height={300}>
           <ComposedChart data={chartData.manaByColorData}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -150,7 +183,7 @@ const ResultsPanel = ({
             {/* ±1σ band for total mana */}
             <Area
               type="monotone"
-              dataKey={(d) => [d['Total Mana Lo'], d['Total Mana Hi']]}
+              dataKey={d => [d['Total Mana Lo'], d['Total Mana Hi']]}
               fill="rgba(124,58,237,0.15)"
               stroke="none"
               name="Total Mana ±1σ"
@@ -159,7 +192,13 @@ const ResultsPanel = ({
               dot={false}
             />
             {/* Average lines */}
-            <Line type="monotone" dataKey="Total Mana" stroke="#7c3aed" strokeWidth={3} dot={false} />
+            <Line
+              type="monotone"
+              dataKey="Total Mana"
+              stroke="#7c3aed"
+              strokeWidth={3}
+              dot={false}
+            />
             <Line type="monotone" dataKey="W" stroke="#fcd34d" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="U" stroke="#60a5fa" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="B" stroke="#6b7280" strokeWidth={2} dot={false} />
@@ -182,7 +221,7 @@ const ResultsPanel = ({
             <Legend />
             <Area
               type="monotone"
-              dataKey={(d) => [d['Life Loss Lo'], d['Life Loss Hi']]}
+              dataKey={d => [d['Life Loss Lo'], d['Life Loss Hi']]}
               fill="rgba(220,38,38,0.15)"
               stroke="none"
               name="Life Loss ±1σ"
@@ -190,7 +229,13 @@ const ResultsPanel = ({
               activeDot={false}
               dot={false}
             />
-            <Line type="monotone" dataKey="Life Loss" stroke="#dc2626" strokeWidth={2} dot={false} />
+            <Line
+              type="monotone"
+              dataKey="Life Loss"
+              stroke="#dc2626"
+              strokeWidth={2}
+              dot={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -202,7 +247,10 @@ const ResultsPanel = ({
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData.keyCardsData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="turn" label={{ value: 'Turn', position: 'insideBottom', offset: -5 }} />
+              <XAxis
+                dataKey="turn"
+                label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
+              />
               <YAxis label={{ value: 'Playable (%)', angle: -90, position: 'insideLeft' }} />
               <Tooltip />
               <Legend />
@@ -243,64 +291,72 @@ const ResultsPanel = ({
             Showing example hands that can play key cards on turn {selectedTurnForSequences}
           </p>
 
-          {Object.entries(simulationResults.fastestPlaySequences).map(([cardName, sequencesByTurn]) => {
-            const sequencesForTurn = sequencesByTurn[selectedTurnForSequences];
-            const burstSequencesForTurn =
-              simulationResults.fastestPlaySequencesBurst?.[cardName]?.[selectedTurnForSequences];
+          {Object.entries(simulationResults.fastestPlaySequences).map(
+            ([cardName, sequencesByTurn]) => {
+              const sequencesForTurn = sequencesByTurn[selectedTurnForSequences];
+              const burstSequencesForTurn =
+                simulationResults.fastestPlaySequencesBurst?.[cardName]?.[selectedTurnForSequences];
 
-            if (
-              (!sequencesForTurn || sequencesForTurn.length === 0) &&
-              (!burstSequencesForTurn || burstSequencesForTurn.length === 0)
-            ) {
+              if (
+                (!sequencesForTurn || sequencesForTurn.length === 0) &&
+                (!burstSequencesForTurn || burstSequencesForTurn.length === 0)
+              ) {
+                return (
+                  <div key={cardName} className="sequence-group">
+                    <h4 className="sequence-card-name">
+                      <CardTooltip name={cardName}>{cardName}</CardTooltip>
+                    </h4>
+                    <p className="sequence-no-result">
+                      No sequences found for turn {selectedTurnForSequences}. This card was not
+                      playable on this turn in any simulated games.
+                    </p>
+                  </div>
+                );
+              }
+
               return (
                 <div key={cardName} className="sequence-group">
-                  <h4 className="sequence-card-name"><CardTooltip name={cardName}>{cardName}</CardTooltip></h4>
-                  <p className="sequence-no-result">
-                    No sequences found for turn {selectedTurnForSequences}. This card was not playable
-                    on this turn in any simulated games.
-                  </p>
+                  <h4 className="sequence-card-name">
+                    <CardTooltip name={cardName}>{cardName}</CardTooltip>
+                  </h4>
+
+                  {sequencesForTurn &&
+                    sequencesForTurn.map((data, seqIdx) => (
+                      <div key={seqIdx} className="sequence-card">
+                        <p className="sequence-meta">
+                          <strong>Example {seqIdx + 1}:</strong> Playable on turn {data.turn} (
+                          {data.manaAvailable} mana available)
+                        </p>
+                        {renderSequenceBody(data, '#667eea')}
+                      </div>
+                    ))}
+
+                  {burstSequencesForTurn && burstSequencesForTurn.length > 0 && (
+                    <>
+                      <p className="sequence-burst-label">
+                        ⚡ Burst-only — playable only by spending{' '}
+                        {burstSequencesForTurn[0]?.burstCards?.join(' / ')}
+                      </p>
+                      {burstSequencesForTurn.map((data, seqIdx) => (
+                        <div key={`burst-${seqIdx}`} className="sequence-card sequence-card--burst">
+                          <p className="sequence-burst-meta">
+                            <strong>Burst example {seqIdx + 1}:</strong> Turn {data.turn}{' '}
+                            &mdash;&nbsp;
+                            {data.manaAvailable} base + {data.manaWithBurst - data.manaAvailable}{' '}
+                            burst &nbsp;= {data.manaWithBurst} mana total
+                          </p>
+                          <p className="sequence-burst-cards">
+                            Burst cards in hand: <strong>{data.burstCards.join(', ')}</strong>
+                          </p>
+                          {renderSequenceBody(data, '#f59e0b')}
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
               );
             }
-
-            return (
-              <div key={cardName} className="sequence-group">
-                <h4 className="sequence-card-name"><CardTooltip name={cardName}>{cardName}</CardTooltip></h4>
-
-                {sequencesForTurn && sequencesForTurn.map((data, seqIdx) => (
-                  <div key={seqIdx} className="sequence-card">
-                    <p className="sequence-meta">
-                      <strong>Example {seqIdx + 1}:</strong> Playable on turn {data.turn}{' '}
-                      ({data.manaAvailable} mana available)
-                    </p>
-                    {renderSequenceBody(data, '#667eea')}
-                  </div>
-                ))}
-
-                {burstSequencesForTurn && burstSequencesForTurn.length > 0 && (
-                  <>
-                    <p className="sequence-burst-label">
-                      ⚡ Burst-only — playable only by spending{' '}
-                      {burstSequencesForTurn[0]?.burstCards?.join(' / ')}
-                    </p>
-                    {burstSequencesForTurn.map((data, seqIdx) => (
-                      <div key={`burst-${seqIdx}`} className="sequence-card sequence-card--burst">
-                        <p className="sequence-burst-meta">
-                          <strong>Burst example {seqIdx + 1}:</strong> Turn {data.turn} &mdash;&nbsp;
-                          {data.manaAvailable} base + {data.manaWithBurst - data.manaAvailable} burst
-                          &nbsp;= {data.manaWithBurst} mana total
-                        </p>
-                        <p className="sequence-burst-cards">
-                          Burst cards in hand: <strong>{data.burstCards.join(', ')}</strong>
-                        </p>
-                        {renderSequenceBody(data, '#f59e0b')}
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            );
-          })}
+          )}
         </div>
       )}
     </div>

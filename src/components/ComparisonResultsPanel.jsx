@@ -22,20 +22,25 @@
 
 import React from 'react';
 import {
-  ComposedChart, LineChart, Line,
-  XAxis, YAxis,
-  CartesianGrid, Tooltip, Legend,
+  ComposedChart,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
 // Deck A: cool blues/greens   Deck B: warm amber/reds
 const DECK_A = {
-  primary:   '#667eea',
+  primary: '#667eea',
   secondary: '#22c55e',
 };
 const DECK_B = {
-  primary:   '#f59e0b',
+  primary: '#f59e0b',
   secondary: '#f87171',
 };
 
@@ -46,10 +51,16 @@ const KEY_PALETTE_B = ['#f59e0b', '#f87171', '#fb923c', '#fbbf24', '#e879f9'];
 const SimpleTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{
-      background: 'rgba(30,30,40,0.92)', border: '1px solid #555',
-      borderRadius: 6, padding: '8px 12px', fontSize: 13, color: '#e5e7eb',
-    }}>
+    <div
+      style={{
+        background: 'rgba(30,30,40,0.92)',
+        border: '1px solid #555',
+        borderRadius: 6,
+        padding: '8px 12px',
+        fontSize: 13,
+        color: '#e5e7eb',
+      }}
+    >
       <p style={{ margin: '0 0 6px', fontWeight: 600, color: '#cbd5e1' }}>Turn {label}</p>
       {payload.map(p => (
         <p key={p.name} style={{ margin: '2px 0', color: p.color || '#e5e7eb' }}>
@@ -58,6 +69,25 @@ const SimpleTooltip = ({ active, payload, label }) => {
         </p>
       ))}
     </div>
+  );
+};
+
+// ── Delta helpers (module-level) ─────────────────────────────────────────────
+const delta = (a, b, higherIsBetter = true) => {
+  const diff = b - a;
+  if (Math.abs(diff) < 0.01) return null;
+  const better = higherIsBetter ? diff > 0 : diff < 0;
+  return { diff: diff.toFixed(2), better };
+};
+
+const DeltaBadge = ({ a, b, higherIsBetter = true, labelB }) => {
+  const d = delta(a, b, higherIsBetter);
+  if (!d) return <span className="delta-neutral">≈ equal</span>;
+  const label = `${d.diff > 0 ? '+' : ''}${d.diff}`;
+  return (
+    <span className={d.better ? 'delta-better' : 'delta-worse'}>
+      {labelB} {d.better ? '▲' : '▼'} {label}
+    </span>
   );
 };
 
@@ -78,30 +108,27 @@ const ComparisonResultsPanel = ({
 }) => {
   if (!chartDataA || !chartDataB) return null;
 
-  const numTurns = Math.min(
-    chartDataA.landsData.length,
-    chartDataB.landsData.length,
-  );
+  const numTurns = Math.min(chartDataA.landsData.length, chartDataB.landsData.length);
 
   // ── Merge per-turn data for each chart ───────────────────────────────────────
   const landsCompare = Array.from({ length: numTurns }, (_, i) => ({
-    turn:                              chartDataA.landsData[i].turn,
-    [`${labelA}: Total Lands`]:        chartDataA.landsData[i]['Total Lands'],
-    [`${labelB}: Total Lands`]:        chartDataB.landsData[i]['Total Lands'],
-    [`${labelA}: Untapped Lands`]:     chartDataA.landsData[i]['Untapped Lands'],
-    [`${labelB}: Untapped Lands`]:     chartDataB.landsData[i]['Untapped Lands'],
+    turn: chartDataA.landsData[i].turn,
+    [`${labelA}: Total Lands`]: chartDataA.landsData[i]['Total Lands'],
+    [`${labelB}: Total Lands`]: chartDataB.landsData[i]['Total Lands'],
+    [`${labelA}: Untapped Lands`]: chartDataA.landsData[i]['Untapped Lands'],
+    [`${labelB}: Untapped Lands`]: chartDataB.landsData[i]['Untapped Lands'],
   }));
 
   const manaCompare = Array.from({ length: numTurns }, (_, i) => ({
-    turn:                              chartDataA.manaByColorData[i].turn,
-    [`${labelA}: Total Mana`]:         chartDataA.manaByColorData[i]['Total Mana'],
-    [`${labelB}: Total Mana`]:         chartDataB.manaByColorData[i]['Total Mana'],
+    turn: chartDataA.manaByColorData[i].turn,
+    [`${labelA}: Total Mana`]: chartDataA.manaByColorData[i]['Total Mana'],
+    [`${labelB}: Total Mana`]: chartDataB.manaByColorData[i]['Total Mana'],
   }));
 
   const lifeCompare = Array.from({ length: numTurns }, (_, i) => ({
-    turn:                              chartDataA.lifeLossData[i].turn,
-    [`${labelA}: Life Loss`]:          chartDataA.lifeLossData[i]['Life Loss'],
-    [`${labelB}: Life Loss`]:          chartDataB.lifeLossData[i]['Life Loss'],
+    turn: chartDataA.lifeLossData[i].turn,
+    [`${labelA}: Life Loss`]: chartDataA.lifeLossData[i]['Life Loss'],
+    [`${labelB}: Life Loss`]: chartDataB.lifeLossData[i]['Life Loss'],
   }));
 
   // ── Key card playability — union of both sets ────────────────────────────────
@@ -118,31 +145,12 @@ const ComparisonResultsPanel = ({
   });
 
   // ── Delta helpers for summary ────────────────────────────────────────────────
-  const avgA = (arr) => arr.reduce((s, v) => s + v, 0) / arr.length;
-  const finalLandA   = chartDataA.landsData.at(-1)?.['Total Lands']   ?? 0;
-  const finalLandB   = chartDataB.landsData.at(-1)?.['Total Lands']   ?? 0;
-  const finalManaA   = chartDataA.manaByColorData.at(-1)?.['Total Mana'] ?? 0;
-  const finalManaB   = chartDataB.manaByColorData.at(-1)?.['Total Mana'] ?? 0;
-  const finalLifeA   = chartDataA.lifeLossData.at(-1)?.['Life Loss']  ?? 0;
-  const finalLifeB   = chartDataB.lifeLossData.at(-1)?.['Life Loss']  ?? 0;
-
-  const delta = (a, b, higherIsBetter = true) => {
-    const diff = b - a;
-    if (Math.abs(diff) < 0.01) return null;
-    const better = higherIsBetter ? diff > 0 : diff < 0;
-    return { diff: diff.toFixed(2), better };
-  };
-
-  const DeltaBadge = ({ a, b, higherIsBetter = true }) => {
-    const d = delta(a, b, higherIsBetter);
-    if (!d) return <span className="delta-neutral">≈ equal</span>;
-    const label = `${d.diff > 0 ? '+' : ''}${d.diff}`;
-    return (
-      <span className={d.better ? 'delta-better' : 'delta-worse'}>
-        {labelB} {d.better ? '▲' : '▼'} {label}
-      </span>
-    );
-  };
+  const finalLandA = chartDataA.landsData.at(-1)?.['Total Lands'] ?? 0;
+  const finalLandB = chartDataB.landsData.at(-1)?.['Total Lands'] ?? 0;
+  const finalManaA = chartDataA.manaByColorData.at(-1)?.['Total Mana'] ?? 0;
+  const finalManaB = chartDataB.manaByColorData.at(-1)?.['Total Mana'] ?? 0;
+  const finalLifeA = chartDataA.lifeLossData.at(-1)?.['Life Loss'] ?? 0;
+  const finalLifeB = chartDataB.lifeLossData.at(-1)?.['Life Loss'] ?? 0;
 
   return (
     <div id="results-section">
@@ -152,25 +160,56 @@ const ComparisonResultsPanel = ({
 
         <div className="comparison-summary-grid">
           {[
-            { label: labelA, res: simulationResultsA, finalLand: finalLandA, finalMana: finalManaA, finalLife: finalLifeA },
-            { label: labelB, res: simulationResultsB, finalLand: finalLandB, finalMana: finalManaB, finalLife: finalLifeB },
+            {
+              label: labelA,
+              res: simulationResultsA,
+              finalLand: finalLandA,
+              finalMana: finalManaA,
+              finalLife: finalLifeA,
+            },
+            {
+              label: labelB,
+              res: simulationResultsB,
+              finalLand: finalLandB,
+              finalMana: finalManaB,
+              finalLife: finalLifeB,
+            },
           ].map(({ label, res, finalLand, finalMana, finalLife }) => (
             <div key={label} className="comparison-summary-col">
               <h4 className={label === labelA ? 'deck-label-a' : 'deck-label-b'}>{label}</h4>
-              <p>Hands kept: <strong>{res.handsKept.toLocaleString()}</strong></p>
+              <p>
+                Hands kept: <strong>{res.handsKept.toLocaleString()}</strong>
+              </p>
               {enableMulligans && (
-                <p>Mulligan rate: <strong>{((res.mulligans / iterations) * 100).toFixed(1)}%</strong></p>
+                <p>
+                  Mulligan rate: <strong>{((res.mulligans / iterations) * 100).toFixed(1)}%</strong>
+                </p>
               )}
-              <p>Lands by final turn: <strong>{finalLand.toFixed(2)}</strong></p>
-              <p>Mana by final turn: <strong>{finalMana.toFixed(2)}</strong></p>
-              <p>Life loss by final turn: <strong>{finalLife.toFixed(2)}</strong></p>
+              <p>
+                Lands by final turn: <strong>{finalLand.toFixed(2)}</strong>
+              </p>
+              <p>
+                Mana by final turn: <strong>{finalMana.toFixed(2)}</strong>
+              </p>
+              <p>
+                Life loss by final turn: <strong>{finalLife.toFixed(2)}</strong>
+              </p>
             </div>
           ))}
           <div className="comparison-summary-col comparison-summary-col--delta">
             <h4>Δ Difference (B vs A)</h4>
-            <p>Lands: <DeltaBadge a={finalLandA} b={finalLandB} higherIsBetter={true} /></p>
-            <p>Mana: <DeltaBadge a={finalManaA} b={finalManaB} higherIsBetter={true} /></p>
-            <p>Life loss: <DeltaBadge a={finalLifeA} b={finalLifeB} higherIsBetter={false} /></p>
+            <p>
+              Lands:{' '}
+              <DeltaBadge a={finalLandA} b={finalLandB} higherIsBetter={true} labelB={labelB} />
+            </p>
+            <p>
+              Mana:{' '}
+              <DeltaBadge a={finalManaA} b={finalManaB} higherIsBetter={true} labelB={labelB} />
+            </p>
+            <p>
+              Life loss:{' '}
+              <DeltaBadge a={finalLifeA} b={finalLifeB} higherIsBetter={false} labelB={labelB} />
+            </p>
           </div>
         </div>
 
@@ -197,10 +236,36 @@ const ComparisonResultsPanel = ({
             <YAxis label={{ value: 'Count', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={SimpleTooltip} />
             <Legend />
-            <Line type="monotone" dataKey={`${labelA}: Total Lands`}    stroke={DECK_A.primary}   strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey={`${labelB}: Total Lands`}    stroke={DECK_B.primary}   strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey={`${labelA}: Untapped Lands`} stroke={DECK_A.secondary} strokeWidth={2} dot={false} strokeDasharray="6 3" />
-            <Line type="monotone" dataKey={`${labelB}: Untapped Lands`} stroke={DECK_B.secondary} strokeWidth={2} dot={false} strokeDasharray="6 3" />
+            <Line
+              type="monotone"
+              dataKey={`${labelA}: Total Lands`}
+              stroke={DECK_A.primary}
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey={`${labelB}: Total Lands`}
+              stroke={DECK_B.primary}
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey={`${labelA}: Untapped Lands`}
+              stroke={DECK_A.secondary}
+              strokeWidth={2}
+              dot={false}
+              strokeDasharray="6 3"
+            />
+            <Line
+              type="monotone"
+              dataKey={`${labelB}: Untapped Lands`}
+              stroke={DECK_B.secondary}
+              strokeWidth={2}
+              dot={false}
+              strokeDasharray="6 3"
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -208,7 +273,9 @@ const ComparisonResultsPanel = ({
       {/* ── Total Mana per Turn ─────────────────────────────────────────────── */}
       <div className="panel">
         <h3>Available Mana per Turn</h3>
-        <p className="card-meta">Blue = {labelA} · Amber = {labelB}</p>
+        <p className="card-meta">
+          Blue = {labelA} · Amber = {labelB}
+        </p>
         <ResponsiveContainer width="100%" height={300}>
           <ComposedChart data={manaCompare}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -216,8 +283,20 @@ const ComparisonResultsPanel = ({
             <YAxis label={{ value: 'Mana', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={SimpleTooltip} />
             <Legend />
-            <Line type="monotone" dataKey={`${labelA}: Total Mana`} stroke={DECK_A.primary} strokeWidth={3} dot={false} />
-            <Line type="monotone" dataKey={`${labelB}: Total Mana`} stroke={DECK_B.primary} strokeWidth={3} dot={false} />
+            <Line
+              type="monotone"
+              dataKey={`${labelA}: Total Mana`}
+              stroke={DECK_A.primary}
+              strokeWidth={3}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey={`${labelB}: Total Mana`}
+              stroke={DECK_B.primary}
+              strokeWidth={3}
+              dot={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -225,7 +304,9 @@ const ComparisonResultsPanel = ({
       {/* ── Cumulative Life Loss ─────────────────────────────────────────────── */}
       <div className="panel">
         <h3>Cumulative Life Loss</h3>
-        <p className="card-meta">Blue = {labelA} · Amber = {labelB}</p>
+        <p className="card-meta">
+          Blue = {labelA} · Amber = {labelB}
+        </p>
         <ResponsiveContainer width="100%" height={300}>
           <ComposedChart data={lifeCompare}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -233,8 +314,20 @@ const ComparisonResultsPanel = ({
             <YAxis label={{ value: 'Life Loss', angle: -90, position: 'insideLeft' }} />
             <Tooltip content={SimpleTooltip} />
             <Legend />
-            <Line type="monotone" dataKey={`${labelA}: Life Loss`} stroke={DECK_A.primary} strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey={`${labelB}: Life Loss`} stroke={DECK_B.primary} strokeWidth={2} dot={false} />
+            <Line
+              type="monotone"
+              dataKey={`${labelA}: Life Loss`}
+              stroke={DECK_A.primary}
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey={`${labelB}: Life Loss`}
+              stroke={DECK_B.primary}
+              strokeWidth={2}
+              dot={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -249,7 +342,10 @@ const ComparisonResultsPanel = ({
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={keyCompare}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="turn" label={{ value: 'Turn', position: 'insideBottom', offset: -5 }} />
+              <XAxis
+                dataKey="turn"
+                label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
+              />
               <YAxis label={{ value: 'Playable (%)', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={SimpleTooltip} />
               <Legend />
