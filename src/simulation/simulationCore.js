@@ -12,16 +12,8 @@
  *       { includeRampSpells, disabledRampSpells }
  */
 
+import { BOUNCE_LANDS } from './landData.js';
 import {
-  BOUNCE_LANDS,
-  CROWD_LANDS,
-  FAST_LANDS,
-  CHECK_LANDS,
-  BATTLE_LANDS,
-  KNOWN_FETCH_LANDS,
-} from './landData.js';
-import {
-  ARTIFACT_DATA,
   SIMPLIFY_MOX_CONDITIONS,
   MOX_PRIORITY_ARTIFACTS,
   BURST_MANA_SOURCES,
@@ -31,7 +23,7 @@ import {
 // Utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const shuffle = (array) => {
+export const shuffle = array => {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -44,14 +36,20 @@ export const shuffle = (array) => {
 export const matchesRampFilter = (land, rampSpell) => {
   if (!land.isLand) return false;
   switch (rampSpell.fetchFilter) {
-    case 'any':     return true;
-    case 'basic':   return !!land.isBasic;
+    case 'any':
+      return true;
+    case 'basic':
+      return !!land.isBasic;
     case 'subtype':
-      return !!(rampSpell.fetchSubtypes && land.landSubtypes &&
-        rampSpell.fetchSubtypes.some(t => land.landSubtypes.includes(t)));
+      return !!(
+        rampSpell.fetchSubtypes &&
+        land.landSubtypes &&
+        rampSpell.fetchSubtypes.some(t => land.landSubtypes.includes(t))
+      );
     case 'snow':
       return !!(land.name && land.name.toLowerCase().includes('snow'));
-    default:        return !!land.isBasic;
+    default:
+      return !!land.isBasic;
   }
 };
 
@@ -68,7 +66,7 @@ export const doesLandEnterTapped = (land, battlefield, turn, commanderMode) => {
     return battlefield.filter(p => p.card.isLand && p.card.isBasic).length < 2;
   }
   if (land.isCheck) {
-    let needsTypes = land.checkTypes?.length ? [...land.checkTypes] : [];
+    const needsTypes = land.checkTypes?.length ? [...land.checkTypes] : [];
     if (needsTypes.length === 0) {
       if (land.produces.includes('W') && land.produces.includes('U')) {
         needsTypes.push('Plains', 'Island');
@@ -93,15 +91,17 @@ export const doesLandEnterTapped = (land, battlefield, turn, commanderMode) => {
       }
     }
     if (needsTypes.length === 0) return false;
-    return !battlefield.some(p =>
-      p.card.isLand && p.card.landSubtypes &&
-      p.card.landSubtypes.some(t => needsTypes.includes(t))
+    return !battlefield.some(
+      p =>
+        p.card.isLand &&
+        p.card.landSubtypes &&
+        p.card.landSubtypes.some(t => needsTypes.includes(t))
     );
   }
   if (land.isCrowd) {
     return !commanderMode;
   }
-  if (land.entersTappedAlways === true)  return true;
+  if (land.entersTappedAlways === true) return true;
   if (land.entersTappedAlways === false) return false;
   return false;
 };
@@ -109,15 +109,15 @@ export const doesLandEnterTapped = (land, battlefield, turn, commanderMode) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // selectBestLand
 // ─────────────────────────────────────────────────────────────────────────────
-export const selectBestLand = (hand, battlefield, library, turn) => {
+export const selectBestLand = (hand, battlefield, _library, _turn) => {
   const lands = hand.filter(c => c.isLand);
   if (lands.length === 0) return null;
 
   const landsWithBouncability = lands.map(land => {
     const isBounceCard = land.isBounce || BOUNCE_LANDS.has(land.name.toLowerCase());
     if (!isBounceCard) return { land, canPlay: true };
-    const nonBounceLandsToReturn = battlefield.filter(p =>
-      p.card.isLand && !p.card.isBounce && !BOUNCE_LANDS.has(p.card.name.toLowerCase())
+    const nonBounceLandsToReturn = battlefield.filter(
+      p => p.card.isLand && !p.card.isBounce && !BOUNCE_LANDS.has(p.card.name.toLowerCase())
     );
     return { land, canPlay: nonBounceLandsToReturn.length > 0 };
   });
@@ -125,16 +125,18 @@ export const selectBestLand = (hand, battlefield, library, turn) => {
   const playableLands = landsWithBouncability.filter(i => i.canPlay).map(i => i.land);
   if (playableLands.length === 0) return null;
 
-  const fetches      = playableLands.filter(l => l.isFetch && l.fetchType !== 'mana_cost');
+  const fetches = playableLands.filter(l => l.isFetch && l.fetchType !== 'mana_cost');
   const untappedSources = battlefield.filter(d => d.isLand && !d.tapped);
   if (fetches.length > 0 && untappedSources.length >= fetches[0].fetchcost) return fetches[0];
 
-  const untappedNonBounce = playableLands.filter(l =>
-    !l.entersTappedAlways && !l.isBounce && !BOUNCE_LANDS.has(l.name.toLowerCase())
+  const untappedNonBounce = playableLands.filter(
+    l => !l.entersTappedAlways && !l.isBounce && !BOUNCE_LANDS.has(l.name.toLowerCase())
   );
   if (untappedNonBounce.length > 0) return untappedNonBounce[0];
 
-  const bouncelands = playableLands.filter(l => l.isBounce || BOUNCE_LANDS.has(l.name.toLowerCase()));
+  const bouncelands = playableLands.filter(
+    l => l.isBounce || BOUNCE_LANDS.has(l.name.toLowerCase())
+  );
   if (bouncelands.length > 0) return bouncelands[0];
   return playableLands[0];
 };
@@ -142,13 +144,20 @@ export const selectBestLand = (hand, battlefield, library, turn) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // findBestLandToFetch
 // ─────────────────────────────────────────────────────────────────────────────
-export const findBestLandToFetch = (fetchLand, library, battlefield, keyCardNames, parsedDeck, turn) => {
+export const findBestLandToFetch = (
+  fetchLand,
+  library,
+  battlefield,
+  keyCardNames,
+  parsedDeck,
+  turn
+) => {
   const onlyBasics = fetchLand.isHideawayFetch || fetchLand.fetchesOnlyBasics;
 
   const eligibleLands = library.filter(card => {
     if (!card.isLand) return false;
     if (onlyBasics && !card.isBasic) return false;
-    const landTypes  = card.landSubtypes || [];
+    const landTypes = card.landSubtypes || [];
     const fetchColors = fetchLand.fetchColors || [];
     return landTypes.some(type => {
       const typeToColor = { Plains: 'W', Island: 'U', Swamp: 'B', Mountain: 'R', Forest: 'G' };
@@ -162,7 +171,8 @@ export const findBestLandToFetch = (fetchLand, library, battlefield, keyCardName
   if (keyCardNames && keyCardNames.length > 0 && parsedDeck) {
     const keyCards = [];
     keyCardNames.forEach(cardName => {
-      const card = parsedDeck.spells.find(c => c.name === cardName) ||
+      const card =
+        parsedDeck.spells.find(c => c.name === cardName) ||
         parsedDeck.creatures.find(c => c.name === cardName) ||
         parsedDeck.artifacts.find(c => c.name === cardName);
       if (card) keyCards.push(card);
@@ -179,8 +189,11 @@ export const findBestLandToFetch = (fetchLand, library, battlefield, keyCardName
 
   const currentColors = new Set();
   battlefield.forEach(permanent => {
-    if (permanent.card.isLand || permanent.card.isManaArtifact ||
-        (permanent.card.isManaCreature && !permanent.summoningSick)) {
+    if (
+      permanent.card.isLand ||
+      permanent.card.isManaArtifact ||
+      (permanent.card.isManaCreature && !permanent.summoningSick)
+    ) {
       (permanent.card.produces || []).forEach(color => {
         if (['W', 'U', 'B', 'R', 'G'].includes(color)) currentColors.add(color);
       });
@@ -192,10 +205,10 @@ export const findBestLandToFetch = (fetchLand, library, battlefield, keyCardName
   const scoredLands = eligibleLands.map(land => {
     let score = 0;
     const producesNeededColor = (land.produces || []).some(c => missingColors.has(c));
-    if (producesNeededColor)                                  score += 300;
-    if (turn <= 2 && (land.produces || []).length > 2)       score += 1000;
-    if (turn >= 6 && land.isShockLand)                       score -= 100;
-    if ((land.produces || []).length >= 2)                    score += 100;
+    if (producesNeededColor) score += 300;
+    if (turn <= 2 && (land.produces || []).length > 2) score += 1000;
+    if (turn >= 6 && land.isShockLand) score -= 100;
+    if ((land.produces || []).length >= 2) score += 100;
     score += (land.produces || []).filter(c => missingColors.has(c)).length * 250;
     return { land, score };
   });
@@ -207,7 +220,18 @@ export const findBestLandToFetch = (fetchLand, library, battlefield, keyCardName
 // playLand
 //   NEW: commanderMode is now an explicit parameter (was a closure over state)
 // ─────────────────────────────────────────────────────────────────────────────
-export const playLand = (land, hand, battlefield, library, graveyard, turn, turnLog, keyCardNames, parsedDeck, commanderMode) => {
+export const playLand = (
+  land,
+  hand,
+  battlefield,
+  library,
+  graveyard,
+  turn,
+  turnLog,
+  keyCardNames,
+  parsedDeck,
+  commanderMode
+) => {
   const index = hand.indexOf(land);
   hand.splice(index, 1);
   let lifeLoss = 0;
@@ -225,12 +249,22 @@ export const playLand = (land, hand, battlefield, library, graveyard, turn, turn
 
   if (land.isFetch) {
     if (land.isHideawayFetch) {
-      const fetchedLand = findBestLandToFetch(land, library, battlefield, keyCardNames, parsedDeck, turn);
+      const fetchedLand = findBestLandToFetch(
+        land,
+        library,
+        battlefield,
+        keyCardNames,
+        parsedDeck,
+        turn
+      );
       if (fetchedLand) {
         library.splice(library.indexOf(fetchedLand), 1);
         battlefield.push({ card: fetchedLand, tapped: true, enteredTapped: true });
         graveyard.push(land);
-        if (turnLog) turnLog.actions.push(`Played ${land.name}, sacrificed it to fetch ${fetchedLand.name} (tapped)`);
+        if (turnLog)
+          turnLog.actions.push(
+            `Played ${land.name}, sacrificed it to fetch ${fetchedLand.name} (tapped)`
+          );
       } else {
         battlefield.push({ card: land, tapped: true, enteredTapped: true });
         if (turnLog) turnLog.actions.push(`Played ${land.name} (tapped, no fetch targets)`);
@@ -244,15 +278,16 @@ export const playLand = (land, hand, battlefield, library, graveyard, turn, turn
       }
     }
   } else {
-    const entersTapped     = doesLandEnterTapped(land, battlefield, turn, commanderMode);
-    const isBounceCard     = land.isBounce || BOUNCE_LANDS.has(land.name.toLowerCase());
+    const entersTapped = doesLandEnterTapped(land, battlefield, turn, commanderMode);
+    const isBounceCard = land.isBounce || BOUNCE_LANDS.has(land.name.toLowerCase());
 
     if (isBounceCard) {
-      const landsToBounce = battlefield.filter(p =>
-        p.card.isLand && !p.card.isBounce && !BOUNCE_LANDS.has(p.card.name.toLowerCase())
+      const landsToBounce = battlefield.filter(
+        p => p.card.isLand && !p.card.isBounce && !BOUNCE_LANDS.has(p.card.name.toLowerCase())
       );
       if (landsToBounce.length === 0) {
-        if (turnLog) turnLog.actions.push(`Cannot play ${land.name} (no non-bounce lands to bounce)`);
+        if (turnLog)
+          turnLog.actions.push(`Cannot play ${land.name} (no non-bounce lands to bounce)`);
         return 0;
       }
     }
@@ -263,22 +298,24 @@ export const playLand = (land, hand, battlefield, library, graveyard, turn, turn
     if (land.isShockLand && turn <= 6 && entersTapped) {
       battlefield[battlefield.length - 1].tapped = false;
       battlefield[battlefield.length - 1].enteredTapped = false;
-      lifeLoss += (land.lifeloss ?? 2);
+      lifeLoss += land.lifeloss ?? 2;
     }
 
     if (isBounceCard) {
       const bounceLandIndex = battlefield.length - 1;
-      const finalState      = battlefield[bounceLandIndex]?.tapped ? 'tapped' : 'untapped';
-      const landsToBounce   = battlefield.filter(p =>
-        p.card.isLand && !p.card.isBounce && !BOUNCE_LANDS.has(p.card.name.toLowerCase())
+      const finalState = battlefield[bounceLandIndex]?.tapped ? 'tapped' : 'untapped';
+      const landsToBounce = battlefield.filter(
+        p => p.card.isLand && !p.card.isBounce && !BOUNCE_LANDS.has(p.card.name.toLowerCase())
       );
       const tappedLands = landsToBounce.filter(p => p.tapped);
-      const toBounce    = tappedLands.length > 0 ? tappedLands[0] : landsToBounce[0];
+      const toBounce = tappedLands.length > 0 ? tappedLands[0] : landsToBounce[0];
       const bouncedState = toBounce.tapped ? 'tapped' : 'untapped';
       battlefield.splice(battlefield.indexOf(toBounce), 1);
       hand.push(toBounce.card);
       if (turnLog)
-        turnLog.actions.push(`Played ${land.name} (${finalState}), bounced ${toBounce.card.name} (${bouncedState})`);
+        turnLog.actions.push(
+          `Played ${land.name} (${finalState}), bounced ${toBounce.card.name} (${bouncedState})`
+        );
     } else {
       if (turnLog) {
         const finalState = battlefield[battlefield.length - 1]?.tapped ? 'tapped' : 'untapped';
@@ -311,8 +348,8 @@ export const tapManaSources = (spell, battlefield) => {
   ['W', 'U', 'B', 'R', 'G'].forEach(color => {
     let needed = colorNeeds[color];
     if (needed === 0) return;
-    const sources = battlefield.filter(p =>
-      !p.tapped && p.card.produces?.includes(color) && (!p.summoningSick || p.card.isLand)
+    const sources = battlefield.filter(
+      p => !p.tapped && p.card.produces?.includes(color) && (!p.summoningSick || p.card.isLand)
     );
     for (const source of sources) {
       if (needed <= 0) break;
@@ -335,42 +372,50 @@ export const tapManaSources = (spell, battlefield) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const calculateManaAvailability = (battlefield, turn = 999) => {
   const colors = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
-  let total    = 0;
+  let total = 0;
   // sources: one entry per mana unit available for bipartite pip-matching
   const sources = [];
   const moxSimpleTurn = 2;
 
-  battlefield.filter(p => !p.tapped).forEach(permanent => {
-    const card = permanent.card;
-    if (card.isLand) {
-      const amt = card.manaAmount || 1;
-      total += amt;
-      card.produces.forEach(color => { colors[color] = (colors[color] || 0) + amt; });
-      for (let i = 0; i < amt; i++) sources.push({ produces: [...card.produces] });
-    } else if (card.isManaArtifact) {
-      if (card.isMoxOpal && !(SIMPLIFY_MOX_CONDITIONS && turn >= moxSimpleTurn)) {
-        const artCount = battlefield.filter(p =>
-          p.card.type?.includes('artifact') || p.card.isManaArtifact
-        ).length;
-        if (artCount < 3) return;
+  battlefield
+    .filter(p => !p.tapped)
+    .forEach(permanent => {
+      const card = permanent.card;
+      if (card.isLand) {
+        const amt = card.manaAmount || 1;
+        total += amt;
+        card.produces.forEach(color => {
+          colors[color] = (colors[color] || 0) + amt;
+        });
+        for (let i = 0; i < amt; i++) sources.push({ produces: [...card.produces] });
+      } else if (card.isManaArtifact) {
+        if (card.isMoxOpal && !(SIMPLIFY_MOX_CONDITIONS && turn >= moxSimpleTurn)) {
+          const artCount = battlefield.filter(
+            p => p.card.type?.includes('artifact') || p.card.isManaArtifact
+          ).length;
+          if (artCount < 3) return;
+        }
+        if (card.isMoxAmber && !(SIMPLIFY_MOX_CONDITIONS && turn >= moxSimpleTurn)) {
+          const legendaries = battlefield.filter(
+            p => p.card.oracleText?.includes('Legendary') || p.card.type?.includes('Legendary')
+          );
+          if (legendaries.length === 0) return;
+        }
+        const amt = card.manaAmount || 1;
+        total += amt;
+        card.produces.forEach(color => {
+          colors[color] = (colors[color] || 0) + amt;
+        });
+        for (let i = 0; i < amt; i++) sources.push({ produces: [...card.produces] });
+      } else if (card.isManaCreature && !permanent.summoningSick) {
+        const amt = card.manaAmount || 1;
+        total += amt;
+        card.produces.forEach(color => {
+          colors[color] = (colors[color] || 0) + amt;
+        });
+        for (let i = 0; i < amt; i++) sources.push({ produces: [...card.produces] });
       }
-      if (card.isMoxAmber && !(SIMPLIFY_MOX_CONDITIONS && turn >= moxSimpleTurn)) {
-        const legendaries = battlefield.filter(p =>
-          p.card.oracleText?.includes('Legendary') || p.card.type?.includes('Legendary')
-        );
-        if (legendaries.length === 0) return;
-      }
-      const amt = card.manaAmount || 1;
-      total += amt;
-      card.produces.forEach(color => { colors[color] = (colors[color] || 0) + amt; });
-      for (let i = 0; i < amt; i++) sources.push({ produces: [...card.produces] });
-    } else if (card.isManaCreature && !permanent.summoningSick) {
-      const amt = card.manaAmount || 1;
-      total += amt;
-      card.produces.forEach(color => { colors[color] = (colors[color] || 0) + amt; });
-      for (let i = 0; i < amt; i++) sources.push({ produces: [...card.produces] });
-    }
-  });
+    });
 
   return { total, colors, sources };
 };
@@ -434,7 +479,7 @@ export const solveColorPips = (pips, sources) => {
 export const canPlayCard = (card, manaAvailable) => {
   if (card.cmc > manaAvailable.total) return false;
 
-  const symbols  = card.manaCost.match(/\{([^}]+)\}/g) || [];
+  const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
   const colorPips = [];
   symbols.forEach(symbol => {
     const clean = symbol.replace(/[{}]/g, '');
@@ -452,7 +497,10 @@ export const canPlayCard = (card, manaAvailable) => {
   const colorRequirements = { W: 0, U: 0, B: 0, R: 0, G: 0 };
   colorPips.forEach(c => colorRequirements[c]++);
   for (const color in colorRequirements) {
-    if (colorRequirements[color] > 0 && (manaAvailable.colors[color] || 0) < colorRequirements[color])
+    if (
+      colorRequirements[color] > 0 &&
+      (manaAvailable.colors[color] || 0) < colorRequirements[color]
+    )
       return false;
   }
   return true;
@@ -462,7 +510,17 @@ export const canPlayCard = (card, manaAvailable) => {
 // castSpells
 //   NEW: simConfig = { includeRampSpells, disabledRampSpells }
 // ─────────────────────────────────────────────────────────────────────────────
-export const castSpells = (hand, battlefield, graveyard, turnLog, keyCardNames, parsedDeck, library, turn = 999, simConfig = {}) => {
+export const castSpells = (
+  hand,
+  battlefield,
+  graveyard,
+  turnLog,
+  keyCardNames,
+  parsedDeck,
+  library,
+  turn = 999,
+  simConfig = {}
+) => {
   const { includeRampSpells = true, disabledRampSpells = new Set() } = simConfig;
 
   // Phase 1: mana-producing permanents
@@ -470,9 +528,11 @@ export const castSpells = (hand, battlefield, graveyard, turnLog, keyCardNames, 
   while (changed) {
     changed = false;
     const manaAvailable = calculateManaAvailability(battlefield, turn);
-    const creatures    = hand.filter(c => c.isManaCreature);
-    const exploration  = hand.filter(c => c.isExploration);
-    const artifacts    = hand.filter(c => c.isManaArtifact && !BURST_MANA_SOURCES.has(c.name?.toLowerCase()));
+    const creatures = hand.filter(c => c.isManaCreature);
+    const exploration = hand.filter(c => c.isExploration);
+    const artifacts = hand.filter(
+      c => c.isManaArtifact && !BURST_MANA_SOURCES.has(c.name?.toLowerCase())
+    );
 
     const castable = [...creatures, ...exploration, ...artifacts].sort((a, b) => {
       const aPrio = MOX_PRIORITY_ARTIFACTS.has(a.name?.toLowerCase()) ? -1 : a.cmc;
@@ -514,28 +574,37 @@ export const castSpells = (hand, battlefield, graveyard, turnLog, keyCardNames, 
       }
 
       if (spell.condition === 'metalcraft' && !(SIMPLIFY_MOX_CONDITIONS && turn >= 2)) {
-        const artCount = battlefield.filter(p => p.card.type?.includes('artifact') || p.card.isManaArtifact).length;
+        const artCount = battlefield.filter(
+          p => p.card.type?.includes('artifact') || p.card.isManaArtifact
+        ).length;
         if (artCount < 2) etbNote += ' ⚠ metalcraft not yet active';
       }
       if (spell.condition === 'legendary' && !(SIMPLIFY_MOX_CONDITIONS && turn >= 2)) {
-        const hasLegendary = battlefield.some(p =>
-          p.card.type?.includes('Legendary') || p.card.oracleText?.includes('Legendary')
+        const hasLegendary = battlefield.some(
+          p => p.card.type?.includes('Legendary') || p.card.oracleText?.includes('Legendary')
         );
         if (!hasLegendary) etbNote += ' ⚠ no legendary — no mana produced';
       }
 
       hand.splice(hand.indexOf(spell), 1);
-      battlefield.push({ card: spell, tapped: spell.entersTapped || false, summoningSick: spell.isManaCreature || spell.isExploration });
+      battlefield.push({
+        card: spell,
+        tapped: spell.entersTapped || false,
+        summoningSick: spell.isManaCreature || spell.isExploration,
+      });
       tapManaSources(spell, battlefield);
 
       if (turnLog) {
         let type = 'permanent';
-        if (spell.isManaArtifact)    type = 'artifact';
+        if (spell.isManaArtifact) type = 'artifact';
         else if (spell.isManaCreature) type = 'creature';
-        else if (spell.isExploration)  type = spell.isCreature ? 'creature' : (spell.isArtifact ? 'artifact' : 'permanent');
+        else if (spell.isExploration)
+          type = spell.isCreature ? 'creature' : spell.isArtifact ? 'artifact' : 'permanent';
         const explorationSuffix = spell.isExploration ? ' (Exploration effect)' : '';
-        const tappedSuffix      = spell.entersTapped  ? ' (enters tapped)'      : '';
-        turnLog.actions.push(`Cast ${type}: ${spell.name}${explorationSuffix}${tappedSuffix}${etbNote}`);
+        const tappedSuffix = spell.entersTapped ? ' (enters tapped)' : '';
+        turnLog.actions.push(
+          `Cast ${type}: ${spell.name}${explorationSuffix}${tappedSuffix}${etbNote}`
+        );
       }
 
       changed = true;
@@ -549,13 +618,14 @@ export const castSpells = (hand, battlefield, graveyard, turnLog, keyCardNames, 
     while (rampChanged) {
       rampChanged = false;
       const manaAvailable = calculateManaAvailability(battlefield, turn);
-      const rampInHand    = hand.filter(c => c.isRampSpell && !disabledRampSpells.has(c.name));
+      const rampInHand = hand.filter(c => c.isRampSpell && !disabledRampSpells.has(c.name));
 
       for (const rampSpell of rampInHand.sort((a, b) => a.cmc - b.cmc)) {
         if (!canPlayCard(rampSpell, manaAvailable)) continue;
         const eligibleInLibrary = library.filter(c => matchesRampFilter(c, rampSpell));
-        const minNeeded = Math.max(1, (rampSpell.landsToAdd || 1) > 0 ? 1 : 0) +
-                          (rampSpell.landsToHand > 0 ? 1 : 0);
+        const minNeeded =
+          Math.max(1, (rampSpell.landsToAdd || 1) > 0 ? 1 : 0) +
+          (rampSpell.landsToHand > 0 ? 1 : 0);
         if (eligibleInLibrary.length < minNeeded) continue;
 
         hand.splice(hand.indexOf(rampSpell), 1);
@@ -564,11 +634,11 @@ export const castSpells = (hand, battlefield, graveyard, turnLog, keyCardNames, 
 
         let sacrificedLandName = null;
         if (rampSpell.sacrificeLand) {
-          const candidates  = battlefield.filter(p => p.card.isLand && !p.card.isFetch);
-          const basics       = candidates.filter(p => p.card.isBasic);
-          const duals        = candidates.filter(p => !p.card.isBasic && !p.card.isBounce);
-          const bounces      = candidates.filter(p => p.card.isBounce);
-          const toSacrifice  = basics[0] ?? duals[0] ?? bounces[0] ?? null;
+          const candidates = battlefield.filter(p => p.card.isLand && !p.card.isFetch);
+          const basics = candidates.filter(p => p.card.isBasic);
+          const duals = candidates.filter(p => !p.card.isBasic && !p.card.isBounce);
+          const bounces = candidates.filter(p => p.card.isBounce);
+          const toSacrifice = basics[0] ?? duals[0] ?? bounces[0] ?? null;
           if (toSacrifice) {
             sacrificedLandName = toSacrifice.card.name;
             battlefield.splice(battlefield.indexOf(toSacrifice), 1);
@@ -582,14 +652,22 @@ export const castSpells = (hand, battlefield, graveyard, turnLog, keyCardNames, 
           if (matchesRampFilter(library[li], rampSpell)) {
             const [fetchedCard] = library.splice(li, 1);
             li--;
-            battlefield.push({ card: fetchedCard, tapped: rampSpell.landsTapped, enteredTapped: rampSpell.landsTapped });
+            battlefield.push({
+              card: fetchedCard,
+              tapped: rampSpell.landsTapped,
+              enteredTapped: rampSpell.landsTapped,
+            });
             landsToFieldNames.push(fetchedCard.name);
           }
         }
 
         const landsToHandNames = [];
         if (rampSpell.landsToHand > 0) {
-          for (let li = 0; li < library.length && landsToHandNames.length < rampSpell.landsToHand; li++) {
+          for (
+            let li = 0;
+            li < library.length && landsToHandNames.length < rampSpell.landsToHand;
+            li++
+          ) {
             if (matchesRampFilter(library[li], rampSpell)) {
               const [card] = library.splice(li, 1);
               li--;
@@ -601,10 +679,16 @@ export const castSpells = (hand, battlefield, graveyard, turnLog, keyCardNames, 
 
         if (turnLog) {
           const tappedNote = rampSpell.landsTapped ? 'tapped' : 'untapped';
-          const sacNote    = sacrificedLandName  ? `, sac'd ${sacrificedLandName}` : '';
-          const fieldNote  = landsToFieldNames.length > 0 ? ` → ${landsToFieldNames.join(', ')} (${tappedNote})` : ' → no land found';
-          const handNote   = landsToHandNames.length > 0  ? `; ${landsToHandNames.join(', ')} to hand` : '';
-          turnLog.actions.push(`Cast ramp spell: ${rampSpell.name}${sacNote}${fieldNote}${handNote}`);
+          const sacNote = sacrificedLandName ? `, sac'd ${sacrificedLandName}` : '';
+          const fieldNote =
+            landsToFieldNames.length > 0
+              ? ` → ${landsToFieldNames.join(', ')} (${tappedNote})`
+              : ' → no land found';
+          const handNote =
+            landsToHandNames.length > 0 ? `; ${landsToHandNames.join(', ')} to hand` : '';
+          turnLog.actions.push(
+            `Cast ramp spell: ${rampSpell.name}${sacNote}${fieldNote}${handNote}`
+          );
         }
         rampChanged = true;
         break;

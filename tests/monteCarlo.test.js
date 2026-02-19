@@ -78,6 +78,7 @@ const ramp = (overrides = {}) => ({
   fetchFilter: 'basic',
   fetchSubtypes: null,
   quantity: 1,
+  ...overrides,
 });
 
 const ritual = (overrides = {}) => ({
@@ -121,13 +122,13 @@ const spell = (overrides = {}) => ({
 
 /** Build a minimal but complete parsed-deck object. */
 const makeDeck = (overrides = {}) => ({
-  lands:      [],
-  artifacts:  [],
-  creatures:  [],
+  lands: [],
+  artifacts: [],
+  creatures: [],
   exploration: [],
   rampSpells: [],
-  rituals:    [],
-  spells:     [],
+  rituals: [],
+  spells: [],
   ...overrides,
 });
 
@@ -263,10 +264,10 @@ describe('buildCompleteDeck', () => {
 
   it('returns correct total card count from a mixed deck', () => {
     const deck = makeDeck({
-      lands:      [land({ quantity: 4 })],
-      artifacts:  [artifact({ quantity: 2 })],
-      creatures:  [creature({ quantity: 3 })],
-      spells:     [spell({ quantity: 1 })],
+      lands: [land({ quantity: 4 })],
+      artifacts: [artifact({ quantity: 2 })],
+      creatures: [creature({ quantity: 3 })],
+      spells: [spell({ quantity: 1 })],
     });
     const result = buildCompleteDeck(deck);
     expect(result).toHaveLength(10);
@@ -367,7 +368,8 @@ describe('monteCarlo — land statistics', () => {
 
   it('a deck of only tapped lands has 0 avg untapped lands on turn 1', () => {
     const tapLands = [];
-    for (let i = 0; i < 40; i++) tapLands.push(land({ name: `Tap ${i}`, entersTappedAlways: true }));
+    for (let i = 0; i < 40; i++)
+      tapLands.push(land({ name: `Tap ${i}`, entersTappedAlways: true }));
     const deck = makeDeck({ lands: tapLands });
     const result = monteCarlo(deck, { iterations: 200, turns: 3, handSize: 7 });
     // On turn 1 everything entered tapped, so untapped count should be 0
@@ -392,7 +394,7 @@ describe('monteCarlo — key-card playability', () => {
   it('a free spell ({0}) is playable 100% of the time by turn 2', () => {
     const freeSpell = spell({ name: 'Zero Spell', cmc: 0, manaCost: '{0}' });
     const deck = makeDeck({
-      lands:  Array.from({ length: 36 }, (_, i) => land({ name: `F${i}` })),
+      lands: Array.from({ length: 36 }, (_, i) => land({ name: `F${i}` })),
       spells: [freeSpell],
     });
     const result = monteCarlo(deck, {
@@ -418,7 +420,7 @@ describe('monteCarlo — key-card playability', () => {
   it('keyCardPlayability percentages are in [0, 100]', () => {
     const freeSpell = spell({ name: 'FreeCard', cmc: 0, manaCost: '{0}' });
     const deck = makeDeck({
-      lands:  Array.from({ length: 36 }, (_, i) => land({ name: `L${i}` })),
+      lands: Array.from({ length: 36 }, (_, i) => land({ name: `L${i}` })),
       spells: [freeSpell],
     });
     const result = monteCarlo(deck, {
@@ -447,7 +449,7 @@ describe('monteCarlo — key-card playability', () => {
   it('playability is monotonically non-decreasing across turns', () => {
     const target = spell({ name: 'ThreeDrop', cmc: 3, manaCost: '{1}{G}{G}' });
     const deck = makeDeck({
-      lands:  Array.from({ length: 36 }, (_, i) => land({ name: `F${i}` })),
+      lands: Array.from({ length: 36 }, (_, i) => land({ name: `F${i}` })),
       spells: [target],
     });
     const result = monteCarlo(deck, {
@@ -468,7 +470,7 @@ describe('monteCarlo — key-card playability', () => {
 describe('monteCarlo — hasBurstCards', () => {
   it('is true when a ritual is in the deck', () => {
     const deck = makeDeck({
-      lands:   Array.from({ length: 36 }, (_, i) => land({ name: `L${i}` })),
+      lands: Array.from({ length: 36 }, (_, i) => land({ name: `L${i}` })),
       rituals: [ritual()],
     });
     const result = monteCarlo(deck, { iterations: 10, turns: 3 });
@@ -500,23 +502,27 @@ describe('monteCarlo — mulligans', () => {
   it('london mulligan keeps correct hand size (7 - mulliganCount cards)', () => {
     // This is implicitly verified: if the sim runs for many iterations without
     // throwing, the hand sizing logic is correct.
-    expect(() => monteCarlo(monoGreenDecks(), {
-      iterations: 100,
-      turns: 4,
-      enableMulligans: true,
-      mulliganRule: 'london',
-      mulliganStrategy: 'balanced',
-    })).not.toThrow();
+    expect(() =>
+      monteCarlo(monoGreenDecks(), {
+        iterations: 100,
+        turns: 4,
+        enableMulligans: true,
+        mulliganRule: 'london',
+        mulliganStrategy: 'balanced',
+      })
+    ).not.toThrow();
   });
 
   it('vancouver mulligan rule runs without error', () => {
-    expect(() => monteCarlo(monoGreenDecks(), {
-      iterations: 100,
-      turns: 4,
-      enableMulligans: true,
-      mulliganRule: 'vancouver',
-      mulliganStrategy: 'conservative',
-    })).not.toThrow();
+    expect(() =>
+      monteCarlo(monoGreenDecks(), {
+        iterations: 100,
+        turns: 4,
+        enableMulligans: true,
+        mulliganRule: 'vancouver',
+        mulliganStrategy: 'conservative',
+      })
+    ).not.toThrow();
   });
 
   it('handsKept equals iterations regardless of mulligans', () => {
@@ -557,17 +563,19 @@ describe('monteCarlo — lifeLossPerTurn', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('monteCarlo — commanderMode', () => {
   it('runs without errors in commander mode', () => {
-    expect(() => monteCarlo(monoGreenDecks(), {
-      iterations: 100,
-      turns: 6,
-      commanderMode: true,
-    })).not.toThrow();
+    expect(() =>
+      monteCarlo(monoGreenDecks(), {
+        iterations: 100,
+        turns: 6,
+        commanderMode: true,
+      })
+    ).not.toThrow();
   });
 
   it('turn-1 lands: commander mode (draws on turn 0) should average ≥ non-commander', () => {
     // In commander mode every turn draws, yielding a slightly better land average
     const base = monteCarlo(monoGreenDecks(), { iterations: 500, turns: 2, commanderMode: false });
-    const cmd  = monteCarlo(monoGreenDecks(), { iterations: 500, turns: 2, commanderMode: true });
+    const cmd = monteCarlo(monoGreenDecks(), { iterations: 500, turns: 2, commanderMode: true });
     // By turn 2 (index 1) commander mode gains an extra card on turn 1, so lands ≥ non-cmd
     expect(cmd.landsPerTurn[1]).toBeGreaterThanOrEqual(base.landsPerTurn[1] - 0.05);
   });
@@ -595,13 +603,15 @@ describe('monteCarlo — edge cases', () => {
   });
 
   it('handles handSize=1 without throwing', () => {
-    expect(() => monteCarlo(monoGreenDecks(), { iterations: 50, turns: 3, handSize: 1 })).not.toThrow();
+    expect(() =>
+      monteCarlo(monoGreenDecks(), { iterations: 50, turns: 3, handSize: 1 })
+    ).not.toThrow();
   });
 
   it('fastestPlaySequences is populated for a key card that becomes playable', () => {
     const freeCard = spell({ name: 'FreeKey', cmc: 0, manaCost: '{0}' });
     const deck = makeDeck({
-      lands:  Array.from({ length: 36 }, (_, i) => land({ name: `L${i}` })),
+      lands: Array.from({ length: 36 }, (_, i) => land({ name: `L${i}` })),
       spells: [freeCard],
     });
     const result = monteCarlo(deck, {

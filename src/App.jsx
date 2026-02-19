@@ -302,7 +302,6 @@ const MTGMonteCarloAnalyzer = () => {
       setCardsDatabase(data);
 
       const lookupMap = new Map();
-      let skippedTokens = 0;
 
       data.forEach(card => {
         if (
@@ -311,7 +310,6 @@ const MTGMonteCarloAnalyzer = () => {
           card.set_type === 'token' ||
           card.type_line?.includes('Token')
         ) {
-          skippedTokens++;
           return;
         }
 
@@ -326,9 +324,6 @@ const MTGMonteCarloAnalyzer = () => {
 
       setCardLookupMap(lookupMap);
       setError('');
-      console.log(
-        `✓ Loaded ${data.length} cards from uploaded file (${skippedTokens} tokens filtered out)`
-      );
     } catch (err) {
       setError('Invalid JSON file. Please check the file format.');
       console.error(err);

@@ -81,19 +81,14 @@ const scryfallInstant = (name, manaCost, cmc, extras = {}) => ({
 
 // ── Standard card fixtures using real names so archive lookups work ───────
 
-const FOREST_DATA        = scryfallLand('Forest', 'Forest', '{G}');
-const ISLAND_DATA        = scryfallLand('Island', 'Island', '{U}');
-const SWAMP_DATA         = scryfallLand('Swamp',  'Swamp',  '{B}');
+const FOREST_DATA = scryfallLand('Forest', 'Forest', '{G}');
+const ISLAND_DATA = scryfallLand('Island', 'Island', '{U}');
 
-const LLANOWAR_DATA      = scryfallCreature(
-  'Llanowar Elves', '{T}: Add {G}.', '{G}', 1
-);
-const SOL_RING_DATA      = scryfallArtifact(
-  'Sol Ring', '{T}: Add {C}{C}.', '{1}', 1
-);
-const CULTIVATE_DATA     = scryfallSorcery('Cultivate',     '{2}{G}', 3);
-const DARK_RITUAL_DATA   = scryfallInstant('Dark Ritual',   '{B}',    1);
-const EXPLORATION_DATA   = {
+const LLANOWAR_DATA = scryfallCreature('Llanowar Elves', '{T}: Add {G}.', '{G}', 1);
+const SOL_RING_DATA = scryfallArtifact('Sol Ring', '{T}: Add {C}{C}.', '{1}', 1);
+const CULTIVATE_DATA = scryfallSorcery('Cultivate', '{2}{G}', 3);
+const DARK_RITUAL_DATA = scryfallInstant('Dark Ritual', '{B}', 1);
+const EXPLORATION_DATA = {
   name: 'Exploration',
   type_line: 'Enchantment',
   oracle_text: 'You may play an additional land on each of your turns.',
@@ -101,7 +96,7 @@ const EXPLORATION_DATA   = {
   cmc: 1,
   layout: 'normal',
 };
-const COUNTERSPELL_DATA  = scryfallInstant('Counterspell',  '{U}{U}', 2);
+const COUNTERSPELL_DATA = scryfallInstant('Counterspell', '{U}{U}', 2);
 
 // ── MDFC: Turntimber Symbiosis // Turntimber, Serpentine Wood ─────────────
 const TURNTIMBER_DATA = {
@@ -130,14 +125,18 @@ const TURNTIMBER_DATA = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper – builds a lookupCard function from a name→data map
 // ─────────────────────────────────────────────────────────────────────────────
-const makeLookup = (map) => async (name) => map.get(name) ?? null;
+const makeLookup = map => async name => map.get(name) ?? null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // parseDeckList — guard conditions
 // ─────────────────────────────────────────────────────────────────────────────
 describe('parseDeckList — guard conditions', () => {
   it('returns an error result for blank deck text', async () => {
-    const ctx = { cardLookupMap: new Map([['x', {}]]), apiMode: 'local', lookupCard: makeLookup(new Map()) };
+    const ctx = {
+      cardLookupMap: new Map([['x', {}]]),
+      apiMode: 'local',
+      lookupCard: makeLookup(new Map()),
+    };
     const result = await parseDeckList('   ', ctx);
     expect(result.errors).toContain('Please enter a deck list');
     expect(result.totalCards).toBe(0);
@@ -151,7 +150,11 @@ describe('parseDeckList — guard conditions', () => {
   });
 
   it('returns null when the deck text contains no parseable lines', async () => {
-    const ctx = { cardLookupMap: new Map([['x', {}]]), apiMode: 'scryfall', lookupCard: makeLookup(new Map()) };
+    const ctx = {
+      cardLookupMap: new Map([['x', {}]]),
+      apiMode: 'scryfall',
+      lookupCard: makeLookup(new Map()),
+    };
     const result = await parseDeckList('// comments only\n\n', ctx);
     expect(result).toBeNull();
   });
@@ -161,7 +164,7 @@ describe('parseDeckList — guard conditions', () => {
 // parseDeckList — line parsing
 // ─────────────────────────────────────────────────────────────────────────────
 describe('parseDeckList — line parsing', () => {
-  const ctx = (lookup) => ({
+  const ctx = lookup => ({
     cardLookupMap: new Map([['Forest', FOREST_DATA]]),
     apiMode: 'scryfall',
     lookupCard: lookup,
@@ -225,14 +228,14 @@ describe('parseDeckList — line parsing', () => {
 describe('parseDeckList — unknown cards', () => {
   it('records an error for a card not in the lookup', async () => {
     const lookup = makeLookup(new Map()); // nothing in the map
-    const ctx    = { cardLookupMap: new Map([['x', {}]]), apiMode: 'scryfall', lookupCard: lookup };
+    const ctx = { cardLookupMap: new Map([['x', {}]]), apiMode: 'scryfall', lookupCard: lookup };
     const result = await parseDeckList('1 Nonexistent Card XYZ', ctx);
     expect(result.errors.some(e => e.includes('Nonexistent Card XYZ'))).toBe(true);
   });
 
   it('skips the unknown card but still processes known ones', async () => {
     const lookup = makeLookup(new Map([['Forest', FOREST_DATA]]));
-    const ctx    = { cardLookupMap: new Map([['x', {}]]), apiMode: 'scryfall', lookupCard: lookup };
+    const ctx = { cardLookupMap: new Map([['x', {}]]), apiMode: 'scryfall', lookupCard: lookup };
     const result = await parseDeckList('1 Forest\n1 Ghost Card', ctx);
     expect(result.lands).toHaveLength(1);
     expect(result.errors.some(e => e.includes('Ghost Card'))).toBe(true);
@@ -244,14 +247,14 @@ describe('parseDeckList — unknown cards', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('parseDeckList — card categorisation', () => {
   const cardMap = new Map([
-    ['Forest',          FOREST_DATA],
-    ['Island',          ISLAND_DATA],
-    ['Llanowar Elves',  LLANOWAR_DATA],
-    ['Sol Ring',        SOL_RING_DATA],
-    ['Cultivate',       CULTIVATE_DATA],
-    ['Dark Ritual',     DARK_RITUAL_DATA],
-    ['Exploration',     EXPLORATION_DATA],
-    ['Counterspell',    COUNTERSPELL_DATA],
+    ['Forest', FOREST_DATA],
+    ['Island', ISLAND_DATA],
+    ['Llanowar Elves', LLANOWAR_DATA],
+    ['Sol Ring', SOL_RING_DATA],
+    ['Cultivate', CULTIVATE_DATA],
+    ['Dark Ritual', DARK_RITUAL_DATA],
+    ['Exploration', EXPLORATION_DATA],
+    ['Counterspell', COUNTERSPELL_DATA],
   ]);
 
   const ctx = {
@@ -320,7 +323,7 @@ describe('parseDeckList — card categorisation', () => {
     ].join('\n');
 
     const result = await parseDeckList(deckText, ctx);
-    expect(result.lands).toHaveLength(2);           // Forest + Island
+    expect(result.lands).toHaveLength(2); // Forest + Island
     expect(result.creatures).toHaveLength(1);
     expect(result.artifacts).toHaveLength(1);
     expect(result.rampSpells).toHaveLength(1);
@@ -401,8 +404,18 @@ describe('parseDeckList — result shape', () => {
     const lookup = makeLookup(new Map([['Forest', FOREST_DATA]]));
     const ctx = { cardLookupMap: new Map([['x', {}]]), apiMode: 'scryfall', lookupCard: lookup };
     const result = await parseDeckList('1 Forest', ctx);
-    ['lands', 'artifacts', 'creatures', 'exploration', 'rituals', 'rampSpells', 'spells',
-     'totalCards', 'landCount', 'errors'].forEach(key => {
+    [
+      'lands',
+      'artifacts',
+      'creatures',
+      'exploration',
+      'rituals',
+      'rampSpells',
+      'spells',
+      'totalCards',
+      'landCount',
+      'errors',
+    ].forEach(key => {
       expect(result).toHaveProperty(key);
     });
   });
@@ -415,10 +428,12 @@ describe('parseDeckList — result shape', () => {
   });
 
   it('returned card objects carry the correct quantity on each entry', async () => {
-    const lookup = makeLookup(new Map([
-      ['Forest', FOREST_DATA],
-      ['Island', ISLAND_DATA],
-    ]));
+    const lookup = makeLookup(
+      new Map([
+        ['Forest', FOREST_DATA],
+        ['Island', ISLAND_DATA],
+      ])
+    );
     const ctx = { cardLookupMap: new Map([['x', {}]]), apiMode: 'scryfall', lookupCard: lookup };
     const result = await parseDeckList('3 Forest\n2 Island', ctx);
     const forest = result.lands.find(c => c.name === 'Forest');
@@ -437,15 +452,15 @@ describe('parseDeckList — transform land (processCardData returns null)', () =
     // but the front face is NOT a land and the back face IS a land (transform layout).
     // The top-level type_line must include 'Land' so processCardData calls processLand.
     const transformCard = {
-      name: 'Arguel\'s Blood Fast',
-      type_line: 'Land',          // ← makes processCardData call processLand
+      name: "Arguel's Blood Fast",
+      type_line: 'Land', // ← makes processCardData call processLand
       oracle_text: '',
       mana_cost: '',
       cmc: 0,
       layout: 'transform',
       card_faces: [
-        { type_line: 'Enchantment', oracle_text: '' },  // front: not a land
-        { type_line: 'Land',        oracle_text: '{T}: Add {B}.' },  // back: land
+        { type_line: 'Enchantment', oracle_text: '' }, // front: not a land
+        { type_line: 'Land', oracle_text: '{T}: Add {B}.' }, // back: land
       ],
     };
     const cardMap = new Map([["Arguel's Blood Fast", transformCard]]);

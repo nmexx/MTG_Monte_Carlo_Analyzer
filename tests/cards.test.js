@@ -16,7 +16,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { MANA_DORK_DATA } from '../Card_Archive/Mana_Dorks.js';
-import { ARTIFACT_DATA, SIMPLIFY_MOX_CONDITIONS, MOX_PRIORITY_ARTIFACTS, BURST_MANA_SOURCES } from '../Card_Archive/Artifacts.js';
+import {
+  ARTIFACT_DATA,
+  SIMPLIFY_MOX_CONDITIONS,
+  MOX_PRIORITY_ARTIFACTS,
+  BURST_MANA_SOURCES,
+} from '../Card_Archive/Artifacts.js';
 import { RAMP_SPELL_DATA } from '../Card_Archive/Ramp_Spells.js';
 import { FETCH_LAND_DATA } from '../Card_Archive/Fetch_Lands.js';
 import { RITUAL_DATA } from '../Card_Archive/Rituals.js';
@@ -25,9 +30,15 @@ import LANDS_JSON from '../Card_Archive/Lands.js';
 
 const VALID_COLORS = new Set(['W', 'U', 'B', 'R', 'G', 'C']);
 const VALID_FETCH_TYPES = new Set([
-  'classic', 'slow', 'free_slow', 'mana_cost',
-  'auto_sacrifice', 'colorless_or_fetch', 'colorless_or_cycle_fetch',
-  'trigger', 'saga_any',
+  'classic',
+  'slow',
+  'free_slow',
+  'mana_cost',
+  'auto_sacrifice',
+  'colorless_or_fetch',
+  'colorless_or_cycle_fetch',
+  'trigger',
+  'saga_any',
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,9 +128,14 @@ describe('Artifacts — structural integrity', () => {
 
   it('ETB-tapped artifacts: diamonds and specific rocks are tapped', () => {
     const tappedRocks = [
-      'marble diamond', 'sky diamond', 'charcoal diamond',
-      'fire diamond', 'moss diamond', 'coldsteel heart',
-      'fractured powerstone', 'nyx lotus',
+      'marble diamond',
+      'sky diamond',
+      'charcoal diamond',
+      'fire diamond',
+      'moss diamond',
+      'coldsteel heart',
+      'fractured powerstone',
+      'nyx lotus',
     ];
     for (const name of tappedRocks) {
       const d = ARTIFACT_DATA.get(name);
@@ -130,8 +146,14 @@ describe('Artifacts — structural integrity', () => {
 
   it('fast mana artifacts enter untapped', () => {
     const fastMana = [
-      'mana crypt', 'sol ring', 'mox diamond', 'chrome mox',
-      'mox opal', 'mox amber', 'lotus petal', 'jeweled lotus',
+      'mana crypt',
+      'sol ring',
+      'mox diamond',
+      'chrome mox',
+      'mox opal',
+      'mox amber',
+      'lotus petal',
+      'jeweled lotus',
     ];
     for (const name of fastMana) {
       const d = ARTIFACT_DATA.get(name);
@@ -184,15 +206,15 @@ describe('Artifacts — known card values', () => {
   it('all 10 Guilds signets cover: manaAmount=1, not tapped', () => {
     const signets = [
       ['azorius signet', ['W', 'U']],
-      ['dimir signet',   ['U', 'B']],
-      ['rakdos signet',  ['B', 'R']],
-      ['gruul signet',   ['R', 'G']],
-      ['selesnya signet',['G', 'W']],
-      ['orzhov signet',  ['W', 'B']],
-      ['izzet signet',   ['U', 'R']],
+      ['dimir signet', ['U', 'B']],
+      ['rakdos signet', ['B', 'R']],
+      ['gruul signet', ['R', 'G']],
+      ['selesnya signet', ['G', 'W']],
+      ['orzhov signet', ['W', 'B']],
+      ['izzet signet', ['U', 'R']],
       ['golgari signet', ['B', 'G']],
-      ['boros signet',   ['R', 'W']],
-      ['simic signet',   ['G', 'U']],
+      ['boros signet', ['R', 'W']],
+      ['simic signet', ['G', 'U']],
     ];
     for (const [name, colors] of signets) {
       const d = ARTIFACT_DATA.get(name);
@@ -211,9 +233,15 @@ describe('Artifacts — known card values', () => {
 
   it('all Talismans include C as a produce option', () => {
     const talismans = [
-      'talisman of progress', 'talisman of dominance', 'talisman of indulgence',
-      'talisman of impulse', 'talisman of unity', 'talisman of hierarchy',
-      'talisman of creativity', 'talisman of resilience', 'talisman of conviction',
+      'talisman of progress',
+      'talisman of dominance',
+      'talisman of indulgence',
+      'talisman of impulse',
+      'talisman of unity',
+      'talisman of hierarchy',
+      'talisman of creativity',
+      'talisman of resilience',
+      'talisman of conviction',
       'talisman of curiosity',
     ];
     for (const name of talismans) {
@@ -251,12 +279,15 @@ describe('Ramp_Spells — structural integrity', () => {
 
   it('every entry has required fields with valid values', () => {
     for (const [name, data] of RAMP_SPELL_DATA) {
-      expect(typeof data.landsToAdd,    `${name}: landsToAdd type`)   .toBe('number');
-      expect(data.landsToAdd,           `${name}: landsToAdd > 0`)    .toBeGreaterThan(0);
-      expect(typeof data.landsTapped,   `${name}: landsTapped type`)  .toBe('boolean');
-      expect(typeof data.landsToHand,   `${name}: landsToHand type`)  .toBe('number');
+      expect(typeof data.landsToAdd, `${name}: landsToAdd type`).toBe('number');
+      expect(data.landsToAdd, `${name}: landsToAdd > 0`).toBeGreaterThan(0);
+      expect(typeof data.landsTapped, `${name}: landsTapped type`).toBe('boolean');
+      expect(typeof data.landsToHand, `${name}: landsToHand type`).toBe('number');
       expect(typeof data.sacrificeLand, `${name}: sacrificeLand type`).toBe('boolean');
-      expect(VALID_FILTERS.has(data.fetchFilter), `${name}: invalid fetchFilter "${data.fetchFilter}"`).toBe(true);
+      expect(
+        VALID_FILTERS.has(data.fetchFilter),
+        `${name}: invalid fetchFilter "${data.fetchFilter}"`
+      ).toBe(true);
       // subtype filter must have a non-empty fetchSubtypes array
       if (data.fetchFilter === 'subtype') {
         expect(Array.isArray(data.fetchSubtypes), `${name}: fetchSubtypes array`).toBe(true);
@@ -340,15 +371,17 @@ describe('Ramp_Spells — known card values', () => {
 describe('Fetch_Lands — structural integrity', () => {
   it('every entry has required fields with valid types', () => {
     for (const [name, data] of FETCH_LAND_DATA) {
-      expect(VALID_FETCH_TYPES.has(data.fetchType),
-        `${name}: unknown fetchType "${data.fetchType}"`).toBe(true);
-      expect(Array.isArray(data.fetchColors),
-        `${name}: fetchColors is array`).toBe(true);
-      expect(data.fetchColors.length,
-        `${name}: fetchColors not empty`).toBeGreaterThan(0);
+      expect(
+        VALID_FETCH_TYPES.has(data.fetchType),
+        `${name}: unknown fetchType "${data.fetchType}"`
+      ).toBe(true);
+      expect(Array.isArray(data.fetchColors), `${name}: fetchColors is array`).toBe(true);
+      expect(data.fetchColors.length, `${name}: fetchColors not empty`).toBeGreaterThan(0);
       expect(typeof data.fetchesOnlyBasics, `${name}: fetchesOnlyBasics type`).toBe('boolean');
-      expect(typeof data.fetchesTwoLands,   `${name}: fetchesTwoLands type`).toBe('boolean');
-      expect(typeof data.fetchedLandEntersTapped, `${name}: fetchedLandEntersTapped type`).toBe('boolean');
+      expect(typeof data.fetchesTwoLands, `${name}: fetchesTwoLands type`).toBe('boolean');
+      expect(typeof data.fetchedLandEntersTapped, `${name}: fetchedLandEntersTapped type`).toBe(
+        'boolean'
+      );
       expect(typeof data.entersTappedAlways, `${name}: entersTappedAlways type`).toBe('boolean');
       expect(typeof data.fetchcost, `${name}: fetchcost type`).toBe('number');
       for (const color of data.fetchColors) {
@@ -367,9 +400,16 @@ describe('Fetch_Lands — structural integrity', () => {
 describe('Fetch_Lands — known card values', () => {
   it('all 10 Onslaught/Zendikar fetches are classic, fetchcost=0, untapped', () => {
     const classics = [
-      'flooded strand', 'polluted delta', 'bloodstained mire', 'wooded foothills',
-      'windswept heath', 'marsh flats', 'scalding tarn', 'verdant catacombs',
-      'arid mesa', 'misty rainforest',
+      'flooded strand',
+      'polluted delta',
+      'bloodstained mire',
+      'wooded foothills',
+      'windswept heath',
+      'marsh flats',
+      'scalding tarn',
+      'verdant catacombs',
+      'arid mesa',
+      'misty rainforest',
     ];
     for (const name of classics) {
       const d = FETCH_LAND_DATA.get(name);
@@ -414,8 +454,11 @@ describe('Fetch_Lands — known card values', () => {
 
   it('all 5 SNC hideaway lands → auto_sacrifice, isHideawayFetch=true', () => {
     const snc = [
-      'brokers hideout', 'obscura storefront', 'maestros theater',
-      'riveteers overlook', 'cabaretti courtyard',
+      'brokers hideout',
+      'obscura storefront',
+      'maestros theater',
+      'riveteers overlook',
+      'cabaretti courtyard',
     ];
     for (const name of snc) {
       const d = FETCH_LAND_DATA.get(name);
@@ -579,7 +622,6 @@ describe('Lands — structural integrity per cycle', () => {
 
   it('no duplicate land names across all cycles', () => {
     const names = LANDS_JSON.cycles.flatMap(c => c.lands.map(l => l.name.toLowerCase()));
-    const unique = new Set(names);
     // Collect duplicates for a readable failure message
     const seen = new Set();
     const duplicates = [];
@@ -592,8 +634,8 @@ describe('Lands — structural integrity per cycle', () => {
 });
 
 describe('Lands — known cycle values', () => {
-  const findCycle = (name) => LANDS_JSON.cycles.find(c => c.name === name);
-  const findLand  = (name) => {
+  const findCycle = name => LANDS_JSON.cycles.find(c => c.name === name);
+  const findLand = name => {
     for (const cycle of LANDS_JSON.cycles) {
       const l = cycle.lands.find(l => l.name.toLowerCase() === name.toLowerCase());
       if (l) return { land: l, cycle };
@@ -633,9 +675,16 @@ describe('Lands — known cycle values', () => {
 
   it('each of the 10 shock lands exists in the Shock Lands cycle', () => {
     const shockLands = [
-      'Hallowed Fountain', 'Watery Grave', 'Blood Crypt', 'Stomping Ground',
-      'Temple Garden', 'Godless Shrine', 'Steam Vents', 'Overgrown Tomb',
-      'Sacred Foundry', 'Breeding Pool',
+      'Hallowed Fountain',
+      'Watery Grave',
+      'Blood Crypt',
+      'Stomping Ground',
+      'Temple Garden',
+      'Godless Shrine',
+      'Steam Vents',
+      'Overgrown Tomb',
+      'Sacred Foundry',
+      'Breeding Pool',
     ];
     const cycle = findCycle('Shock Lands');
     const cycleNames = cycle.lands.map(l => l.name);
@@ -646,8 +695,16 @@ describe('Lands — known cycle values', () => {
 
   it('each of the 10 ABUR duals exists in the Original Duals cycle', () => {
     const duals = [
-      'Tundra', 'Underground Sea', 'Badlands', 'Taiga', 'Savannah',
-      'Scrubland', 'Volcanic Island', 'Bayou', 'Plateau', 'Tropical Island',
+      'Tundra',
+      'Underground Sea',
+      'Badlands',
+      'Taiga',
+      'Savannah',
+      'Scrubland',
+      'Volcanic Island',
+      'Bayou',
+      'Plateau',
+      'Tropical Island',
     ];
     const cycle = findCycle('Original Duals (ABUR)');
     const cycleNames = cycle.lands.map(l => l.name);

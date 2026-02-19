@@ -16,7 +16,7 @@
  * Run:  npm test
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   shuffle,
   matchesRampFilter,
@@ -110,14 +110,14 @@ const perm = (card, overrides = {}) => ({
 describe('shuffle', () => {
   it('returns a new array with the same elements', () => {
     const original = [1, 2, 3, 4, 5];
-    const result   = shuffle(original);
+    const result = shuffle(original);
     expect(result).not.toBe(original);
     expect(result.sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('does not modify the original array', () => {
     const original = ['a', 'b', 'c'];
-    const copy     = [...original];
+    const copy = [...original];
     shuffle(original);
     expect(original).toEqual(copy);
   });
@@ -156,9 +156,9 @@ describe('matchesRampFilter', () => {
 
   it('"basic" filter accepts only basic lands', () => {
     const basic = makeLand({ isBasic: true });
-    const dual  = makeLand({ isBasic: false });
+    const dual = makeLand({ isBasic: false });
     expect(matchesRampFilter(basic, { fetchFilter: 'basic' })).toBe(true);
-    expect(matchesRampFilter(dual,  { fetchFilter: 'basic' })).toBe(false);
+    expect(matchesRampFilter(dual, { fetchFilter: 'basic' })).toBe(false);
   });
 
   it('"subtype" filter accepts lands with a matching subtype', () => {
@@ -175,17 +175,17 @@ describe('matchesRampFilter', () => {
   });
 
   it('"snow" filter accepts lands whose name contains "snow"', () => {
-    const snow    = makeLand({ name: 'Snow-Covered Forest' });
-    const normal  = makeLand({ name: 'Forest' });
-    expect(matchesRampFilter(snow,   { fetchFilter: 'snow' })).toBe(true);
+    const snow = makeLand({ name: 'Snow-Covered Forest' });
+    const normal = makeLand({ name: 'Forest' });
+    expect(matchesRampFilter(snow, { fetchFilter: 'snow' })).toBe(true);
     expect(matchesRampFilter(normal, { fetchFilter: 'snow' })).toBe(false);
   });
 
   it('unrecognized fetchFilter falls back to basic', () => {
     const basic = makeLand({ isBasic: true });
-    const dual  = makeLand({ isBasic: false });
+    const dual = makeLand({ isBasic: false });
     expect(matchesRampFilter(basic, { fetchFilter: 'unknown_type_xyz' })).toBe(true);
-    expect(matchesRampFilter(dual,  { fetchFilter: 'unknown_type_xyz' })).toBe(false);
+    expect(matchesRampFilter(dual, { fetchFilter: 'unknown_type_xyz' })).toBe(false);
   });
 });
 
@@ -210,16 +210,13 @@ describe('doesLandEnterTapped', () => {
 
   it('a fast land enters untapped when ≤ 2 lands are already in play', () => {
     const fast = makeLand({ isFast: true });
-    const bf   = [
-      perm(makeLand({ name: 'Island' })),
-      perm(makeLand({ name: 'Swamp' })),
-    ];
+    const bf = [perm(makeLand({ name: 'Island' })), perm(makeLand({ name: 'Swamp' }))];
     expect(doesLandEnterTapped(fast, bf, 3, false)).toBe(false);
   });
 
   it('a fast land enters tapped when > 2 lands are already in play', () => {
     const fast = makeLand({ isFast: true });
-    const bf   = [
+    const bf = [
       perm(makeLand({ name: 'A', isLand: true })),
       perm(makeLand({ name: 'B', isLand: true })),
       perm(makeLand({ name: 'C', isLand: true })),
@@ -282,14 +279,14 @@ describe('selectBestLand', () => {
 
   it('returns the only land when hand has one', () => {
     const forest = makeLand();
-    const hand   = [forest];
+    const hand = [forest];
     expect(selectBestLand(hand, [], [], 1)).toBe(forest);
   });
 
   it('prefers an untapped land over a tapped land', () => {
-    const tapped   = makeLand({ name: 'Tap City',   entersTappedAlways: true });
+    const tapped = makeLand({ name: 'Tap City', entersTappedAlways: true });
     const untapped = makeLand({ name: 'Quick Hills', entersTappedAlways: false });
-    const hand     = [tapped, untapped];
+    const hand = [tapped, untapped];
     expect(selectBestLand(hand, [], [], 1)).toBe(untapped);
   });
 
@@ -300,19 +297,24 @@ describe('selectBestLand', () => {
   });
 
   it('returns a bounce land when there is a non-bounce land to return', () => {
-    const bounce  = makeLand({ name: 'Simic Growth Chamber', isBounce: true });
+    const bounce = makeLand({ name: 'Simic Growth Chamber', isBounce: true });
     const regular = makeLand({ name: 'Forest', isBounce: false });
-    const bf      = [perm(regular)];
-    const result  = selectBestLand([bounce], bf, [], 1);
+    const bf = [perm(regular)];
+    const result = selectBestLand([bounce], bf, [], 1);
     expect(result).toBe(bounce);
   });
 
   it('returns a fetch land before a plain untapped land when mana is available', () => {
-    const fetch   = makeLand({ name: 'Polluted Delta', isFetch: true, fetchType: 'classic', fetchcost: 0 });
+    const fetch = makeLand({
+      name: 'Polluted Delta',
+      isFetch: true,
+      fetchType: 'classic',
+      fetchcost: 0,
+    });
     const regular = makeLand({ name: 'Forest', isFetch: false });
-    const hand    = [fetch, regular];
-    const bf      = [perm(makeLand({ name: 'Island' }))];
-    const result  = selectBestLand(hand, bf, [], 1);
+    const hand = [fetch, regular];
+    const bf = [perm(makeLand({ name: 'Island' }))];
+    const result = selectBestLand(hand, bf, [], 1);
     expect(result).toBe(fetch);
   });
 });
@@ -345,30 +347,30 @@ describe('calculateManaAvailability', () => {
 
   it('counts mana artifacts', () => {
     const solRing = makeArtifact({ produces: ['C'], manaAmount: 2 });
-    const result  = calculateManaAvailability([perm(solRing)]);
+    const result = calculateManaAvailability([perm(solRing)]);
     expect(result.total).toBe(2);
     expect(result.colors.C).toBe(2);
   });
 
   it('counts mana creatures without summoning sickness', () => {
-    const dork   = makeCreature({ produces: ['G'], manaAmount: 1 });
+    const dork = makeCreature({ produces: ['G'], manaAmount: 1 });
     const result = calculateManaAvailability([perm(dork, { summoningSick: false })]);
     expect(result.total).toBe(1);
     expect(result.colors.G).toBe(1);
   });
 
   it('does not count mana creatures with summoning sickness', () => {
-    const dork   = makeCreature({ produces: ['G'], manaAmount: 1 });
+    const dork = makeCreature({ produces: ['G'], manaAmount: 1 });
     const result = calculateManaAvailability([perm(dork, { summoningSick: true })]);
     expect(result.total).toBe(0);
   });
 
   it('correctly sums multiple sources', () => {
-    const forest   = makeLand({ produces: ['G'] });
-    const island   = makeLand({ name: 'Island', produces: ['U'] });
-    const solRing  = makeArtifact({ produces: ['C'], manaAmount: 2 });
+    const forest = makeLand({ produces: ['G'] });
+    const island = makeLand({ name: 'Island', produces: ['U'] });
+    const solRing = makeArtifact({ produces: ['C'], manaAmount: 2 });
     const bf = [perm(forest), perm(island), perm(solRing)];
-    const result   = calculateManaAvailability(bf);
+    const result = calculateManaAvailability(bf);
     expect(result.total).toBe(4);
     expect(result.colors.G).toBe(1);
     expect(result.colors.U).toBe(1);
@@ -376,7 +378,7 @@ describe('calculateManaAvailability', () => {
   });
 
   it('accounts for manaAmount > 1 on lands (e.g. Ancient Tomb)', () => {
-    const tomb   = makeLand({ name: 'Ancient Tomb', produces: ['C'], manaAmount: 2 });
+    const tomb = makeLand({ name: 'Ancient Tomb', produces: ['C'], manaAmount: 2 });
     const result = calculateManaAvailability([perm(tomb)]);
     expect(result.total).toBe(2);
     expect(result.colors.C).toBe(2);
@@ -385,7 +387,7 @@ describe('calculateManaAvailability', () => {
   });
 
   it('builds a source entry per mana unit for a dual land (Watery Grave)', () => {
-    const wg     = makeLand({ name: 'Watery Grave', produces: ['U', 'B'], isBasic: false });
+    const wg = makeLand({ name: 'Watery Grave', produces: ['U', 'B'], isBasic: false });
     const result = calculateManaAvailability([perm(wg)]);
     expect(result.total).toBe(1);
     expect(result.sources).toHaveLength(1);
@@ -398,7 +400,7 @@ describe('calculateManaAvailability', () => {
 // solveColorPips
 // ─────────────────────────────────────────────────────────────────────────────
 describe('solveColorPips', () => {
-  const src = (colors) => ({ produces: colors });
+  const src = colors => ({ produces: colors });
 
   it('returns true when there are no pip requirements', () => {
     expect(solveColorPips([], [src(['G'])])).toBe(true);
@@ -440,16 +442,16 @@ describe('solveColorPips', () => {
   });
 
   it('honours the wildcard "*" produces (e.g. City of Brass style lands)', () => {
-    expect(solveColorPips(['U', 'B', 'R'], [
-      src(['*']), src(['*']), src(['*']),
-    ])).toBe(true);
+    expect(solveColorPips(['U', 'B', 'R'], [src(['*']), src(['*']), src(['*'])])).toBe(true);
   });
 
   it('handles five-colour pips against one source per colour', () => {
-    expect(solveColorPips(
-      ['W', 'U', 'B', 'R', 'G'],
-      [src(['W']), src(['U']), src(['B']), src(['R']), src(['G'])],
-    )).toBe(true);
+    expect(
+      solveColorPips(
+        ['W', 'U', 'B', 'R', 'G'],
+        [src(['W']), src(['U']), src(['B']), src(['R']), src(['G'])]
+      )
+    ).toBe(true);
   });
 
   it('returns false when one colour pip is unserviceable', () => {
@@ -510,7 +512,7 @@ describe('canPlayCard', () => {
       colors: { W: 0, U: 1, B: 1, R: 0, G: 1, C: 0 },
       sources: [
         { produces: ['U', 'B'] }, // Watery Grave
-        { produces: ['G'] },      // Forest
+        { produces: ['G'] }, // Forest
       ],
     };
     expect(canPlayCard(card, available)).toBe(false);
@@ -524,7 +526,7 @@ describe('canPlayCard', () => {
       colors: { W: 0, U: 2, B: 1, R: 0, G: 0, C: 0 },
       sources: [
         { produces: ['U', 'B'] }, // Watery Grave
-        { produces: ['U'] },      // Island
+        { produces: ['U'] }, // Island
       ],
     };
     expect(canPlayCard(card, available)).toBe(true);
@@ -550,7 +552,7 @@ describe('canPlayCard', () => {
       colors: { W: 0, U: 1, B: 1, R: 0, G: 0, C: 0 },
       sources: [
         { produces: ['U', 'B'] }, // Watery Grave — counted toward U and B but only one tap
-        { produces: ['B'] },      // Swamp — cannot help with U
+        { produces: ['B'] }, // Swamp — cannot help with U
       ],
     };
     expect(canPlayCard(card, available)).toBe(false);
@@ -585,25 +587,25 @@ describe('canPlayCard', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('tapManaSources', () => {
   it('taps a single coloured source for a coloured spell', () => {
-    const forest   = makeLand({ produces: ['G'] });
-    const bf       = [perm(forest)];
-    const spell    = { manaCost: '{G}', cmc: 1 };
+    const forest = makeLand({ produces: ['G'] });
+    const bf = [perm(forest)];
+    const spell = { manaCost: '{G}', cmc: 1 };
     tapManaSources(spell, bf);
     expect(bf[0].tapped).toBe(true);
   });
 
   it('taps a colourless source for a generic-cost spell', () => {
     const solRing = makeArtifact({ produces: ['C'], manaAmount: 2 });
-    const bf      = [perm(solRing)];
-    const spell   = { manaCost: '{2}', cmc: 2 };
+    const bf = [perm(solRing)];
+    const spell = { manaCost: '{2}', cmc: 2 };
     tapManaSources(spell, bf);
     expect(bf[0].tapped).toBe(true);
   });
 
   it('does not tap already-tapped sources', () => {
-    const forest  = makeLand({ produces: ['G'] });
-    const bf      = [perm(forest, { tapped: true })];
-    const spell   = { manaCost: '{G}', cmc: 1 };
+    const forest = makeLand({ produces: ['G'] });
+    const bf = [perm(forest, { tapped: true })];
+    const spell = { manaCost: '{G}', cmc: 1 };
     tapManaSources(spell, bf);
     // tapped was already true and the source was unavailable — still true
     expect(bf[0].tapped).toBe(true);
@@ -621,7 +623,7 @@ describe('tapManaSources', () => {
 
   it('leaves battlefield untouched when spell has no mana cost', () => {
     const forest = makeLand({ produces: ['G'] });
-    const bf     = [perm(forest)];
+    const bf = [perm(forest)];
     tapManaSources({ manaCost: '{0}', cmc: 0 }, bf);
     expect(bf[0].tapped).toBe(false);
   });
@@ -632,34 +634,79 @@ describe('tapManaSources', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('findBestLandToFetch', () => {
   it('returns null when no eligible lands exist', () => {
-    const fetch   = makeLand({ name: 'Polluted Delta', isFetch: true, fetchColors: ['U', 'B'], fetchesOnlyBasics: false });
+    const fetch = makeLand({
+      name: 'Polluted Delta',
+      isFetch: true,
+      fetchColors: ['U', 'B'],
+      fetchesOnlyBasics: false,
+    });
     const library = [makeLand({ name: 'Forest', landSubtypes: ['Forest'], produces: ['G'] })];
     expect(findBestLandToFetch(fetch, library, [], [], null, 1)).toBeNull();
   });
 
   it('returns an eligible land that matches fetchColors', () => {
-    const fetch   = makeLand({ name: 'Polluted Delta', isFetch: true, fetchColors: ['U', 'B'], fetchesOnlyBasics: false });
-    const island  = makeLand({ name: 'Island', landSubtypes: ['Island'], produces: ['U'], isBasic: true });
+    const fetch = makeLand({
+      name: 'Polluted Delta',
+      isFetch: true,
+      fetchColors: ['U', 'B'],
+      fetchesOnlyBasics: false,
+    });
+    const island = makeLand({
+      name: 'Island',
+      landSubtypes: ['Island'],
+      produces: ['U'],
+      isBasic: true,
+    });
     const library = [island];
-    const result  = findBestLandToFetch(fetch, library, [], [], null, 1);
+    const result = findBestLandToFetch(fetch, library, [], [], null, 1);
     expect(result).toBe(island);
   });
 
   it('respects fetchesOnlyBasics', () => {
-    const fetch      = makeLand({ name: 'Evolving Wilds', isFetch: true, fetchColors: ['G'], fetchesOnlyBasics: true });
-    const basic      = makeLand({ name: 'Forest',    landSubtypes: ['Forest'], produces: ['G'], isBasic: true });
-    const nonbasic   = makeLand({ name: 'Overgrown Tomb', landSubtypes: ['Swamp', 'Forest'], produces: ['B', 'G'], isBasic: false });
-    const library    = [nonbasic, basic];
-    const result     = findBestLandToFetch(fetch, library, [], [], null, 1);
+    const fetch = makeLand({
+      name: 'Evolving Wilds',
+      isFetch: true,
+      fetchColors: ['G'],
+      fetchesOnlyBasics: true,
+    });
+    const basic = makeLand({
+      name: 'Forest',
+      landSubtypes: ['Forest'],
+      produces: ['G'],
+      isBasic: true,
+    });
+    const nonbasic = makeLand({
+      name: 'Overgrown Tomb',
+      landSubtypes: ['Swamp', 'Forest'],
+      produces: ['B', 'G'],
+      isBasic: false,
+    });
+    const library = [nonbasic, basic];
+    const result = findBestLandToFetch(fetch, library, [], [], null, 1);
     expect(result).toBe(basic);
   });
 
   it('prioritises dual lands early (turn ≤ 2)', () => {
-    const fetch   = makeLand({ name: 'Wooded Foothills', isFetch: true, fetchColors: ['G', 'R'], fetchesOnlyBasics: false });
-    const dual    = makeLand({ name: 'Stomping Ground', landSubtypes: ['Mountain', 'Forest'], produces: ['R', 'G'], isBasic: false });
-    const basic   = makeLand({ name: 'Forest', landSubtypes: ['Forest'], produces: ['G'], isBasic: true });
+    const fetch = makeLand({
+      name: 'Wooded Foothills',
+      isFetch: true,
+      fetchColors: ['G', 'R'],
+      fetchesOnlyBasics: false,
+    });
+    const dual = makeLand({
+      name: 'Stomping Ground',
+      landSubtypes: ['Mountain', 'Forest'],
+      produces: ['R', 'G'],
+      isBasic: false,
+    });
+    const basic = makeLand({
+      name: 'Forest',
+      landSubtypes: ['Forest'],
+      produces: ['G'],
+      isBasic: true,
+    });
     const library = [basic, dual];
-    const result  = findBestLandToFetch(fetch, library, [], [], null, 1);
+    const result = findBestLandToFetch(fetch, library, [], [], null, 1);
     // Dual produces 2 colours → higher score on turn 1
     expect(result).toBe(dual);
   });
@@ -671,8 +718,8 @@ describe('findBestLandToFetch', () => {
 describe('playLand', () => {
   it('moves the land from hand to battlefield', () => {
     const forest = makeLand();
-    const hand   = [forest];
-    const bf     = [];
+    const hand = [forest];
+    const bf = [];
     playLand(forest, hand, bf, [], [], 1, null, [], null, false);
     expect(hand).toHaveLength(0);
     expect(bf).toHaveLength(1);
@@ -681,21 +728,21 @@ describe('playLand', () => {
 
   it('a basic land enters untapped', () => {
     const forest = makeLand();
-    const bf     = [];
+    const bf = [];
     playLand(forest, [forest], bf, [], [], 1, null, [], null, false);
     expect(bf[0].tapped).toBe(false);
   });
 
   it('a tapped land enters tapped', () => {
     const tapLand = makeLand({ entersTappedAlways: true });
-    const bf      = [];
+    const bf = [];
     playLand(tapLand, [tapLand], bf, [], [], 1, null, [], null, false);
     expect(bf[0].tapped).toBe(true);
   });
 
   it('records an action in turnLog', () => {
     const forest = makeLand();
-    const log    = { actions: [] };
+    const log = { actions: [] };
     playLand(forest, [forest], [], [], [], 1, log, [], null, false);
     expect(log.actions.length).toBeGreaterThan(0);
     expect(log.actions[0]).toContain('Forest');
@@ -703,9 +750,13 @@ describe('playLand', () => {
 
   it('a bounce land returns a non-bounce land to hand', () => {
     const regular = makeLand({ name: 'Forest', isBounce: false });
-    const bounce  = makeLand({ name: 'Simic Growth Chamber', isBounce: true, entersTappedAlways: true });
-    const hand    = [bounce];
-    const bf      = [perm(regular)];
+    const bounce = makeLand({
+      name: 'Simic Growth Chamber',
+      isBounce: true,
+      entersTappedAlways: true,
+    });
+    const hand = [bounce];
+    const bf = [perm(regular)];
     playLand(bounce, hand, bf, [], [], 2, null, [], null, false);
     // Battlefield should now contain the bounce land; hand should contain the returned land
     expect(bf.some(p => p.card.name === 'Simic Growth Chamber')).toBe(true);
@@ -713,8 +764,13 @@ describe('playLand', () => {
   });
 
   it('a fetch land enters the battlefield (non-hideaway)', () => {
-    const island  = makeLand({ name: 'Island', landSubtypes: ['Island'], produces: ['U'], isBasic: true });
-    const fetch   = makeLand({
+    const island = makeLand({
+      name: 'Island',
+      landSubtypes: ['Island'],
+      produces: ['U'],
+      isBasic: true,
+    });
+    const fetch = makeLand({
       name: 'Flooded Strand',
       isFetch: true,
       fetchType: 'classic',
@@ -724,8 +780,8 @@ describe('playLand', () => {
       fetchcost: 0,
       entersTappedAlways: false,
     });
-    const hand    = [fetch];
-    const bf      = [perm(makeLand({ name: 'Plains' }))];
+    const hand = [fetch];
+    const bf = [perm(makeLand({ name: 'Plains' }))];
     const library = [island];
     playLand(fetch, hand, bf, library, [], 1, null, [], null, false);
     // Fetch should be on battlefield (waiting to be activated) or have fetched Island in
@@ -745,10 +801,10 @@ describe('playLand', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('castSpells', () => {
   it('casts a mana creature when enough mana exists', () => {
-    const forest  = makeLand({ produces: ['G'] });
-    const dork    = makeCreature({ name: 'Llanowar Elves', cmc: 1, manaCost: '{G}' });
-    const hand    = [dork];
-    const bf      = [perm(forest)];
+    const forest = makeLand({ produces: ['G'] });
+    const dork = makeCreature({ name: 'Llanowar Elves', cmc: 1, manaCost: '{G}' });
+    const hand = [dork];
+    const bf = [perm(forest)];
     castSpells(hand, bf, [], null, [], null, [], 1, {});
     expect(hand).toHaveLength(0);
     expect(bf.some(p => p.card.name === 'Llanowar Elves')).toBe(true);
@@ -762,10 +818,16 @@ describe('castSpells', () => {
   });
 
   it('casts a mana artifact when enough mana exists', () => {
-    const island   = makeLand({ produces: ['U'] });
-    const signet   = makeArtifact({ name: 'Arcane Signet', cmc: 2, manaCost: '{2}', produces: ['G', 'U'], manaAmount: 1 });
-    const hand     = [signet];
-    const bf       = [perm(island), perm(makeLand({ name: 'Swamp', produces: ['B'] }))];
+    const island = makeLand({ produces: ['U'] });
+    const signet = makeArtifact({
+      name: 'Arcane Signet',
+      cmc: 2,
+      manaCost: '{2}',
+      produces: ['G', 'U'],
+      manaAmount: 1,
+    });
+    const hand = [signet];
+    const bf = [perm(island), perm(makeLand({ name: 'Swamp', produces: ['B'] }))];
     castSpells(hand, bf, [], null, [], null, [], 1, {});
     expect(hand).toHaveLength(0);
     expect(bf.some(p => p.card.name === 'Arcane Signet')).toBe(true);
@@ -775,13 +837,26 @@ describe('castSpells', () => {
     const forest1 = makeLand({ name: 'Forest 1', produces: ['G'], isBasic: true });
     const forest2 = makeLand({ name: 'Forest 2', produces: ['G'], isBasic: true });
     const forest3 = makeLand({ name: 'Forest 3', produces: ['G'], isBasic: true });
-    const cultivate = makeSpell({ name: 'Cultivate', cmc: 3, manaCost: '{2}{G}', fetchFilter: 'basic', landsToAdd: 1, landsToHand: 1 });
+    const cultivate = makeSpell({
+      name: 'Cultivate',
+      cmc: 3,
+      manaCost: '{2}{G}',
+      fetchFilter: 'basic',
+      landsToAdd: 1,
+      landsToHand: 1,
+    });
     // 3 forests on battlefield provide {G}{G}{G}
-    const bf  = [perm(forest1), perm(forest2), perm(forest3)];
-    const lib  = [makeLand({ name: 'Forest 4', isBasic: true, produces: ['G'] }), makeLand({ name: 'Forest 5', isBasic: true, produces: ['G'] })];
+    const bf = [perm(forest1), perm(forest2), perm(forest3)];
+    const lib = [
+      makeLand({ name: 'Forest 4', isBasic: true, produces: ['G'] }),
+      makeLand({ name: 'Forest 5', isBasic: true, produces: ['G'] }),
+    ];
     const hand = [cultivate];
-    const gy   = [];
-    castSpells(hand, bf, gy, null, [], null, lib, 3, { includeRampSpells: true, disabledRampSpells: new Set() });
+    const gy = [];
+    castSpells(hand, bf, gy, null, [], null, lib, 3, {
+      includeRampSpells: true,
+      disabledRampSpells: new Set(),
+    });
     // Cultivate goes to graveyard; 1 basic → battlefield (tapped); 1 basic → hand
     expect(gy.some(c => c.name === 'Cultivate')).toBe(true);
     expect(bf.length).toBeGreaterThan(3);
@@ -795,7 +870,7 @@ describe('castSpells', () => {
     const forest2 = makeLand({ name: 'F2', produces: ['G'], isBasic: true });
     const forest3 = makeLand({ name: 'F3', produces: ['G'], isBasic: true });
     const cultivate = makeSpell({ name: 'Cultivate', cmc: 3, manaCost: '{2}{G}' });
-    const bf   = [perm(forest1), perm(forest2), perm(forest3)];
+    const bf = [perm(forest1), perm(forest2), perm(forest3)];
     const hand = [cultivate];
     castSpells(hand, bf, [], null, [], null, [], 3, { includeRampSpells: false });
     expect(hand).toHaveLength(1);
@@ -806,16 +881,19 @@ describe('castSpells', () => {
     const f2 = makeLand({ name: 'F2', produces: ['G'], isBasic: true });
     const f3 = makeLand({ name: 'F3', produces: ['G'], isBasic: true });
     const cultivate = makeSpell({ name: 'Cultivate', cmc: 3, manaCost: '{2}{G}' });
-    const bf   = [perm(f1), perm(f2), perm(f3)];
+    const bf = [perm(f1), perm(f2), perm(f3)];
     const hand = [cultivate];
-    castSpells(hand, bf, [], null, [], null, [], 3, { includeRampSpells: true, disabledRampSpells: new Set(['Cultivate']) });
+    castSpells(hand, bf, [], null, [], null, [], 3, {
+      includeRampSpells: true,
+      disabledRampSpells: new Set(['Cultivate']),
+    });
     expect(hand).toHaveLength(1);
   });
 
   it('records cast actions in turnLog', () => {
     const forest = makeLand({ produces: ['G'] });
-    const dork   = makeCreature({ name: 'Llanowar Elves', cmc: 1, manaCost: '{G}' });
-    const log    = { actions: [] };
+    const dork = makeCreature({ name: 'Llanowar Elves', cmc: 1, manaCost: '{G}' });
+    const log = { actions: [] };
     castSpells([dork], [perm(forest)], [], log, [], null, [], 1, {});
     expect(log.actions.some(a => a.includes('Llanowar Elves'))).toBe(true);
   });

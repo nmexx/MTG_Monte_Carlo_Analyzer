@@ -87,7 +87,11 @@ export default [
         ecmaFeatures: { jsx: true },
       },
     },
+    plugins: {
+      react: reactPlugin,
+    },
     rules: {
+      'react/jsx-uses-vars': 'error',
       'no-unused-vars': 'warn',
     },
   },

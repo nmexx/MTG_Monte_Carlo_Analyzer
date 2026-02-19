@@ -15,23 +15,22 @@
 
 // @vitest-environment jsdom
 
-import React from 'react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import MTGMonteCarloAnalyzer from '../src/App.jsx';
 
 // ─── Global stubs (jsdom gaps) ────────────────────────────────────────────────
 
 global.ResizeObserver = class {
-  observe()    {}
-  unobserve()  {}
+  observe() {}
+  unobserve() {}
   disconnect() {}
 };
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
 vi.mock('../src/simulation/monteCarlo.js', () => ({
-  monteCarlo:       vi.fn(() => ({})),
+  monteCarlo: vi.fn(() => ({})),
   buildCompleteDeck: vi.fn(() => []),
 }));
 
@@ -43,21 +42,30 @@ vi.mock('../src/parser/deckParser.js', () => ({
 
 /** Minimal parsed-deck object returned by a mocked successful parseDeckList call */
 const MOCK_PARSED_DECK = {
-  totalCards:  60,
-  landCount:   24,
-  lands:       [{ name: 'Forest', quantity: 24, isBasic: true, produces: ['G'], isFetch: false, entersTappedAlways: false }],
-  spells:      [],
-  creatures:   [],
-  artifacts:   [],
-  rituals:     [],
-  rampSpells:  [],
+  totalCards: 60,
+  landCount: 24,
+  lands: [
+    {
+      name: 'Forest',
+      quantity: 24,
+      isBasic: true,
+      produces: ['G'],
+      isFetch: false,
+      entersTappedAlways: false,
+    },
+  ],
+  spells: [],
+  creatures: [],
+  artifacts: [],
+  rituals: [],
+  rampSpells: [],
   exploration: [],
-  errors:      [],
+  errors: [],
 };
 
 /** Convenience: import the mocked module so tests can configure it per-test */
 import { parseDeckList } from '../src/parser/deckParser.js';
-import { monteCarlo }    from '../src/simulation/monteCarlo.js';
+import { monteCarlo } from '../src/simulation/monteCarlo.js';
 
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
 
@@ -291,17 +299,17 @@ describe('Run Simulation flow', () => {
     // then verify monteCarlo is called.
     parseDeckList.mockResolvedValue(MOCK_PARSED_DECK);
     monteCarlo.mockReturnValue({
-      landsPerTurn:       [],
-      untappedPerTurn:    [],
-      colorsByTurn:       [],
-      manaByTurn:         [],
-      lifeLossByTurn:     [],
-      stdDevByTurn:       [],
+      landsPerTurn: [],
+      untappedPerTurn: [],
+      colorsByTurn: [],
+      manaByTurn: [],
+      lifeLossByTurn: [],
+      stdDevByTurn: [],
       keyCardPlayability: {},
-      mulligans:          0,
-      handsKept:          1,
+      mulligans: 0,
+      handsKept: 1,
       fastestPlaySequences: [],
-      hasBurstCards:      false,
+      hasBurstCards: false,
     });
 
     render(<MTGMonteCarloAnalyzer />);
@@ -322,9 +330,12 @@ describe('Run Simulation flow', () => {
     });
 
     // monteCarlo should be called (inside a setTimeout—wait for it)
-    await waitFor(() => {
-      expect(monteCarlo).toHaveBeenCalledTimes(1);
-    }, { timeout: 500 });
+    await waitFor(
+      () => {
+        expect(monteCarlo).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 500 }
+    );
   });
 });
 
@@ -370,7 +381,9 @@ describe('localStorage persistence', () => {
     render(<MTGMonteCarloAnalyzer />);
     const compareBtn = screen.getByRole('button', { name: /compare two decks/i });
 
-    await act(async () => { fireEvent.click(compareBtn); });
+    await act(async () => {
+      fireEvent.click(compareBtn);
+    });
 
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('mtg_mca_state') || '{}');
@@ -399,9 +412,7 @@ describe('localStorage persistence', () => {
   it('restores comparisonMode from localStorage on mount', () => {
     localStorage.setItem('mtg_mca_state', JSON.stringify({ comparisonMode: true }));
     render(<MTGMonteCarloAnalyzer />);
-    expect(
-      screen.getByRole('button', { name: /compare two decks/i }).className
-    ).toMatch(/active/i);
+    expect(screen.getByRole('button', { name: /compare two decks/i }).className).toMatch(/active/i);
   });
 });
 
@@ -472,7 +483,9 @@ describe('Comparison mode', () => {
     });
 
     const [parseBtnA] = screen.getAllByRole('button', { name: /parse deck/i });
-    await act(async () => { fireEvent.click(parseBtnA); });
+    await act(async () => {
+      fireEvent.click(parseBtnA);
+    });
 
     expect(parseDeckList).toHaveBeenCalledTimes(1);
   });
@@ -486,7 +499,9 @@ describe('Comparison mode', () => {
     });
 
     const [, parseBtnB] = screen.getAllByRole('button', { name: /parse deck/i });
-    await act(async () => { fireEvent.click(parseBtnB); });
+    await act(async () => {
+      fireEvent.click(parseBtnB);
+    });
 
     expect(parseDeckList).toHaveBeenCalledTimes(1);
   });
@@ -500,7 +515,9 @@ describe('Comparison mode', () => {
     });
 
     const [, parseBtnB] = screen.getAllByRole('button', { name: /parse deck/i });
-    await act(async () => { fireEvent.click(parseBtnB); });
+    await act(async () => {
+      fireEvent.click(parseBtnB);
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/Parsing failed \(Deck B\)/i)).toBeInTheDocument();
@@ -510,9 +527,17 @@ describe('Comparison mode', () => {
   it('shows guard error "Please parse Deck B first" when only Deck A is parsed', async () => {
     parseDeckList.mockResolvedValue(MOCK_PARSED_DECK);
     monteCarlo.mockReturnValue({
-      landsPerTurn: [], untappedPerTurn: [], colorsByTurn: [], manaByTurn: [],
-      lifeLossByTurn: [], stdDevByTurn: [], keyCardPlayability: {},
-      mulligans: 0, handsKept: 1, fastestPlaySequences: [], hasBurstCards: false,
+      landsPerTurn: [],
+      untappedPerTurn: [],
+      colorsByTurn: [],
+      manaByTurn: [],
+      lifeLossByTurn: [],
+      stdDevByTurn: [],
+      keyCardPlayability: {},
+      mulligans: 0,
+      handsKept: 1,
+      fastestPlaySequences: [],
+      hasBurstCards: false,
     });
     render(<MTGMonteCarloAnalyzer />);
 
@@ -522,7 +547,9 @@ describe('Comparison mode', () => {
 
     // Parse only Deck A
     const [parseBtnA] = screen.getAllByRole('button', { name: /parse deck/i });
-    await act(async () => { fireEvent.click(parseBtnA); });
+    await act(async () => {
+      fireEvent.click(parseBtnA);
+    });
 
     // SimulationSettingsPanel should appear after Deck A is parsed
     await waitFor(() => {
@@ -540,9 +567,17 @@ describe('Comparison mode', () => {
   it('calls monteCarlo twice when both decks are parsed and simulation runs', async () => {
     parseDeckList.mockResolvedValue(MOCK_PARSED_DECK);
     monteCarlo.mockReturnValue({
-      landsPerTurn: [], untappedPerTurn: [], colorsByTurn: [], manaByTurn: [],
-      lifeLossByTurn: [], stdDevByTurn: [], keyCardPlayability: {},
-      mulligans: 0, handsKept: 1, fastestPlaySequences: [], hasBurstCards: false,
+      landsPerTurn: [],
+      untappedPerTurn: [],
+      colorsByTurn: [],
+      manaByTurn: [],
+      lifeLossByTurn: [],
+      stdDevByTurn: [],
+      keyCardPlayability: {},
+      mulligans: 0,
+      handsKept: 1,
+      fastestPlaySequences: [],
+      hasBurstCards: false,
     });
     render(<MTGMonteCarloAnalyzer />);
 
@@ -552,8 +587,12 @@ describe('Comparison mode', () => {
 
     // Parse both decks
     const [parseBtnA, parseBtnB] = screen.getAllByRole('button', { name: /parse deck/i });
-    await act(async () => { fireEvent.click(parseBtnA); });
-    await act(async () => { fireEvent.click(parseBtnB); });
+    await act(async () => {
+      fireEvent.click(parseBtnA);
+    });
+    await act(async () => {
+      fireEvent.click(parseBtnB);
+    });
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /start simulation/i })).toBeInTheDocument();
@@ -562,8 +601,11 @@ describe('Comparison mode', () => {
       fireEvent.click(screen.getByRole('button', { name: /start simulation/i }));
     });
 
-    await waitFor(() => {
-      expect(monteCarlo).toHaveBeenCalledTimes(2);
-    }, { timeout: 500 });
+    await waitFor(
+      () => {
+        expect(monteCarlo).toHaveBeenCalledTimes(2);
+      },
+      { timeout: 500 }
+    );
   });
 });
