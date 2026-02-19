@@ -37,16 +37,16 @@ jobs:
       - name: Build (Vite)
         run: npm run build
 
-      # ── 7. Deploy via SFTP (SCP over SSH port 22) ──────────────────────────
-      #  Secrets are set in: GitHub repo → Settings → Secrets → Actions
-      #  Required secrets:  FTP_HOST  FTP_USER  FTP_PASSWORD  FTP_REMOTE
-      - name: Deploy to server via SCP
-        uses: appleboy/scp-action@v0.1.7
+      # ── 7. Deploy via rsync over SSH (port 22) ─────────────────────────────
+      #  Secrets: FTP_HOST  FTP_USER  FTP_PASSWORD  FTP_REMOTE
+      #  FTP_REMOTE = absolute path on server, e.g. /home/user/public_html/mtg
+      - name: Deploy via rsync
+        uses: Burnett01/rsync-deployments@7.0.1
         with:
-          host: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: 22
-          source: 'dist/*'
-          target: ${{ secrets.FTP_REMOTE }}
-          strip_components: 1
+          switches: -avzr --delete
+          path: dist/
+          remote_path: ${{ secrets.FTP_REMOTE }}
+          remote_host: ${{ secrets.FTP_HOST }}
+          remote_port: 22
+          remote_user: ${{ secrets.FTP_USER }}
+          remote_password: ${{ secrets.FTP_PASSWORD }}
