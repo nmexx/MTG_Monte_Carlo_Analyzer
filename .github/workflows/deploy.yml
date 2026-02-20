@@ -43,10 +43,4 @@ jobs:
       - name: Deploy via lftp SFTP
         run: |
           sudo apt-get install -y lftp
-          lftp -c "
-            set sftp:auto-confirm yes;
-            set net:max-retries 3;
-            open -u ${{ secrets.FTP_USER }},${{ secrets.FTP_PASSWORD }} sftp://${{ secrets.FTP_HOST }}:22;
-            mirror -R --delete --verbose dist/ ${{ secrets.FTP_REMOTE }};
-            quit
-          "
+          lftp sftp://${{ secrets.FTP_USER }}:${{ secrets.FTP_PASSWORD }}@${{ secrets.FTP_HOST }}:22 -e "set sftp:auto-confirm yes; mirror -R --delete --verbose dist/ ${{ secrets.FTP_REMOTE }}; quit"
