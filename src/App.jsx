@@ -135,6 +135,11 @@ const hasCastables = deck =>
     deck.rampSpells?.length > 0 ||
     deck.exploration?.length > 0);
 
+// Scryfall API usage limits per browser session.
+// Cards already in the local cache never count against these.
+const SCRYFALL_SOFT_LIMIT = 60; // show advisory warning
+const SCRYFALL_HARD_LIMIT = 150; // block further API calls
+
 // =============================================================================
 const MTGMonteCarloAnalyzer = () => {
   // URL hash state takes priority over localStorage, read once at startup.
@@ -144,6 +149,13 @@ const MTGMonteCarloAnalyzer = () => {
   const [cardsDatabase, setCardsDatabase] = useState(null);
   // Mutable lookup cache — intentionally a ref so updates don't trigger re-renders
   const lookupCacheRef = useRef(new Map());
+
+  // ── Scryfall API rate limiting ─────────────────────────────────────────────
+  // Count is state (for display in JSX) and also mirrored in sessionStorage
+  // so it survives React re-renders but resets when the tab is closed.
+  const [scryfallCallCount, setScryfallCallCount] = useState(() =>
+    parseInt(sessionStorage.getItem('scryfall_call_count') || '0', 10)
+  );
 
   // ── Comparison mode ────────────────────────────────────────────────────────
   const [comparisonMode, setComparisonMode] = useState(() => _s.comparisonMode ?? false);
@@ -433,12 +445,20 @@ const MTGMonteCarloAnalyzer = () => {
     }
 
     if (apiMode === 'scryfall') {
+      // Hard limit — stop making API calls for the rest of this session
+      if (scryfallCallCount >= SCRYFALL_HARD_LIMIT) return null;
+
       try {
         const response = await fetch(
           `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`
         );
         if (response.ok) {
           const data = await response.json();
+
+          // Track every real API request made
+          const newCount = scryfallCallCount + 1;
+          sessionStorage.setItem('scryfall_call_count', newCount);
+          setScryfallCallCount(newCount);
 
           if (
             data.layout === 'token' ||
@@ -723,6 +743,30 @@ const MTGMonteCarloAnalyzer = () => {
             Scryfall API (Fallback)
           </label>
         </div>
+
+        {/* Scryfall usage warnings */}
+        {apiMode === 'scryfall' &&
+          scryfallCallCount >= SCRYFALL_SOFT_LIMIT &&
+          scryfallCallCount < SCRYFALL_HARD_LIMIT && (
+            <div className="scryfall-usage-warning">
+              ⚠️ You&apos;ve made {scryfallCallCount} Scryfall API requests this session. For large
+              or repeated imports, switch to the{' '}
+              <button className="inline-link" onClick={() => setApiMode('local')}>
+                Local JSON file
+              </button>{' '}
+              to avoid hitting rate limits.
+            </div>
+          )}
+        {apiMode === 'scryfall' && scryfallCallCount >= SCRYFALL_HARD_LIMIT && (
+          <div className="scryfall-usage-blocked">
+            🚫 Scryfall API limit reached ({SCRYFALL_HARD_LIMIT} requests this session). Please{' '}
+            <button className="inline-link" onClick={() => setApiMode('local')}>
+              switch to Local JSON
+            </button>{' '}
+            for further lookups, or reload the page to reset the counter.{' '}
+            <em>Tip: the local JSON file is faster and works offline.</em>
+          </div>
+        )}
 
         {apiMode === 'local' && (
           <div className="upload-section">

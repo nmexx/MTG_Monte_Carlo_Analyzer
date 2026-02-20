@@ -285,6 +285,41 @@ body {
   font-size: 0.875rem;
 }
 
+/* ─── Scryfall API usage warnings ───────────────────────────────────────── */
+.scryfall-usage-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.scryfall-usage-blocked {
+  background: #fee2e2;
+  color: var(--clr-danger);
+  border: 1px solid #fca5a5;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* Inline button styled as a hyperlink — used inside usage warnings */
+.inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+}
+
 /* ─── Shared card rows ───────────────────────────────────────────────────── */
 .card-row {
   padding: 8px 0;
