@@ -6,34 +6,39 @@
 }
 
 body {
-  font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    'Inter',
+    'Segoe UI',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   background-color: #f9fafb;
   color: #1f2937;
 }
 
 /* ─── Design tokens ──────────────────────────────────────────────────────── */
 :root {
-  --clr-primary:      #667eea;
-  --clr-primary-end:  #764ba2;
-  --clr-success:      #22c55e;
-  --clr-danger:       #dc2626;
-  --clr-warning:      #f59e0b;
-  --clr-text:         #1f2937;
-  --clr-muted:        #6b7280;
-  --clr-faint:        #9ca3af;
-  --clr-border:       #e5e7eb;
-  --clr-row-border:   #f3f4f6;
-  --clr-bg:           #f9fafb;
-  --clr-bg-panel:     #ffffff;
-  --clr-bg-muted:     #f3f4f6;
-  --clr-bg-accent:    #dbeafe;
-  --clr-bg-warn:      #fffbeb;
-  --clr-generic-pip:  #d1d5db;
-  --shadow-sm:        0 1px 3px rgba(0, 0, 0, 0.1);
-  --radius-lg:        12px;
-  --radius-md:        8px;
-  --radius-sm:        6px;
-  --radius-xs:        4px;
+  --clr-primary: #667eea;
+  --clr-primary-end: #764ba2;
+  --clr-success: #22c55e;
+  --clr-danger: #dc2626;
+  --clr-warning: #f59e0b;
+  --clr-text: #1f2937;
+  --clr-muted: #6b7280;
+  --clr-faint: #9ca3af;
+  --clr-border: #e5e7eb;
+  --clr-row-border: #f3f4f6;
+  --clr-bg: #f9fafb;
+  --clr-bg-panel: #ffffff;
+  --clr-bg-muted: #f3f4f6;
+  --clr-bg-accent: #dbeafe;
+  --clr-bg-warn: #fffbeb;
+  --clr-generic-pip: #d1d5db;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+  --radius-xs: 4px;
 }
 
 /* ─── App shell ──────────────────────────────────────────────────────────── */
@@ -619,8 +624,14 @@ body {
 }
 
 @keyframes tooltip-fadein {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .card-tooltip-img {
@@ -650,7 +661,9 @@ body {
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .mode-toggle__btn--active {
@@ -695,8 +708,14 @@ body {
 }
 
 /* Deck label in panels */
-.deck-label-a { color: var(--clr-primary); margin: 0 0 8px; }
-.deck-label-b { color: #b45309;            margin: 0 0 8px; }
+.deck-label-a {
+  color: var(--clr-primary);
+  margin: 0 0 8px;
+}
+.deck-label-b {
+  color: #b45309;
+  margin: 0 0 8px;
+}
 
 /* Comparison summary grid (3 columns: A | B | delta) */
 .comparison-summary-grid {
@@ -729,9 +748,18 @@ body {
 }
 
 /* Delta badges */
-.delta-better { color: #15803d; font-weight: 600; }
-.delta-worse  { color: #b91c1c; font-weight: 600; }
-.delta-neutral { color: var(--clr-muted); font-weight: 500; }
+.delta-better {
+  color: #15803d;
+  font-weight: 600;
+}
+.delta-worse {
+  color: #b91c1c;
+  font-weight: 600;
+}
+.delta-neutral {
+  color: var(--clr-muted);
+  font-weight: 500;
+}
 
 /* Deck name inputs */
 .deck-label-input {
@@ -751,4 +779,233 @@ body {
   visibility: hidden;
   pointer-events: none;
   min-height: 1px;
+}
+
+/* ─── Flood / Screw tracking ────────────────────────────────────────────── */
+
+/* Settings panel section */
+.flood-screw-box {
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: var(--clr-bg-muted);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+}
+
+.flood-screw-title {
+  font-weight: 700;
+  font-size: 0.875rem;
+  margin-bottom: 4px;
+  color: var(--clr-text);
+}
+
+.flood-screw-hint {
+  font-size: 0.78rem;
+  color: var(--clr-muted);
+  margin: 0 0 10px;
+}
+
+.flood-screw-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.flood-screw-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.84rem;
+  color: var(--clr-text);
+  flex-wrap: wrap;
+}
+
+.flood-screw-input {
+  width: 48px;
+  padding: 3px 6px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--clr-border);
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+/* Results panel rate badges */
+.flood-screw-rates {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.flood-screw-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  border: 1px solid transparent;
+}
+
+.flood-screw-badge--flood {
+  background: rgba(96, 165, 250, 0.1);
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.flood-screw-badge--screw {
+  background: rgba(251, 146, 60, 0.1);
+  border-color: rgba(251, 146, 60, 0.25);
+}
+
+.flood-screw-badge__icon {
+  font-weight: 700;
+  color: var(--clr-text);
+}
+
+.flood-screw-badge__def {
+  color: var(--clr-muted);
+  font-size: 0.8rem;
+}
+
+.flood-screw-badge__pct {
+  font-weight: 800;
+  font-size: 1rem;
+  margin-left: auto;
+}
+
+.flood-screw-badge--flood .flood-screw-badge__pct {
+  color: #60a5fa;
+}
+.flood-screw-badge--screw .flood-screw-badge__pct {
+  color: #fb923c;
+}
+
+.on-curve-summary {
+  margin-top: 20px;
+  border-top: 1px solid var(--clr-border);
+  padding-top: 16px;
+}
+
+.on-curve-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--clr-text);
+}
+
+.on-curve-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin-top: 8px;
+}
+
+.on-curve-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--clr-muted);
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.on-curve-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--clr-border);
+  vertical-align: middle;
+}
+
+.on-curve-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.on-curve-table tbody tr:hover td {
+  background: var(--clr-bg-muted);
+}
+
+.on-curve-card-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 7px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.on-curve-pct {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+/* ─── First Playable by Turn Summary ────────────────────────────────────── */
+.first-playable-summary {
+  margin-top: 20px;
+  border-top: 1px solid var(--clr-border);
+  padding-top: 16px;
+}
+
+.first-playable-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--clr-text);
+}
+
+.first-playable-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin-top: 8px;
+}
+
+.first-playable-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--clr-muted);
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.first-playable-table th:not(:first-child),
+.first-playable-table td:not(:first-child) {
+  text-align: center;
+}
+
+.first-playable-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--clr-border);
+  vertical-align: middle;
+}
+
+.first-playable-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.first-playable-table tbody tr:hover td {
+  background: var(--clr-bg-muted);
+}
+
+.first-playable-turn {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--clr-text);
+  background: var(--clr-bg-muted);
+  border-radius: 4px;
+  padding: 2px 8px;
+  min-width: 32px;
+  text-align: center;
+}
+
+.first-playable-never {
+  color: var(--clr-muted);
+  font-size: 0.875rem;
 }

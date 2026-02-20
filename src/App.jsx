@@ -226,6 +226,12 @@ const MTGMonteCarloAnalyzer = () => {
   );
   const [commanderMode, setCommanderMode] = useState(() => _s.commanderMode ?? false);
 
+  // ── Flood / screw thresholds ───────────────────────────────────────────────
+  const [floodNLands, setFloodNLands] = useState(() => _s.floodNLands ?? 5);
+  const [floodTurn, setFloodTurn] = useState(() => _s.floodTurn ?? 5);
+  const [screwNLands, setScrewNLands] = useState(() => _s.screwNLands ?? 2);
+  const [screwTurn, setScrewTurn] = useState(() => _s.screwTurn ?? 3);
+
   const [isSimulating, setIsSimulating] = useState(false);
 
   // ── Derived chart data ─────────────────────────────────────────────────────
@@ -260,6 +266,10 @@ const MTGMonteCarloAnalyzer = () => {
           mulliganRule,
           mulliganStrategy,
           customMulliganRules,
+          floodNLands,
+          floodTurn,
+          screwNLands,
+          screwTurn,
         })
       );
     } catch (err) {
@@ -282,6 +292,10 @@ const MTGMonteCarloAnalyzer = () => {
     mulliganRule,
     mulliganStrategy,
     customMulliganRules,
+    floodNLands,
+    floodTurn,
+    screwNLands,
+    screwTurn,
   ]);
 
   // ============================================================================
@@ -423,6 +437,10 @@ const MTGMonteCarloAnalyzer = () => {
     mulliganRule,
     mulliganStrategy,
     customMulliganRules,
+    floodNLands,
+    floodTurn,
+    screwNLands,
+    screwTurn,
     selectedKeyCards: slot.selectedKeyCards,
     includeExploration: slot.includeExploration,
     disabledExploration: slot.disabledExploration,
@@ -825,6 +843,14 @@ const MTGMonteCarloAnalyzer = () => {
                 setMulliganStrategy={setMulliganStrategy}
                 customMulliganRules={customMulliganRules}
                 setCustomMulliganRules={setCustomMulliganRules}
+                floodNLands={floodNLands}
+                setFloodNLands={setFloodNLands}
+                floodTurn={floodTurn}
+                setFloodTurn={setFloodTurn}
+                screwNLands={screwNLands}
+                setScrewNLands={setScrewNLands}
+                screwTurn={screwTurn}
+                setScrewTurn={setScrewTurn}
                 runSimulation={runSimulation}
                 isSimulating={isSimulating}
               />
@@ -1104,6 +1130,14 @@ const MTGMonteCarloAnalyzer = () => {
               setMulliganStrategy={setMulliganStrategy}
               customMulliganRules={customMulliganRules}
               setCustomMulliganRules={setCustomMulliganRules}
+              floodNLands={floodNLands}
+              setFloodNLands={setFloodNLands}
+              floodTurn={floodTurn}
+              setFloodTurn={setFloodTurn}
+              screwNLands={screwNLands}
+              setScrewNLands={setScrewNLands}
+              screwTurn={screwTurn}
+              setScrewTurn={setScrewTurn}
               runSimulation={runSimulation}
               isSimulating={isSimulating}
             />

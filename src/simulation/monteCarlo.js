@@ -130,6 +130,10 @@ export const monteCarlo = (deckToParse, config = {}) => {
     disabledExploration = new Set(),
     includeRampSpells = true,
     disabledRampSpells = new Set(),
+    floodNLands = 5,
+    floodTurn = 5,
+    screwNLands = 2,
+    screwTurn = 3,
   } = config;
 
   const deck = buildCompleteDeck(deckToParse, config);
@@ -154,6 +158,12 @@ export const monteCarlo = (deckToParse, config = {}) => {
       .map(() => []),
     keyCardPlayability: {},
     keyCardPlayabilityBurst: {},
+    keyCardOnCurvePlayability: {},
+    keyCardOnCurveCMC: {},
+    floodRate: null,
+    screwRate: null,
+    floodThreshold: { lands: floodNLands, turn: floodTurn },
+    screwThreshold: { lands: screwNLands, turn: screwTurn },
     hasBurstCards: false,
     fastestPlaySequences: {},
     fastestPlaySequencesBurst: {},
@@ -164,6 +174,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
   keyCardNames.forEach(name => {
     results.keyCardPlayability[name] = Array(turns).fill(0);
     results.keyCardPlayabilityBurst[name] = Array(turns).fill(0);
+    results.keyCardOnCurvePlayability[name] = 0;
   });
 
   results.hasBurstCards =
@@ -184,6 +195,12 @@ export const monteCarlo = (deckToParse, config = {}) => {
   const keyCardMap = new Map(
     keyCardNames.map(name => [name, allPlayableCards.find(c => c.name === name)])
   );
+
+  // Store the CMC of each key card so the UI can display the on-curve turn.
+  keyCardNames.forEach(name => {
+    const kc = keyCardMap.get(name);
+    results.keyCardOnCurveCMC[name] = kc?.cmc ?? null;
+  });
 
   // ── Main iteration loop ───────────────────────────────────────────────────
   for (let iter = 0; iter < iterations; iter++) {
@@ -537,6 +554,15 @@ export const monteCarlo = (deckToParse, config = {}) => {
 
         if (keyCard && canPlayCard(keyCard, manaAvailable)) {
           results.keyCardPlayability[cardName][turn]++;
+
+          // On-curve: castable on exactly the turn equal to the card's CMC.
+          // A CMC-3 card is "on curve" on turn 3 (turn index 2).
+          // 0-CMC cards are considered on-curve on turn 1 (turn index 0).
+          const onCurveTurnIdx = Math.max(0, (keyCard.cmc ?? 0) - 1);
+          if (turn === onCurveTurnIdx) {
+            results.keyCardOnCurvePlayability[cardName]++;
+          }
+
           if (!results.fastestPlaySequences[cardName]) results.fastestPlaySequences[cardName] = {};
           const ct = turn + 1;
           if (!results.fastestPlaySequences[cardName][ct])
@@ -575,6 +601,18 @@ export const monteCarlo = (deckToParse, config = {}) => {
     } // end turn loop
   } // end iteration loop
 
+  // Flood / screw rates — computed from raw per-turn arrays BEFORE averaging
+  const floodTurnIdx = floodTurn - 1;
+  const screwTurnIdx = screwTurn - 1;
+  if (floodTurnIdx >= 0 && floodTurnIdx < turns && results.landsPerTurn[floodTurnIdx].length > 0) {
+    const floodCount = results.landsPerTurn[floodTurnIdx].filter(n => n >= floodNLands).length;
+    results.floodRate = (floodCount / results.handsKept) * 100;
+  }
+  if (screwTurnIdx >= 0 && screwTurnIdx < turns && results.landsPerTurn[screwTurnIdx].length > 0) {
+    const screwCount = results.landsPerTurn[screwTurnIdx].filter(n => n <= screwNLands).length;
+    results.screwRate = (screwCount / results.handsKept) * 100;
+  }
+
   // Capture standard deviations before collapsing arrays to averages
   results.landsPerTurnStdDev = results.landsPerTurn.map(arr => stdDev(arr));
   results.untappedLandsPerTurnStdDev = results.untappedLandsPerTurn.map(arr => stdDev(arr));
@@ -607,6 +645,12 @@ export const monteCarlo = (deckToParse, config = {}) => {
   };
   toPercent(results.keyCardPlayability);
   toPercent(results.keyCardPlayabilityBurst);
+
+  // On-curve percentage (single number per card, not per-turn)
+  Object.keys(results.keyCardOnCurvePlayability).forEach(name => {
+    results.keyCardOnCurvePlayability[name] =
+      (results.keyCardOnCurvePlayability[name] / results.handsKept) * 100;
+  });
 
   return results;
 };

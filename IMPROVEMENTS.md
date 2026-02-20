@@ -34,10 +34,9 @@
    - No CMC distribution chart exists.
    - Show spells grouped by CMC (standard deckbuilding metric); trivially added with existing Recharts infrastructure.
 
-6. **"First playable by turn X" summary table** `[Low]`
-   - For each key card, show the earliest turn where playability crosses configurable thresholds (e.g. 50%, 80%, 95%).
-   - All required data already exists in `keyCardPlayability`; this is a pure display addition.
-   - Complements the full per-turn chart with a quick-read summary.
+6. **"First playable by turn X" summary table** --------DONE
+   - Table below the Key Cards chart showing the earliest turn each card crosses 50%, 80%, and 95% cumulative playability.
+   - Pure display addition; reads directly from the existing `keyCardPlayability` per-turn arrays.
 
 7. **Standard deviation bands on charts** --------DONE
    - Only averages are currently reported.
@@ -94,13 +93,15 @@
     - Add a "require all of" combo group: report the % of games where *all* selected cards in a group are simultaneously castable on the same turn.
     - High value for combo decks (e.g. Thassa's Oracle + Demonic Consultation both available by turn 3).
 
-17. **"On-curve" playability** `[Low]`
-    - Separate from general cumulative playability, track the % of games where a key card is castable on *exactly* the turn matching its CMC.
-    - The current metric shows a 3-drop at 90% on turn 7; the meaningful question is turn 3.
+17. **"On-curve" playability** --------DONE
+    - Added `keyCardOnCurvePlayability` and `keyCardOnCurveCMC` to `monteCarlo.js` results.
+    - Tracks per-iteration whether each key card is castable on exactly the turn equal to its CMC.
+    - Displayed as a summary table below the Key Cards chart in `ResultsPanel.jsx`, colour-coded green/amber/red.
 
-18. **Land flood / screw rate tracking** `[Low]`
-    - Track per-iteration whether the game hit defined thresholds: ≥ N lands by turn T (flood) or ≤ N lands by turn T (screw).
-    - Report as a % alongside the averages — directly answers "am I running too many/few lands?" in a way averages cannot.
+18. **Land flood / screw rate tracking** --------DONE
+    - Configurable thresholds (default: flood ≥5 lands by T5, screw ≤2 lands by T3) exposed in the settings panel.
+    - `monteCarlo.js` computes `floodRate` / `screwRate` from the raw per-iteration land arrays before averaging.
+    - Displayed as colour-coded rate badges (blue / orange) inside the Lands per Turn panel.
 
 19. **Opening hand land distribution histogram** `[Low]`
     - Bar chart of how often kept hands contain exactly 0–7 lands after mulligans.
@@ -178,11 +179,3 @@
     - When a fetch land is activated in Phase 5 and retrieves a shock land, `doesLandEnterTapped` evaluates the shock using the battlefield state *before* the fetch resolved.
     - This means the land-count and subtype checks that govern shock/check/battle land conditions are slightly wrong for the turn the fetch fires.
     - Fix: call `doesLandEnterTapped` after splicing the fetch out of the battlefield but before pushing the fetched land, so the snapshot accurately reflects the post-fetch board state.
-
-
-Lands Logic:
-
-Thriving Lands should choose a color of the key card as second --------DONE
-Filter Lands need land to activate --------DONE
-Filter Lands --------DONE
-verge lands --------DONE

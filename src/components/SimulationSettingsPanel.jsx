@@ -11,16 +11,34 @@
 import React from 'react';
 
 const SimulationSettingsPanel = ({
-  iterations, setIterations,
-  turns, setTurns,
-  handSize, setHandSize,
-  maxSequences, setMaxSequences,
-  selectedTurnForSequences, setSelectedTurnForSequences,
-  commanderMode, setCommanderMode,
-  enableMulligans, setEnableMulligans,
-  mulliganRule, setMulliganRule,
-  mulliganStrategy, setMulliganStrategy,
-  customMulliganRules, setCustomMulliganRules,
+  iterations,
+  setIterations,
+  turns,
+  setTurns,
+  handSize,
+  setHandSize,
+  maxSequences,
+  setMaxSequences,
+  selectedTurnForSequences,
+  setSelectedTurnForSequences,
+  commanderMode,
+  setCommanderMode,
+  enableMulligans,
+  setEnableMulligans,
+  mulliganRule,
+  setMulliganRule,
+  mulliganStrategy,
+  setMulliganStrategy,
+  customMulliganRules,
+  setCustomMulliganRules,
+  floodNLands,
+  setFloodNLands,
+  floodTurn,
+  setFloodTurn,
+  screwNLands,
+  setScrewNLands,
+  screwTurn,
+  setScrewTurn,
   runSimulation,
   isSimulating,
 }) => (
@@ -34,8 +52,9 @@ const SimulationSettingsPanel = ({
         <input
           type="number"
           value={iterations}
-          onChange={(e) => setIterations(parseInt(e.target.value))}
-          min="1000" max="100000"
+          onChange={e => setIterations(parseInt(e.target.value))}
+          min="1000"
+          max="100000"
           className="settings-input"
         />
       </div>
@@ -44,8 +63,9 @@ const SimulationSettingsPanel = ({
         <input
           type="number"
           value={turns}
-          onChange={(e) => setTurns(parseInt(e.target.value))}
-          min="1" max="15"
+          onChange={e => setTurns(parseInt(e.target.value))}
+          min="1"
+          max="15"
           className="settings-input"
         />
       </div>
@@ -54,8 +74,9 @@ const SimulationSettingsPanel = ({
         <input
           type="number"
           value={handSize}
-          onChange={(e) => setHandSize(parseInt(e.target.value))}
-          min="1" max="10"
+          onChange={e => setHandSize(parseInt(e.target.value))}
+          min="1"
+          max="10"
           className="settings-input"
         />
       </div>
@@ -64,8 +85,9 @@ const SimulationSettingsPanel = ({
         <input
           type="range"
           value={selectedTurnForSequences}
-          onChange={(e) => setSelectedTurnForSequences(parseInt(e.target.value))}
-          min="1" max={turns}
+          onChange={e => setSelectedTurnForSequences(parseInt(e.target.value))}
+          min="1"
+          max={turns}
           className="settings-input"
         />
         <div className="range-display">Turn {selectedTurnForSequences}</div>
@@ -75,8 +97,9 @@ const SimulationSettingsPanel = ({
         <input
           type="range"
           value={maxSequences}
-          onChange={(e) => setMaxSequences(parseInt(e.target.value))}
-          min="1" max="10"
+          onChange={e => setMaxSequences(parseInt(e.target.value))}
+          min="1"
+          max="10"
           className="settings-input"
         />
         <div className="range-display">
@@ -91,13 +114,14 @@ const SimulationSettingsPanel = ({
         <input
           type="checkbox"
           checked={commanderMode}
-          onChange={(e) => setCommanderMode(e.target.checked)}
+          onChange={e => setCommanderMode(e.target.checked)}
         />
         <span>🎩 Commander Mode (100-card singleton, optimized for multiplayer)</span>
       </label>
       {commanderMode && (
         <div className="commander-hint">
-          Assumes multiplayer environment: Crowd lands enter untapped, longer game simulation recommended
+          Assumes multiplayer environment: Crowd lands enter untapped, longer game simulation
+          recommended
         </div>
       )}
     </div>
@@ -108,7 +132,7 @@ const SimulationSettingsPanel = ({
         <input
           type="checkbox"
           checked={enableMulligans}
-          onChange={(e) => setEnableMulligans(e.target.checked)}
+          onChange={e => setEnableMulligans(e.target.checked)}
         />
         <span>Enable Mulligan Logic</span>
       </label>
@@ -120,7 +144,7 @@ const SimulationSettingsPanel = ({
             <label className="mulligan-select-label">Mulligan Rule</label>
             <select
               value={mulliganRule}
-              onChange={(e) => setMulliganRule(e.target.value)}
+              onChange={e => setMulliganRule(e.target.value)}
               className="mulligan-select"
             >
               <option value="london">London Mulligan (draw 7, bottom N cards)</option>
@@ -133,7 +157,7 @@ const SimulationSettingsPanel = ({
             <label className="mulligan-select-label">Mulligan Strategy</label>
             <select
               value={mulliganStrategy}
-              onChange={(e) => setMulliganStrategy(e.target.value)}
+              onChange={e => setMulliganStrategy(e.target.value)}
               className="mulligan-select"
             >
               <option value="conservative">Conservative (only 0 or 7 lands)</option>
@@ -156,7 +180,9 @@ const SimulationSettingsPanel = ({
                   <input
                     type="checkbox"
                     checked={customMulliganRules[key]}
-                    onChange={(e) => setCustomMulliganRules({ ...customMulliganRules, [key]: e.target.checked })}
+                    onChange={e =>
+                      setCustomMulliganRules({ ...customMulliganRules, [key]: e.target.checked })
+                    }
                   />
                   <span>{label}</span>
                 </label>
@@ -166,14 +192,25 @@ const SimulationSettingsPanel = ({
                 <input
                   type="checkbox"
                   checked={customMulliganRules.mulliganMinLands}
-                  onChange={(e) => setCustomMulliganRules({ ...customMulliganRules, mulliganMinLands: e.target.checked })}
+                  onChange={e =>
+                    setCustomMulliganRules({
+                      ...customMulliganRules,
+                      mulliganMinLands: e.target.checked,
+                    })
+                  }
                 />
                 <span>Mulligan if less than </span>
                 <input
                   type="number"
                   value={customMulliganRules.minLandsThreshold}
-                  onChange={(e) => setCustomMulliganRules({ ...customMulliganRules, minLandsThreshold: parseInt(e.target.value) })}
-                  min="0" max="7"
+                  onChange={e =>
+                    setCustomMulliganRules({
+                      ...customMulliganRules,
+                      minLandsThreshold: parseInt(e.target.value),
+                    })
+                  }
+                  min="0"
+                  max="7"
                   className="custom-rule-input"
                 />
                 <span> lands</span>
@@ -183,14 +220,25 @@ const SimulationSettingsPanel = ({
                 <input
                   type="checkbox"
                   checked={customMulliganRules.mulliganMaxLands}
-                  onChange={(e) => setCustomMulliganRules({ ...customMulliganRules, mulliganMaxLands: e.target.checked })}
+                  onChange={e =>
+                    setCustomMulliganRules({
+                      ...customMulliganRules,
+                      mulliganMaxLands: e.target.checked,
+                    })
+                  }
                 />
                 <span>Mulligan if more than </span>
                 <input
                   type="number"
                   value={customMulliganRules.maxLandsThreshold}
-                  onChange={(e) => setCustomMulliganRules({ ...customMulliganRules, maxLandsThreshold: parseInt(e.target.value) })}
-                  min="0" max="7"
+                  onChange={e =>
+                    setCustomMulliganRules({
+                      ...customMulliganRules,
+                      maxLandsThreshold: parseInt(e.target.value),
+                    })
+                  }
+                  min="0"
+                  max="7"
                   className="custom-rule-input"
                 />
                 <span> lands</span>
@@ -200,14 +248,25 @@ const SimulationSettingsPanel = ({
                 <input
                   type="checkbox"
                   checked={customMulliganRules.mulliganNoPlaysByTurn}
-                  onChange={(e) => setCustomMulliganRules({ ...customMulliganRules, mulliganNoPlaysByTurn: e.target.checked })}
+                  onChange={e =>
+                    setCustomMulliganRules({
+                      ...customMulliganRules,
+                      mulliganNoPlaysByTurn: e.target.checked,
+                    })
+                  }
                 />
                 <span>Mulligan if no plays by turn </span>
                 <input
                   type="number"
                   value={customMulliganRules.noPlaysTurnThreshold}
-                  onChange={(e) => setCustomMulliganRules({ ...customMulliganRules, noPlaysTurnThreshold: parseInt(e.target.value) })}
-                  min="1" max="5"
+                  onChange={e =>
+                    setCustomMulliganRules({
+                      ...customMulliganRules,
+                      noPlaysTurnThreshold: parseInt(e.target.value),
+                    })
+                  }
+                  min="1"
+                  max="5"
                   className="custom-rule-input"
                 />
               </label>
@@ -217,11 +276,57 @@ const SimulationSettingsPanel = ({
       )}
     </div>
 
-    <button
-      onClick={runSimulation}
-      disabled={isSimulating}
-      className="btn-run"
-    >
+    {/* Flood / Screw tracking thresholds */}
+    <div className="flood-screw-box">
+      <div className="flood-screw-title">🌊 Flood / 🏜️ Screw Tracking</div>
+      <p className="flood-screw-hint">
+        After simulation, report the % of games that hit each land-count threshold.
+      </p>
+      <div className="flood-screw-grid">
+        <label className="flood-screw-label">
+          Flood: ≥
+          <input
+            type="number"
+            value={floodNLands}
+            onChange={e => setFloodNLands(parseInt(e.target.value))}
+            min="1"
+            max="20"
+            className="flood-screw-input"
+          />
+          lands by turn
+          <input
+            type="number"
+            value={floodTurn}
+            onChange={e => setFloodTurn(parseInt(e.target.value))}
+            min="1"
+            max="15"
+            className="flood-screw-input"
+          />
+        </label>
+        <label className="flood-screw-label">
+          Screw: ≤
+          <input
+            type="number"
+            value={screwNLands}
+            onChange={e => setScrewNLands(parseInt(e.target.value))}
+            min="0"
+            max="20"
+            className="flood-screw-input"
+          />
+          lands by turn
+          <input
+            type="number"
+            value={screwTurn}
+            onChange={e => setScrewTurn(parseInt(e.target.value))}
+            min="1"
+            max="15"
+            className="flood-screw-input"
+          />
+        </label>
+      </div>
+    </div>
+
+    <button onClick={runSimulation} disabled={isSimulating} className="btn-run">
       {isSimulating ? '⏳ Simulating...' : '🎲 Start Simulation'}
     </button>
   </div>

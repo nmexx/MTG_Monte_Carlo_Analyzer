@@ -75,6 +75,8 @@ const makeStdTooltip = (sdMap = {}) => {
   return StdTooltip;
 };
 
+const FIRST_PLAYABLE_THRESHOLDS = [50, 80, 95];
+
 const ResultsPanel = ({
   simulationResults,
   chartData,
@@ -165,6 +167,38 @@ const ResultsPanel = ({
             />
           </ComposedChart>
         </ResponsiveContainer>
+
+        {/* Flood / Screw rate badges */}
+        {(simulationResults.floodRate != null || simulationResults.screwRate != null) && (
+          <div className="flood-screw-rates">
+            {simulationResults.floodRate != null && (
+              <div className="flood-screw-badge flood-screw-badge--flood">
+                <span className="flood-screw-badge__icon">🌊 Flood</span>
+                <span className="flood-screw-badge__def">
+                  {'>='}
+                  {simulationResults.floodThreshold.lands} lands by T
+                  {simulationResults.floodThreshold.turn}
+                </span>
+                <span className="flood-screw-badge__pct">
+                  {simulationResults.floodRate.toFixed(1)}%
+                </span>
+              </div>
+            )}
+            {simulationResults.screwRate != null && (
+              <div className="flood-screw-badge flood-screw-badge--screw">
+                <span className="flood-screw-badge__icon">🏜️ Screw</span>
+                <span className="flood-screw-badge__def">
+                  {'<='}
+                  {simulationResults.screwThreshold.lands} lands by T
+                  {simulationResults.screwThreshold.turn}
+                </span>
+                <span className="flood-screw-badge__pct">
+                  {simulationResults.screwRate.toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Mana by Color */}
@@ -280,6 +314,114 @@ const ResultsPanel = ({
               })}
             </LineChart>
           </ResponsiveContainer>
+
+          {/* First Playable by Turn X */}
+          {simulationResults?.keyCardPlayability &&
+            Object.keys(simulationResults.keyCardPlayability).length > 0 && (
+              <div className="first-playable-summary">
+                <h4 className="first-playable-title">📅 First Playable by Turn</h4>
+                <p className="card-meta">
+                  Earliest turn where cumulative playability first crosses each threshold.
+                </p>
+                <table className="first-playable-table">
+                  <thead>
+                    <tr>
+                      <th>Card</th>
+                      {FIRST_PLAYABLE_THRESHOLDS.map(t => (
+                        <th key={t}>&ge;&thinsp;{t}%</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from(selectedKeyCards).map((cardName, idx) => {
+                      const colors = ['#667eea', '#f59e0b', '#22c55e', '#dc2626', '#60a5fa'];
+                      const color = colors[idx % colors.length];
+                      const perTurn = simulationResults.keyCardPlayability?.[cardName] ?? [];
+                      return (
+                        <tr key={cardName}>
+                          <td>
+                            <span className="on-curve-card-dot" style={{ background: color }} />
+                            <CardTooltip name={cardName}>{cardName}</CardTooltip>
+                          </td>
+                          {FIRST_PLAYABLE_THRESHOLDS.map(threshold => {
+                            const turnIdx = perTurn.findIndex(pct => pct >= threshold);
+                            return (
+                              <td key={threshold}>
+                                {turnIdx === -1 ? (
+                                  <span className="first-playable-never">—</span>
+                                ) : (
+                                  <span className="first-playable-turn">T{turnIdx + 1}</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+          {/* On-Curve Playability Summary */}
+          {simulationResults?.keyCardOnCurvePlayability &&
+            Object.keys(simulationResults.keyCardOnCurvePlayability).length > 0 && (
+              <div className="on-curve-summary">
+                <h4 className="on-curve-title">🎯 On-Curve Playability</h4>
+                <p className="card-meta">
+                  % of games where the card is castable on exactly the turn matching its CMC.
+                </p>
+                <table className="on-curve-table">
+                  <thead>
+                    <tr>
+                      <th>Card</th>
+                      <th>CMC</th>
+                      <th>On-Curve Turn</th>
+                      <th>On-Curve %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from(selectedKeyCards).map((cardName, idx) => {
+                      const colors = ['#667eea', '#f59e0b', '#22c55e', '#dc2626', '#60a5fa'];
+                      const color = colors[idx % colors.length];
+                      const cmc = simulationResults.keyCardOnCurveCMC?.[cardName];
+                      const pct = simulationResults.keyCardOnCurvePlayability?.[cardName] ?? null;
+                      const onCurveTurn = cmc != null ? (cmc === 0 ? 1 : cmc) : null;
+                      const pctDisplay = pct != null ? `${pct.toFixed(1)}%` : '—';
+                      const cmcDisplay = cmc != null ? cmc : '—';
+                      const turnDisplay = onCurveTurn != null ? `Turn ${onCurveTurn}` : '—';
+                      return (
+                        <tr key={cardName}>
+                          <td>
+                            <span className="on-curve-card-dot" style={{ background: color }} />
+                            <CardTooltip name={cardName}>{cardName}</CardTooltip>
+                          </td>
+                          <td>{cmcDisplay}</td>
+                          <td>{turnDisplay}</td>
+                          <td>
+                            <span
+                              className="on-curve-pct"
+                              style={{
+                                color:
+                                  pct == null
+                                    ? '#9ca3af'
+                                    : pct >= 70
+                                      ? '#4ade80'
+                                      : pct >= 40
+                                        ? '#f59e0b'
+                                        : '#f87171',
+                              }}
+                            >
+                              {pctDisplay}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
         </div>
       )}
 
