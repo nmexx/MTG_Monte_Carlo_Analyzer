@@ -732,7 +732,7 @@ const MTGMonteCarloAnalyzer = () => {
       {/* Header */}
       <div className="app-header">
         <div className="app-header__titles">
-          <h1>Commandertables</h1>
+          <h1>Commandertables presents: MTG Analyzer</h1>
           <p>Monte Carlo mana-base analyzer for Magic: The Gathering</p>
         </div>
       </div>
