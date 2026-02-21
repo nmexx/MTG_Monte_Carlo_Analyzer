@@ -39,6 +39,7 @@ body {
   --radius-md: 8px;
   --radius-sm: 6px;
   --radius-xs: 4px;
+  color-scheme: light;
 }
 
 /* ─── App shell ──────────────────────────────────────────────────────────── */
@@ -1285,6 +1286,7 @@ body {
   --clr-bg-warn: #2a1a00;
   --clr-generic-pip: #475569;
   --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
 }
 
 [data-theme='dark'] body {
