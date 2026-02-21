@@ -1396,32 +1396,3 @@ body {
   background: #162032;
   border-color: #334155;
 }
-
-/* Theme toggle button ───────────────────────────────────────────────────── */
-.btn-theme {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(255, 255, 255, 0.18);
-  border: 1.5px solid rgba(255, 255, 255, 0.55);
-  color: white;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 1.05rem;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 0.18s,
-    border-color 0.18s,
-    transform 0.1s;
-}
-
-.btn-theme:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: white;
-}
-
-.btn-theme:active {
-  transform: translateY(-50%) scale(0.93);
-}

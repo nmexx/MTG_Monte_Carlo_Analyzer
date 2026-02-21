@@ -13,10 +13,7 @@
          Inline scripts wait for preceding stylesheets to load, so putting the
          link first would cause a flash of light mode before data-theme is set. -->
     <script>
-      document.documentElement.setAttribute(
-        'data-theme',
-        localStorage.getItem('mtg_mca_theme') ?? 'dark'
-      );
+      document.documentElement.setAttribute('data-theme', 'dark');
     </script>
     <link rel="stylesheet" href="./src/index.css" />
     <style>
@@ -187,11 +184,6 @@
             Watch on YouTube
           </a>
           <a class="toolbar-btn toolbar-btn--active" href="./index.html">← Back to Analyzer</a>
-        </div>
-        <div class="app-toolbar__right">
-          <button class="toolbar-btn" id="theme-toggle" title="Toggle dark / light mode">
-            ☀️ Light
-          </button>
         </div>
       </div>
 
@@ -2207,22 +2199,5 @@
       </div>
     </div>
     <!-- /.tutorial-root -->
-
-    <script>
-      // Mirror the theme toggle from the main app
-      const btn = document.getElementById('theme-toggle');
-      const updateBtn = () => {
-        const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-        btn.textContent = dark ? '☀️ Light' : '🌙 Dark';
-      };
-      updateBtn();
-      btn.addEventListener('click', () => {
-        const next =
-          document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('mtg_mca_theme', next);
-        updateBtn();
-      });
-    </script>
   </body>
 </html>

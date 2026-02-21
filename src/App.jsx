@@ -267,16 +267,6 @@ const MTGMonteCarloAnalyzer = () => {
 
   const [isSimulating, setIsSimulating] = useState(false);
 
-  // ── Dark / Light theme ────────────────────────────────────────────────────
-  const [theme, setTheme] = useState(() => localStorage.getItem('mtg_mca_theme') ?? 'dark');
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('mtg_mca_theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'));
-
   // ── Share URL ──────────────────────────────────────────────────────────────
   const [shareCopied, setShareCopied] = useState(false);
 
@@ -764,13 +754,6 @@ const MTGMonteCarloAnalyzer = () => {
           </a>
         </div>
         <div className="app-toolbar__right">
-          <button
-            className="toolbar-btn"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-          </button>
           <button
             className={`toolbar-btn${shareCopied ? ' toolbar-btn--copied' : ''}`}
             onClick={handleShareUrl}
