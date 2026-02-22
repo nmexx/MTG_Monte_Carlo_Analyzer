@@ -397,6 +397,13 @@
             onto the battlefield.
           </li>
           <li>
+            <strong>Cost reducers</strong> — Emerald Medallion, Goblin Electromancer, Baral Chief
+            of Compliance, Helm of Awakening, etc. These permanents reduce the <em>generic</em>
+            portion of spell costs by a fixed amount. They are cast at the start of the spell phase
+            (before mana producers) so their discount applies to everything else cast that turn.
+            Colored pip requirements are never reduced.
+          </li>
+          <li>
             <strong>Rituals</strong> — Dark Ritual, Cabal Ritual, Seething Song, etc. These are
             one-shot burst mana sources counted separately in the <em>Burst</em> playability metric.
           </li>
@@ -765,7 +772,7 @@
             ⑥ Cast Spells
           </text>
           <text x="403" y="116" font-size="10.5" fill="var(--clr-text,#ccc)">
-            Ramp spells, artifacts, creatures cast greedily if affordable.
+            Cost reducers → mana producers → ramp spells (greedy, discounted).
           </text>
           <text x="403" y="166" font-size="11" font-weight="bold" fill="var(--clr-text,#e8e6f0)">
             ⑦ Record Statistics
@@ -774,6 +781,33 @@
             Land count, mana, color availability, key-card castability saved.
           </text>
         </svg>
+
+        <h3>Cast Spells sub-phases (Phase 6)</h3>
+        <p>
+          Phase 6 runs three nested sub-phases in order, each looping until nothing more can be
+          cast:
+        </p>
+        <ol>
+          <li>
+            <strong>0 — Cost reducers</strong> — Emerald Medallion, Goblin Electromancer, Baral,
+            Helm of Awakening, etc. are cast first. Casting them before mana producers ensures their
+            discount is active for every subsequent spell in the same turn.
+          </li>
+          <li>
+            <strong>1 — Mana producers</strong> — Mana artifacts (Sol Ring, Arcane Signet, …) and
+            mana creatures (Llanowar Elves, …) and Exploration effects are cast in CMC order.
+          </li>
+          <li>
+            <strong>2 — Ramp spells</strong> — Cultivate, Kodama's Reach, Farseek, etc. are cast
+            last, after mana producers have resolved, using any available discount from cost
+            reducers.
+          </li>
+        </ol>
+        <p>
+          Cost discounts reduce only the <em>generic</em> portion of a spell's cost. A card that
+          costs <code>{2}{G}</code> with Emerald Medallion in play requires <code>{1}{G}</code> —
+          the <code>{G}</code> pip is always paid in full.
+        </p>
 
         <h3>Land selection priority (Phase 2 &amp; 4)</h3>
         <p>
@@ -1632,6 +1666,12 @@
             only, forest, etc.).
           </li>
           <li>Rituals and hand-zero Mox artifacts as a separate <em>burst mana</em> pool.</li>
+          <li>
+            Cost-reducer permanents (Medallion cycle, Goblin Electromancer, Baral, Helm of
+            Awakening, Urza's Incubator, and more) — each reduces the generic portion of matching
+            spell costs; discounts stack and are applied to both ramp-spell and key-card castability
+            checks.
+          </li>
           <li>City of Traitors being sacrificed when another land is played.</li>
           <li>Bounce lands returning the cheapest legal target to hand.</li>
           <li>London and Vancouver mulligan rules with four configurable strategies.</li>
@@ -2022,6 +2062,22 @@
           <code>{2}{W}{W}</code> — even though total mana ≥ 4 — because the two {W} pips have no
           valid source.
         </div>
+
+        <h3>Cost reducer discounts</h3>
+        <p>
+          When a cost-reducer permanent is on the battlefield, the castability check computes an
+          <em>effective CMC</em> for the key card before evaluating it:
+        </p>
+        <p style="text-align:center; font-family: monospace; margin: 10px 0">
+          effectiveCmc = max(0, card.cmc &minus; totalDiscount)
+        </p>
+        <p>
+          The discount only removes generic mana — the colored pip requirements are not affected.
+          Multiple reducers stack. For example, Emerald Medallion + Helm of Awakening together give
+          a &minus;2 discount to any Green spell; a <code>{3}{G}</code> card becomes effectively
+          <code>{1}{G}</code>. The engine accounts for this when determining whether the key card
+          is castable and when logging play sequences.
+        </p>
       </div>
 
       <!-- ── 7. Flood &amp; Screw Tracking ────────────────────────────────────── -->
@@ -2152,6 +2208,13 @@
             or Mox brings a key card online a full turn earlier, the Burst chart will show a
             noticeably higher bar on that turn — confirmation that the burst pieces are pulling
             their weight.
+          </li>
+          <li>
+            <strong>Model Medallion-style cost reducers.</strong> Cards like Emerald Medallion or
+            Goblin Electromancer appear in the <em>Cost Reducers</em> panel after parsing. They are
+            cast before mana producers each turn, so their discount applies to everything in the
+            same turn. Toggle individual reducers off to measure exactly how much each one
+            contributes to your key-card playability.
           </li>
           <li>
             <strong>Click play sequences.</strong> In the Key-Card results panel, each turn bar is

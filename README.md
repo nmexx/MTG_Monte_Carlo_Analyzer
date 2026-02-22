@@ -74,7 +74,7 @@ Tests are written with [Vitest](https://vitest.dev/) and cover the simulation en
 - Accepts standard **MTG Arena export format** (`4 Lightning Bolt`, `3 Island`, etc.)
 - Lines without a leading quantity (e.g. `Lightning Bolt`) are treated as a single copy (quantity 1)
 - **MDFC lands** (e.g. `Hengegate Pathway // Mistgate Pathway`) are correctly counted once in the total card count; the spell face is stored separately for key-card selection without inflating the total
-- Automatically classifies every card into its simulation role: land, mana artifact, mana creature, exploration effect, ramp spell, ritual, or non-mana spell
+- Automatically classifies every card into its simulation role: land, mana artifact, mana creature, exploration effect, ramp spell, ritual, cost reducer, or non-mana spell
 - Reports deck statistics (total cards, land count, land percentage)
 - Surfaces parse errors inline without blocking the rest of the UI
 
@@ -104,12 +104,14 @@ Each mana-producing category can be enabled/disabled wholesale or per-card:
 - **Exploration Effects** (Exploration, Azusa, Oracle of Mul Daya, etc.)
 - **Ramp Spells** (Cultivate, Rampant Growth, Kodama's Reach, etc.)
 - **Rituals** (Dark Ritual, Cabal Ritual, etc.)
+- **Cost Reducers** (Emerald Medallion, Goblin Electromancer, Baral, Helm of Awakening, Urza's Incubator, etc.) — reduce the generic portion of matching spell costs; cast before mana producers each turn so their discount applies to everything else in the turn; discounts stack
 
 ### Key Card Selection
 - Mark any non-land spell as a **key card** to track its castability turn by turn
 - Per-turn castability is computed in two modes:
   - **Regular** — mana from permanents on the battlefield only
   - **Burst** — regular mana plus any ritual or Mox-style artifact still in hand
+- **Cost reducer discounts** — if a cost-reducer permanent is on the battlefield, its discount is applied to effective CMC before the castability check (`effectiveCmc = max(0, cmc − discount)`); only generic mana is discounted, colored-pip requirements are unchanged
 - **On-curve playability** — a single headline percentage for each key card: how often it can be cast on the turn equal to its CMC
 
 ### Simulation Engine
@@ -200,6 +202,7 @@ src/
     ComparisonResultsPanel.jsx  Overlay charts for A/B comparison mode
     ComparisonRow.jsx           Two-column comparison layout primitive
     CreaturesPanel.jsx          Mana-creature toggle panel
+    CostReducersPanel.jsx        Cost-reducer toggle panel
     DeckStatisticsPanel.jsx     Post-parse stats: CMC, land breakdown, colour identity
     ExplorationPanel.jsx        Exploration-effect toggle panel
     LandsPanel.jsx              Land display with colour/fetch badges
@@ -220,6 +223,7 @@ src/
     uiHelpers.jsx               Mana symbol rendering, chart data prep
 card_data/                      Curated card data files for simulation classification
   Artifacts.js
+  CostReducers.js
   Exploration_Effects.js
   Fetch_Lands.js
   Lands.js
