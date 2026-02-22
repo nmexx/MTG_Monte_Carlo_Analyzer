@@ -11,6 +11,7 @@
 
 import React from 'react';
 import { safeToFixed } from './math.js';
+import CardTooltip from '../components/CardTooltip.jsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mana symbols
@@ -85,13 +86,228 @@ export const getFetchTitle = fetchType => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// buildActionSegments
+//   Parses a turnLog action string into an array of {text, isCard} segments
+//   so the renderer can wrap card names with CardTooltip.
+//
+//   Handles every action pattern emitted by simulationCore.js / monteCarlo.js:
+//     "Drew: <name>"
+//     "Discarded: <name> (<reason>)"
+//     "Played <name> (<state>)"  [incl. bounce, fetch]
+//     "Sacrificed <name> (<reason>)"
+//     "Cannot play <name> (<reason>)"
+//     "Cast <type>: <name>[etb/sac/imprint notes][ → land list; land to hand]"
+//     "Cast draw spell: <name> → drew N cards: <n1>, <n2>"
+//     "<name>: created N treasure(s)"
+// ─────────────────────────────────────────────────────────────────────────────
+export const buildActionSegments = action => {
+  const p = t => ({ text: t, isCard: false }); // plain text segment
+  const c = t => ({ text: t.trim(), isCard: true }); // card name segment
+
+  // Split a comma-separated name list into alternating [card, plain(', '), card...] segs
+  const fromList = listStr =>
+    listStr
+      .split(', ')
+      .flatMap((name, i, arr) => (i < arr.length - 1 ? [c(name), p(', ')] : [c(name)]));
+
+  // ── "Drew: <name>" ─────────────────────────────────────────────────────────
+  if (action.startsWith('Drew: ')) {
+    return [p('Drew: '), ...fromList(action.slice('Drew: '.length))];
+  }
+
+  // ── "Discarded: <name> (<reason>)" ────────────────────────────────────────
+  const discM = action.match(/^(Discarded: )(.+?)( \([^)]+\))$/);
+  if (discM) return [p(discM[1]), c(discM[2]), p(discM[3])];
+
+  // ── "<name>: created N treasure(s)" [upkeep treasure entries] ─────────────
+  const treasM = action.match(/^(.+?)(: created \d+ treasures?)$/);
+  if (treasM) return [c(treasM[1]), p(treasM[2])];
+
+  // ── "Sacrificed <name> (<reason>)" ────────────────────────────────────────
+  const sacM = action.match(/^(Sacrificed )(.+?)( \([^)]+\))$/);
+  if (sacM) return [p(sacM[1]), c(sacM[2]), p(sacM[3])];
+
+  // ── "Cannot play <name> (<reason>)" ───────────────────────────────────────
+  const cantM = action.match(/^(Cannot play )(.+?)( \([^)]+\))$/);
+  if (cantM) return [p(cantM[1]), c(cantM[2]), p(cantM[3])];
+
+  // ── "Played …" ─────────────────────────────────────────────────────────────
+  if (action.startsWith('Played ')) {
+    const rest = action.slice('Played '.length);
+
+    // "Played <name>, sacrificed it to fetch <fetched> (state)"
+    const fetchM = rest.match(/^(.+?), (sacrificed it to fetch )(.+?)( \([^)]+\))$/);
+    if (fetchM) {
+      return [p('Played '), c(fetchM[1]), p(', '), p(fetchM[2]), c(fetchM[3]), p(fetchM[4])];
+    }
+
+    // "Played <name> (<state>), bounced <bounce> (<state>)"
+    const bounceM = rest.match(/^(.+?)( \([^)]+\), bounced )(.+?)( \([^)]+\))$/);
+    if (bounceM) {
+      return [p('Played '), c(bounceM[1]), p(bounceM[2]), c(bounceM[3]), p(bounceM[4])];
+    }
+
+    // "Played <name> (<state>)" — standard
+    const stdM = rest.match(/^(.+?)( \([^)]+\))$/);
+    if (stdM) return [p('Played '), c(stdM[1]), p(stdM[2])];
+
+    // Fallback (no parenthesis)
+    return [p('Played '), c(rest)];
+  }
+
+  // ── Cast <type>: <name>[...] ───────────────────────────────────────────────
+  const CAST_PREFIX_RX =
+    /^(Cast (?:artifact|creature|permanent|ramp spell|draw permanent|draw spell|treasure permanent|treasure spell|cost reducer): )/;
+  const castPrefixM = action.match(CAST_PREFIX_RX);
+  if (castPrefixM) {
+    const prefix = castPrefixM[1];
+    const rest = action.slice(prefix.length);
+
+    // Card name ends at: " (" · " →" · "," · end-of-string
+    // Note: use explicit chars to avoid unintended Unicode range in char class
+    const mainNameEnd = rest.search(/ [(→]|,/);
+    const mainName = rest.slice(0, mainNameEnd >= 0 ? mainNameEnd : rest.length);
+    const afterName = mainNameEnd >= 0 ? rest.slice(mainNameEnd) : '';
+
+    const segs = [p(prefix), c(mainName)];
+
+    // ETB note: "(discarded <name>)"  or  "(discarded hand: <n1>, <n2>)"
+    const discETB = afterName.match(/\(discarded ([^)]+)\)/);
+    if (discETB) {
+      const inner = discETB[1];
+      const beforeDisc = afterName.slice(
+        0,
+        afterName.indexOf('(discarded ') + '(discarded '.length
+      );
+      const afterDisc = afterName.slice(
+        afterName.indexOf('(discarded ') + '(discarded '.length + inner.length + 1
+      );
+      if (inner.startsWith('hand: ')) {
+        segs.push(
+          p(beforeDisc),
+          p('hand: '),
+          ...fromList(inner.slice('hand: '.length)),
+          p(afterDisc)
+        );
+      } else {
+        segs.push(p(beforeDisc), c(inner), p(afterDisc));
+      }
+    }
+    // ETB note: "(imprinted <name>)"
+    else if (afterName.includes('(imprinted ')) {
+      const impM = afterName.match(/^(.*\(imprinted )([^)]+)(\).*)$/);
+      if (impM) segs.push(p(impM[1]), c(impM[2]), p(impM[3]));
+      else segs.push(p(afterName));
+    }
+    // Ramp: optional "sac'd <name>" in afterName before "→"
+    else if (afterName.includes("sac'd ")) {
+      const sacdM = afterName.match(/^(.*?, sac'd )([^,→;(]+?)((?:,? →|;|$).*)$/s);
+      if (sacdM) {
+        const tail = sacdM[3];
+        // Push the sac'd card then continue with the arrow / hand segments
+        const preArrowSegs = [p(sacdM[1]), c(sacdM[2].trim())];
+        // tail may contain "→ land1, land2 (state); land3 to hand"
+        const arrowSegs = buildArrowSegments(tail);
+        segs.push(...preArrowSegs, ...arrowSegs);
+      } else {
+        segs.push(p(afterName));
+      }
+    }
+    // Arrow portion "→ ..."  (ramp land list or draw card list)
+    else if (afterName.includes(' → ')) {
+      segs.push(...buildArrowSegments(afterName));
+    } else {
+      segs.push(p(afterName));
+    }
+
+    return segs;
+  }
+
+  // ── No pattern matched ──────────────────────────────────────────────────────
+  return [p(action)];
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildArrowSegments
+//   Parses the " → …" tail of a Cast action:
+//     " → land1, land2 (tapped); land3, land4 to hand"
+//     " → drew N cards: name1, name2"
+//     " → draws each turn"
+//     " → no land found"
+// ─────────────────────────────────────────────────────────────────────────────
+const buildArrowSegments = tail => {
+  const p = t => ({ text: t, isCard: false });
+  const fromList = listStr =>
+    listStr
+      .split(', ')
+      .flatMap((name, i, arr) =>
+        i < arr.length - 1
+          ? [{ text: name.trim(), isCard: true }, p(', ')]
+          : [{ text: name.trim(), isCard: true }]
+      );
+
+  const segs = [];
+
+  // "→ drew N cards: name1, name2"
+  const drewM = tail.match(/^( → drew \d+ cards?: )(.+)$/);
+  if (drewM) {
+    segs.push(p(drewM[1]), ...fromList(drewM[2]));
+    return segs;
+  }
+
+  // "→ drew N card" (0 drawn or just 1 without names)
+  if (/ → drew \d+ card/.test(tail)) {
+    segs.push(p(tail));
+    return segs;
+  }
+
+  // "→ draws each turn"
+  if (tail.includes('→ draws each turn') || tail.includes('→ no land found')) {
+    segs.push(p(tail));
+    return segs;
+  }
+
+  // "→ land1, land2 (state)[; land3, land4 to hand]"
+  const arrowM = tail.match(/^( → )(.+?)( \([^)]+\))(.*)?$/);
+  if (arrowM) {
+    const landList = arrowM[2];
+    const stateNote = arrowM[3];
+    const rest2 = arrowM[4] || '';
+
+    segs.push(p(arrowM[1]), ...fromList(landList), p(stateNote));
+
+    // "; land3, land4 to hand"
+    const toHandM = rest2.match(/^(; )(.+?)( to hand)(.*)$/);
+    if (toHandM) {
+      segs.push(p(toHandM[1]), ...fromList(toHandM[2]), p(toHandM[3]));
+      if (toHandM[4]) segs.push(p(toHandM[4]));
+    } else if (rest2) {
+      segs.push(p(rest2));
+    }
+    return segs;
+  }
+
+  segs.push(p(tail));
+  return segs;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // renderSequenceBody  –  opening hand + turn-by-turn actions block
 // ─────────────────────────────────────────────────────────────────────────────
 export const renderSequenceBody = (data, accentColor = '#667eea') => (
   <>
     <div className="seq-opening-hand">
       <p className="seq-opening-title">Opening Hand:</p>
-      <div className="seq-opening-cards">{data.openingHand.join(', ')}</div>
+      <div className="seq-opening-cards">
+        {data.openingHand.map((name, i) => (
+          <React.Fragment key={name + i}>
+            {i > 0 && ', '}
+            <CardTooltip name={name}>
+              <span className="seq-card-ref">{name}</span>
+            </CardTooltip>
+          </React.Fragment>
+        ))}
+      </div>
     </div>
     <div>
       <p className="seq-turns-title">Turn-by-turn sequence:</p>
@@ -101,9 +317,22 @@ export const renderSequenceBody = (data, accentColor = '#667eea') => (
             <p className="seq-turn-title">Turn {turnLog.turn}:</p>
             {turnLog.actions.length > 0 ? (
               <ul className="seq-turn-actions">
-                {turnLog.actions.map((action, ai) => (
-                  <li key={ai}>{action}</li>
-                ))}
+                {turnLog.actions.map((action, ai) => {
+                  const segs = buildActionSegments(action);
+                  return (
+                    <li key={ai}>
+                      {segs.map((seg, si) =>
+                        seg.isCard ? (
+                          <CardTooltip key={si} name={seg.text}>
+                            <span className="seq-card-ref">{seg.text}</span>
+                          </CardTooltip>
+                        ) : (
+                          <React.Fragment key={si}>{seg.text}</React.Fragment>
+                        )
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="seq-no-actions">No actions</p>

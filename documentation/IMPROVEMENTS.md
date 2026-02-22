@@ -257,3 +257,11 @@
     - **`processCardData` router** — oracle fallback block inserted just before `return processSpell(data)`, after all name-map checks. Uses `resolvedOracle` / `resolvedTypeLine` so MDFCs are handled correctly via the already-resolved `frontFace`.
     - **`processTreasureCard` / `processDrawSpell`** — both now accept an optional second argument (`tdOverride` / `drawDataOverride`) picked up with `??` (not `||`) so zero-valued properties are preserved. When the argument is present it takes priority over the name-map lookup.
     - **Tests** — 23 new tests in `cardProcessors.test.js`: 8 for `detectTreasureFromOracle`, 13 for `detectDrawFromOracle` (includes 4 impulse-draw cases), 2 new `processCardData` routing tests for the oracle fallback; total suite: 547 tests.
+
+38. **Play Sequence: drawn/discarded card names + CardTooltip on all card refs** --------DONE
+    - **`simulationCore.js`** — draw spell phase now collects drawn card names into `drawnCardNames[]` and appends them to the log entry: `Cast draw spell: Night's Whisper → drew 2 cards: Counterspell, Forest`. Discard already logged card names via `enforceHandSizeLimit` in a prior version.
+    - **`uiHelpers.jsx`** — two new exported helpers:
+      - `buildActionSegments(action)` — parses any turn-log action string into an array of `{ text, isCard }` segments. Handles all patterns: `Drew:`, `Discarded:`, `Played`, `Sacrificed`, `Cannot play`, `Cast <type>:` (including cast arrow tails for ramp land lists, draw card lists, sac'd land notes, imprint ETB, discarded-hand ETB), and recurring treasure upkeep entries.
+      - `renderSequenceBody` — updated to wrap each card ref with `<CardTooltip>` via `buildActionSegments`, and to render the Opening Hand cards as individual `<CardTooltip>`-wrapped names.
+    - **`CardTooltip`** import added to `uiHelpers.jsx`.
+    - **Tests** — 15 new tests in `uiHelpers.test.js` (`buildActionSegments` describe block covering: `Drew:`, `Discarded:`, `Played`, fetch-sacrifice, bounce-land, `Sacrificed`, `Cannot play`, `Cast artifact:`, draw spell with named cards, draw spell with 0 drawn, draw permanent, ramp spell with land list, ramp spell with sac'd land, recurring treasure upkeep, unrecognised-pattern fallback); total suite: 562 tests.

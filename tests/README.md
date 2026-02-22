@@ -11,7 +11,7 @@ npm run test:watch
 ```
 
 **Framework:** [Vitest](https://vitest.dev/)
-**Test files:** 8 files · **524 tests** total (as of Feb 2026)
+**Test files:** 8 files · **562 tests** total (as of Feb 2026)
 
 ---
 
@@ -151,7 +151,7 @@ Covers both exported pure helpers.
 
 ---
 
-### `uiHelpers.test.js` — `src/utils/uiHelpers.jsx` (41 tests)
+### `uiHelpers.test.js` — `src/utils/uiHelpers.jsx` (56 tests)
 
 Runs in the **jsdom** environment (`// @vitest-environment jsdom`). Covers all 7 exports.
 
@@ -162,6 +162,7 @@ Runs in the **jsdom** environment (`// @vitest-environment jsdom`). Covers all 7
 | `getFetchSymbol` | 2 | All 4 known fetch types return correct badge string; unknown type → `''` |
 | `renderManaCost` | 6 | `null`/empty → `[]`; element count matches symbols; colour pip uses `mana-cost-symbol` class; generic uses `mana-cost-generic`; multicolour cost; each element is a valid React element |
 | `renderSequenceBody` | 5 | Returns a valid React element; accepts optional `accentColor`; empty sequence array; turn with no actions; turn with life loss |
+| `buildActionSegments` | 15 | `Drew:` single card; `Discarded:` with reason; `Played` standard; fetch-sacrifice two cards; bounce-land two cards; `Sacrificed` with reason; `Cannot play` with reason; `Cast artifact:` multi-word name; draw spell with named cards; draw spell 0 drawn; draw permanent; ramp spell with land list; ramp spell with sac'd land; recurring treasure upkeep; unrecognised-pattern fallback |
 | `downloadTextFile` | 3 | Anchor element created and `.click()` called once; `.download` filename set correctly; `Blob` constructed with correct content and `text/plain` type |
 | `prepareChartData` | 13 | `null` input → `null`; returns object with 4 expected array keys; array length equals `turns`; turn numbers 1-indexed; missing `landsPerTurn` → 0; averages rounded to 2 dp; Lo/Hi std-dev bands; Lo ≥ 0 always; per-colour mana; missing `colorsByTurn`; key-card playability; `+burst` columns present/absent; life-loss bands; missing `stdDev` → 0 |
 
@@ -202,9 +203,9 @@ Runs in the **jsdom** environment with `@testing-library/react`. Tests the top-l
 | `monteCarlo.test.js` | 85 |
 | `deckParser.test.js` | 30 |
 | `math.test.js` | 22 |
-| `uiHelpers.test.js` | 41 |
+| `uiHelpers.test.js` | 56 |
 | `App.test.jsx` | 46 |
-| **Total** | **547** |
+| **Total** | **562** |
 
 ## What is not yet tested
 

@@ -25,6 +25,7 @@ import {
   getFetchSymbol,
   renderManaCost,
   renderSequenceBody,
+  buildActionSegments,
   downloadTextFile,
   prepareChartData,
 } from '../src/utils/uiHelpers.jsx';
@@ -192,6 +193,119 @@ describe('renderSequenceBody', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// buildActionSegments
+// ─────────────────────────────────────────────────────────────────────────────
+describe('buildActionSegments', () => {
+  const getText = segs => segs.map(s => s.text).join('');
+  const getCards = segs => segs.filter(s => s.isCard).map(s => s.text);
+
+  it('parses "Drew: CardName" into one plain + one card segment', () => {
+    const segs = buildActionSegments("Drew: Night's Whisper");
+    expect(getCards(segs)).toEqual(["Night's Whisper"]);
+    expect(getText(segs)).toBe("Drew: Night's Whisper");
+  });
+
+  it('parses "Discarded: CardName (reason)" correctly', () => {
+    const segs = buildActionSegments('Discarded: Forest (flood discard)');
+    expect(getCards(segs)).toEqual(['Forest']);
+    expect(getText(segs)).toBe('Discarded: Forest (flood discard)');
+  });
+
+  it('parses "Played Land (untapped)" correctly', () => {
+    const segs = buildActionSegments('Played Forest (untapped)');
+    expect(getCards(segs)).toEqual(['Forest']);
+    expect(getText(segs)).toBe('Played Forest (untapped)');
+  });
+
+  it('parses "Played FetchLand, sacrificed it to fetch Shock Land (tapped)"', () => {
+    const segs = buildActionSegments(
+      'Played Scalding Tarn, sacrificed it to fetch Steam Vents (tapped)'
+    );
+    expect(getCards(segs)).toEqual(['Scalding Tarn', 'Steam Vents']);
+  });
+
+  it('parses "Played BounceLand (tapped), bounced Forest (untapped)"', () => {
+    const segs = buildActionSegments(
+      'Played Simic Growth Chamber (tapped), bounced Forest (untapped)'
+    );
+    expect(getCards(segs)).toEqual(['Simic Growth Chamber', 'Forest']);
+    expect(getText(segs)).toBe('Played Simic Growth Chamber (tapped), bounced Forest (untapped)');
+  });
+
+  it('parses "Sacrificed Land (reason)" correctly', () => {
+    const segs = buildActionSegments('Sacrificed Forest (another land played)');
+    expect(getCards(segs)).toEqual(['Forest']);
+    expect(getText(segs)).toBe('Sacrificed Forest (another land played)');
+  });
+
+  it('parses "Cannot play Land (reason)" correctly', () => {
+    const segs = buildActionSegments(
+      'Cannot play Simic Growth Chamber (no non-bounce lands to bounce)'
+    );
+    expect(getCards(segs)).toEqual(['Simic Growth Chamber']);
+  });
+
+  it('parses "Cast artifact: Mana Crypt (enters tapped)" correctly', () => {
+    const segs = buildActionSegments('Cast artifact: Mana Crypt (enters tapped)');
+    expect(getCards(segs)).toEqual(['Mana Crypt']);
+    expect(getText(segs)).toBe('Cast artifact: Mana Crypt (enters tapped)');
+  });
+
+  it('parses draw spell with named cards drawn', () => {
+    const action = "Cast draw spell: Night's Whisper → drew 2 cards: Counterspell, Forest";
+    const segs = buildActionSegments(action);
+    expect(getCards(segs)).toEqual(["Night's Whisper", 'Counterspell', 'Forest']);
+    expect(getText(segs)).toBe(action);
+  });
+
+  it('parses draw spell with 0 cards drawn (no card list)', () => {
+    const action = "Cast draw spell: Night's Whisper → drew 0 cards";
+    const segs = buildActionSegments(action);
+    expect(getCards(segs)).toEqual(["Night's Whisper"]);
+    expect(getText(segs)).toBe(action);
+  });
+
+  it('parses draw permanent: draws each turn', () => {
+    const action = 'Cast draw permanent: Sylvan Library → draws each turn';
+    const segs = buildActionSegments(action);
+    expect(getCards(segs)).toEqual(['Sylvan Library']);
+    expect(getText(segs)).toBe(action);
+  });
+
+  it('parses ramp spell with fetched lands', () => {
+    const action = 'Cast ramp spell: Cultivate → Forest, Island (tapped); Plains to hand';
+    const segs = buildActionSegments(action);
+    expect(getCards(segs)).toContain('Cultivate');
+    expect(getCards(segs)).toContain('Forest');
+    expect(getCards(segs)).toContain('Island');
+    expect(getCards(segs)).toContain('Plains');
+    expect(getText(segs)).toBe(action);
+  });
+
+  it('parses ramp spell with sac land and fetched lands', () => {
+    const action = "Cast ramp spell: Harrow, sac'd Forest → Mountain, Island (tapped)";
+    const segs = buildActionSegments(action);
+    expect(getCards(segs)).toContain('Harrow');
+    expect(getCards(segs)).toContain('Forest');
+    expect(getCards(segs)).toContain('Mountain');
+    expect(getCards(segs)).toContain('Island');
+  });
+
+  it('parses "CardName: created N treasures" (recurring upkeep) correctly', () => {
+    const segs = buildActionSegments("Brass's Bounty: created 5 treasures");
+    expect(getCards(segs)).toEqual(["Brass's Bounty"]);
+    expect(getText(segs)).toBe("Brass's Bounty: created 5 treasures");
+  });
+
+  it('falls back to plain text for unrecognised patterns', () => {
+    const action = 'Mana Crypt damage: -1 life (avg)';
+    const segs = buildActionSegments(action);
+    expect(segs.every(s => !s.isCard)).toBe(true);
+    expect(getText(segs)).toBe(action);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // downloadTextFile  (requires jsdom)
 // ─────────────────────────────────────────────────────────────────────────────
 describe('downloadTextFile', () => {
@@ -204,8 +318,8 @@ describe('downloadTextFile', () => {
   });
 
   it('creates an anchor element and triggers a click', () => {
-    const clickSpy  = vi.fn();
-    const createSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+    const clickSpy = vi.fn();
+    const createSpy = vi.spyOn(document, 'createElement').mockImplementation(tag => {
       if (tag === 'a') {
         return { href: '', download: '', click: clickSpy };
       }
@@ -223,7 +337,7 @@ describe('downloadTextFile', () => {
 
   it('sets the correct download filename', () => {
     let capturedAnchor = null;
-    const createSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+    const createSpy = vi.spyOn(document, 'createElement').mockImplementation(tag => {
       if (tag === 'a') {
         capturedAnchor = { href: '', download: '', click: vi.fn() };
         return capturedAnchor;
@@ -245,7 +359,9 @@ describe('downloadTextFile', () => {
     vi.stubGlobal('Blob', BlobSpy);
 
     const createSpy = vi.spyOn(document, 'createElement').mockReturnValue({
-      href: '', download: '', click: vi.fn(),
+      href: '',
+      download: '',
+      click: vi.fn(),
     });
 
     downloadTextFile('deck data here', 'deck.txt');

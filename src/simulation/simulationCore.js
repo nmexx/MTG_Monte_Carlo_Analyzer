@@ -1002,10 +1002,13 @@ export const castSpells = (
 
         // One-shot draw: immediately draw cards into hand
         let cardsDrawn = 0;
+        const drawnCardNames = [];
         if (drawSpell.isOneTimeDraw && drawSpell.netCardsDrawn > 0) {
           const toDraw = Math.min(drawSpell.netCardsDrawn, library.length);
           for (let d = 0; d < toDraw; d++) {
-            hand.push(library.shift());
+            const drawnCard = library.shift();
+            hand.push(drawnCard);
+            drawnCardNames.push(drawnCard.name);
           }
           cardsDrawn = toDraw;
           if (simConfig?.drawTracker) simConfig.drawTracker.count += cardsDrawn;
@@ -1013,8 +1016,9 @@ export const castSpells = (
 
         if (turnLog) {
           const verb = drawSpell.staysOnBattlefield ? 'Cast draw permanent' : 'Cast draw spell';
+          const drawnList = drawnCardNames.length > 0 ? `: ${drawnCardNames.join(', ')}` : '';
           const drawNote = drawSpell.isOneTimeDraw
-            ? ` → drew ${cardsDrawn} card${cardsDrawn !== 1 ? 's' : ''}`
+            ? ` → drew ${cardsDrawn} card${cardsDrawn !== 1 ? 's' : ''}${drawnList}`
             : ' → draws each turn';
           turnLog.actions.push(`${verb}: ${drawSpell.name}${drawNote}`);
         }
