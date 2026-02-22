@@ -38,9 +38,9 @@ Validates the six data files in `card_data/` that feed the simulation engine.
 
 ---
 
-### `cardProcessors.test.js` — `src/simulation/cardProcessors.js` (73 tests)
+### `cardProcessors.test.js` — `src/simulation/cardProcessors.js` (92 tests)
 
-Covers all 13 exported pure functions that transform raw Scryfall data into internal card objects.
+Covers all 15 exported pure functions that transform raw Scryfall data into internal card objects.
 
 | Function | Tests | Key scenarios |
 |---|---|---|
@@ -49,6 +49,8 @@ Covers all 13 exported pure functions that transform raw Scryfall data into inte
 | `extractRitualManaAmount` | 5 | `null`, explicit symbols (`{R}{R}{R}`), English words (two/three), numeric, unrecognized |
 | `calculateCMC` | 7 | Valid `dataCmc`, calculated from cost, 0-override, generics-only, coloured pips, X ignored, null/null |
 | `hasManaTapAbility` | 5 | `null`, `{T}: Add {G}`, lowercase `{t}`, plain spell, life-gain text |
+| `detectTreasureFromOracle` | 8 | `null` oracle → `null`, no treasure text → `null`, one-time sorcery, word/digit/X amounts, recurring Whenever trigger, ETB permanent (staysOnBattlefield=true) |
+| `detectDrawFromOracle` | 9 | `null` oracle → `null`, no draw pattern → `null`, symmetrical exclusions (each player/opponent), one-time instant, word-number amounts, X-cost default=2, recurring enchantment, cardType inference |
 | `processLand` | 4 | Basic forest, fetch land (Polluted Delta), transform-back-land → `null`, bounce land (`isBounce`) |
 | `processManaArtifact` | 4 | Generic rock, Sol Ring known entry, Mox Diamond flag, Chrome Mox flag |
 | `processManaCreature` | 3 | Generic dork, Birds of Paradise known entry, Llanowar Elves known entry |
@@ -56,7 +58,7 @@ Covers all 13 exported pure functions that transform raw Scryfall data into inte
 | `processRampSpell` | 2 | Cultivate known entry, unknown name falls back to safe defaults |
 | `processRitual` | 3 | Well-formed object, Dark Ritual known values, unknown name defaults |
 | `processSpell` | 3 | Plain spell, split/adventure card takes front face, `{0}` cost → `cmc=0` |
-| `processCardData` | 7 | Routes land, mana creature, mana artifact, ramp spell, ritual, plain spell, MDFC land-face |
+| `processCardData` | 9 | Routes land, mana creature, mana artifact, ramp spell, ritual, plain spell, MDFC land-face, cost reducer; oracle fallback for treasure & draw cards |
 | `processDrawSpell` | — | (covered within `processCardData` routing tests) |
 | `processTreasureCard` | — | (covered within `processCardData` routing tests) |
 
@@ -195,14 +197,14 @@ Runs in the **jsdom** environment with `@testing-library/react`. Tests the top-l
 | File | Tests |
 |---|---|
 | `cards.test.js` | 77 |
-| `cardProcessors.test.js` | 73 |
+| `cardProcessors.test.js` | 92 |
 | `simulationCore.test.js` | 150 |
 | `monteCarlo.test.js` | 85 |
 | `deckParser.test.js` | 30 |
 | `math.test.js` | 22 |
 | `uiHelpers.test.js` | 41 |
 | `App.test.jsx` | 46 |
-| **Total** | **524** |
+| **Total** | **543** |
 
 ## What is not yet tested
 

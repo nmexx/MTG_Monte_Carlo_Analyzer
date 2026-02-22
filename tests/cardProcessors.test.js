@@ -1,12 +1,14 @@
 /**
  * cardProcessors.js — Unit Tests
  *
- * Covers all 13 exported functions:
+ * Covers all 15 exported functions:
  *   extractManaProduction      – low-level text helper
  *   extractManaAmount          – low-level text helper
  *   extractRitualManaAmount    – low-level text helper
  *   calculateCMC               – mana-cost math
  *   hasManaTapAbility          – oracle-text regex
+ *   detectTreasureFromOracle   – oracle-text treasure fallback
+ *   detectDrawFromOracle       – oracle-text draw fallback
  *   processLand                – full land object builder
  *   processManaArtifact        – artifact object builder
  *   processManaCreature        – creature object builder
@@ -26,6 +28,8 @@ import {
   extractRitualManaAmount,
   calculateCMC,
   hasManaTapAbility,
+  detectTreasureFromOracle,
+  detectDrawFromOracle,
   processLand,
   processManaArtifact,
   processManaCreature,
@@ -185,6 +189,115 @@ describe('hasManaTapAbility', () => {
 
   it('returns false for an MDFC back face that merely adds life', () => {
     expect(hasManaTapAbility('You gain 3 life.')).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// detectTreasureFromOracle
+// ─────────────────────────────────────────────────────────────────────────────
+describe('detectTreasureFromOracle', () => {
+  it('returns null for null oracle text', () => {
+    expect(detectTreasureFromOracle(null, 'Sorcery')).toBeNull();
+  });
+
+  it('returns null when oracle contains no "treasure token"', () => {
+    expect(detectTreasureFromOracle('Draw a card.', 'Instant')).toBeNull();
+  });
+
+  it('detects a one-time sorcery that creates a single Treasure token', () => {
+    const result = detectTreasureFromOracle('Create a Treasure token.', 'Sorcery');
+    expect(result).not.toBeNull();
+    expect(result.isOneTreasure).toBe(true);
+    expect(result.treasuresProduced).toBe(1);
+    expect(result.staysOnBattlefield).toBe(false);
+    expect(result.avgTreasuresPerTurn).toBe(0);
+  });
+
+  it('parses word-number amounts ("two Treasure tokens")', () => {
+    const result = detectTreasureFromOracle('Create two Treasure tokens.', 'Sorcery');
+    expect(result.treasuresProduced).toBe(2);
+  });
+
+  it('parses digit amounts ("create 3 Treasure tokens")', () => {
+    const result = detectTreasureFromOracle('Create 3 Treasure tokens.', 'Sorcery');
+    expect(result.treasuresProduced).toBe(3);
+  });
+
+  it('defaults X-cost to 2 Treasures ("create X Treasure tokens")', () => {
+    const result = detectTreasureFromOracle('Create X Treasure tokens.', 'Sorcery');
+    expect(result.treasuresProduced).toBe(2);
+  });
+
+  it('detects a recurring permanent with a Whenever trigger', () => {
+    const result = detectTreasureFromOracle(
+      'Whenever you cast a spell, create a Treasure token.',
+      'Enchantment'
+    );
+    expect(result).not.toBeNull();
+    expect(result.isOneTreasure).toBe(false);
+    expect(result.staysOnBattlefield).toBe(true);
+    expect(result.avgTreasuresPerTurn).toBe(1);
+    expect(result.treasuresProduced).toBe(0);
+  });
+
+  it('treats an ETB permanent (no Whenever) as one-time, staysOnBattlefield = true', () => {
+    const result = detectTreasureFromOracle('When ~ enters, create a Treasure token.', 'Artifact');
+    expect(result.isOneTreasure).toBe(true);
+    expect(result.staysOnBattlefield).toBe(true);
+    expect(result.avgTreasuresPerTurn).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// detectDrawFromOracle
+// ─────────────────────────────────────────────────────────────────────────────
+describe('detectDrawFromOracle', () => {
+  it('returns null for null oracle text', () => {
+    expect(detectDrawFromOracle(null, 'Sorcery')).toBeNull();
+  });
+
+  it('returns null when oracle has no draw pattern', () => {
+    expect(detectDrawFromOracle('Destroy target creature.', 'Instant')).toBeNull();
+  });
+
+  it('returns null for symmetrical "each player draws a card" effects', () => {
+    expect(detectDrawFromOracle('Each player draws a card.', 'Sorcery')).toBeNull();
+  });
+
+  it('returns null for "each opponent draws a card" effects', () => {
+    expect(detectDrawFromOracle('Each opponent draws a card.', 'Sorcery')).toBeNull();
+  });
+
+  it('detects "draw a card" on an instant (one-time)', () => {
+    const result = detectDrawFromOracle('Draw a card.', 'Instant');
+    expect(result).not.toBeNull();
+    expect(result.netCardsDrawn).toBe(1);
+    expect(result.avgCardsPerTurn).toBe(0);
+    expect(result.cardsDiscarded).toBe(0);
+  });
+
+  it('parses word-number draw amounts ("draw two cards")', () => {
+    const result = detectDrawFromOracle('Draw two cards.', 'Sorcery');
+    expect(result.netCardsDrawn).toBe(2);
+  });
+
+  it('defaults X-cost to 2 ("draw X cards")', () => {
+    const result = detectDrawFromOracle('Draw X cards.', 'Sorcery');
+    expect(result.netCardsDrawn).toBe(2);
+  });
+
+  it('detects a recurring enchantment with Whenever trigger', () => {
+    const result = detectDrawFromOracle('Whenever you cast a spell, draw a card.', 'Enchantment');
+    expect(result).not.toBeNull();
+    expect(result.netCardsDrawn).toBe(0);
+    expect(result.avgCardsPerTurn).toBe(1);
+    expect(result.triggerType).toBe('upkeep');
+    expect(result.cardType).toBe('enchantment');
+  });
+
+  it('infers cardType = "sorcery" for a plain sorcery', () => {
+    const result = detectDrawFromOracle('Draw a card.', 'Sorcery');
+    expect(result.cardType).toBe('sorcery');
   });
 });
 
@@ -678,6 +791,32 @@ describe('processCardData', () => {
     const result = processCardData(data);
     expect(result.isCostReducer).toBe(true);
     expect(result.reducesType).toBe('instant_or_sorcery');
+  });
+
+  it('oracle fallback: unknown card with "treasure token" in oracle is routed as a treasure card', () => {
+    const data = {
+      name: 'Unknown Treasure Maker 9999',
+      type_line: 'Sorcery',
+      oracle_text: 'Create a Treasure token.',
+      mana_cost: '{2}',
+      cmc: 2,
+      layout: 'normal',
+    };
+    const result = processCardData(data);
+    expect(result.isTreasureCard).toBe(true);
+  });
+
+  it('oracle fallback: unknown card with "draw a card" in oracle is routed as a draw spell', () => {
+    const data = {
+      name: 'Unknown Draw Spell 9999',
+      type_line: 'Instant',
+      oracle_text: 'Draw a card.',
+      mana_cost: '{1}',
+      cmc: 1,
+      layout: 'normal',
+    };
+    const result = processCardData(data);
+    expect(result.isDrawSpell).toBe(true);
   });
 });
 

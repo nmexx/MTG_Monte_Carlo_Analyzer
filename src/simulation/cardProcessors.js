@@ -123,6 +123,112 @@ export const hasManaTapAbility = oracleText => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Oracle-text fallback detectors
+// These run only when a card's name is NOT found in the hand-authored data maps.
+// They return a data-map-shaped object, or null if the pattern is not detected.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WORD_TO_NUM = {
+  a: 1,
+  an: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+};
+
+/**
+ * Detects cards that create Treasure tokens from oracle text.
+ * Returns a TREASURE_DATA-shaped object, or null.
+ *
+ * Heuristics:
+ *   - Must contain the phrase "treasure token" (case-insensitive).
+ *   - Amount inferred from the first "create <N> treasure token(s)" pattern.
+ *   - Recurring if it is a permanent AND oracle contains a "Whenever" or
+ *     "At the beginning of" trigger; one-time otherwise.
+ */
+export const detectTreasureFromOracle = (oracleText, typeLine) => {
+  if (!oracleText) return null;
+  const text = oracleText.toLowerCase();
+  if (!text.includes('treasure token')) return null;
+
+  // How many per trigger?
+  let amount = 1;
+  const m = text.match(/create (?:(?:an? |one |\d+ )?additional )?(\w+) treasure token/);
+  if (m) {
+    const w = m[1];
+    if (WORD_TO_NUM[w] !== undefined) amount = WORD_TO_NUM[w];
+    else if (/^\d+$/.test(w)) amount = parseInt(w, 10);
+    else if (w === 'x') amount = 2; // X-cost cards: conservative default
+  }
+
+  const isPermanent = !/(instant|sorcery)/i.test(typeLine || '');
+  const isRecurring = isPermanent && /whenever|at the beginning of/i.test(oracleText);
+
+  return isRecurring
+    ? {
+        staysOnBattlefield: true,
+        isOneTreasure: false,
+        treasuresProduced: 0,
+        avgTreasuresPerTurn: amount,
+        colors: [],
+      }
+    : {
+        staysOnBattlefield: isPermanent,
+        isOneTreasure: true,
+        treasuresProduced: amount,
+        avgTreasuresPerTurn: 0,
+        colors: [],
+      };
+};
+
+/**
+ * Detects cards that draw cards for their controller from oracle text.
+ * Returns a CARD_DRAW_DATA-shaped object, or null.
+ *
+ * Heuristics:
+ *   - Must match a "draw a/N card(s)" pattern specifically for the controller.
+ *   - Excludes symmetrical effects ("each player draws", "each opponent draws", etc.).
+ *   - Recurring if it is a permanent AND oracle contains a "Whenever" or
+ *     "At the beginning of" trigger; one-time otherwise.
+ */
+export const detectDrawFromOracle = (oracleText, typeLine) => {
+  if (!oracleText) return null;
+  const text = oracleText.toLowerCase();
+
+  // Must have a draw-for-you pattern
+  if (!/\bdraw (?:a card|\w+ cards?)\b/.test(text)) return null;
+  // Exclude effects that benefit all players or only opponents
+  if (/each player draws|each opponent draws|target player draws|they draw/.test(text)) return null;
+
+  // How many cards?
+  let netCards = 1;
+  const m = text.match(/\bdraw (\w+) cards?\b/);
+  if (m) {
+    const w = m[1];
+    if (w === 'a') netCards = 1;
+    else if (WORD_TO_NUM[w] !== undefined) netCards = WORD_TO_NUM[w];
+    else if (/^\d+$/.test(w)) netCards = parseInt(w, 10);
+    else if (w === 'x') netCards = 2;
+  }
+
+  const isPermanent = !/(instant|sorcery)/i.test(typeLine || '');
+  const isRecurring = isPermanent && /whenever|at the beginning of/i.test(oracleText);
+
+  // Best-effort card type for display
+  const typeMatch = /(creature|enchantment|artifact|planeswalker)/i.exec(typeLine || '');
+  const cardType = typeMatch ? typeMatch[1].toLowerCase() : isPermanent ? 'enchantment' : 'sorcery';
+  const triggerType = isRecurring ? 'upkeep' : 'cast';
+
+  return isRecurring
+    ? { cardType, triggerType, netCardsDrawn: 0, cardsDiscarded: 0, avgCardsPerTurn: netCards }
+    : { cardType, triggerType, netCardsDrawn: netCards, cardsDiscarded: 0, avgCardsPerTurn: 0 };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // processLand
 // ─────────────────────────────────────────────────────────────────────────────
 export const processLand = (data, face, _isMDFC) => {
@@ -604,15 +710,16 @@ export const processCostReducer = data => {
 //   · isOneTreasure: true       → one-time trigger (ETB/cast); generates `treasuresProduced`
 //   · isOneTreasure: false      → recurring engine; generates `avgTreasuresPerTurn` per upkeep
 // ─────────────────────────────────────────────────────────────────────────────
-export const processTreasureCard = data => {
+export const processTreasureCard = (data, tdOverride) => {
   const cardName = data.name.toLowerCase();
-  const td = TREASURE_DATA.get(cardName) || {
-    staysOnBattlefield: false,
-    isOneTreasure: true,
-    treasuresProduced: 1,
-    avgTreasuresPerTurn: 0,
-    colors: [],
-  };
+  const td = tdOverride ??
+    TREASURE_DATA.get(cardName) ?? {
+      staysOnBattlefield: false,
+      isOneTreasure: true,
+      treasuresProduced: 1,
+      avgTreasuresPerTurn: 0,
+      colors: [],
+    };
   return {
     name: data.name,
     type: 'treasureCard',
@@ -638,15 +745,16 @@ export const processTreasureCard = data => {
 //     sorceries, or ETB effects that only fire once); false for per-turn effects
 //     (upkeep triggers, opponent_cast triggers, etc.).
 // ─────────────────────────────────────────────────────────────────────────────
-export const processDrawSpell = data => {
+export const processDrawSpell = (data, drawDataOverride) => {
   const cardName = data.name.toLowerCase();
-  const drawData = CARD_DRAW_DATA.get(cardName) || {
-    cardType: 'sorcery',
-    triggerType: 'cast',
-    netCardsDrawn: 1,
-    cardsDiscarded: 0,
-    avgCardsPerTurn: 0,
-  };
+  const drawData = drawDataOverride ??
+    CARD_DRAW_DATA.get(cardName) ?? {
+      cardType: 'sorcery',
+      triggerType: 'cast',
+      netCardsDrawn: 1,
+      cardsDiscarded: 0,
+      avgCardsPerTurn: 0,
+    };
 
   const PERMANENT_TYPES = ['enchantment', 'artifact', 'creature', 'planeswalker'];
   const isPermanent = PERMANENT_TYPES.includes(drawData.cardType);
@@ -751,5 +859,17 @@ export const processCardData = data => {
   if (TREASURE_DATA.has(cardName)) return processTreasureCard(data);
   if (RITUAL_DATA.has(cardName)) return processRitual(data);
   if (CARD_DRAW_DATA.has(cardName)) return processDrawSpell(data);
+
+  // Oracle-text fallbacks for cards not in the hand-authored maps.
+  // Uses the resolved oracle text / type line so MDFCs are handled correctly.
+  const resolvedOracle = data.oracle_text || frontFace.oracle_text;
+  const resolvedTypeLine = data.type_line || frontFace.type_line;
+
+  const oracleTd = detectTreasureFromOracle(resolvedOracle, resolvedTypeLine);
+  if (oracleTd) return processTreasureCard(data, oracleTd);
+
+  const oracleDd = detectDrawFromOracle(resolvedOracle, resolvedTypeLine);
+  if (oracleDd) return processDrawSpell(data, oracleDd);
+
   return processSpell(data);
 };
