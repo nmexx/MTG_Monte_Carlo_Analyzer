@@ -33,6 +33,7 @@ import {
   processRampSpell,
   processRitual,
   processSpell,
+  processCostReducer,
   processCardData,
 } from '../src/simulation/cardProcessors.js';
 
@@ -251,7 +252,7 @@ describe('processLand', () => {
       name: 'Simic Growth Chamber',
       type_line: 'Land',
       oracle_text:
-        'Simic Growth Chamber enters the battlefield tapped.\nWhen Simic Growth Chamber enters, return a land you control to its owner\'s hand.\n{T}: Add {G}{U}.',
+        "Simic Growth Chamber enters the battlefield tapped.\nWhen Simic Growth Chamber enters, return a land you control to its owner's hand.\n{T}: Add {G}{U}.",
     });
     const result = processLand(data, data, false);
     expect(result).not.toBeNull();
@@ -294,7 +295,8 @@ describe('processManaArtifact', () => {
     const data = makeCard({
       name: 'Mox Diamond',
       type_line: 'Artifact',
-      oracle_text: 'If Mox Diamond would enter the battlefield, you may discard a land card instead. If you do, put Mox Diamond onto the battlefield. If you don\'t, put it into its owner\'s graveyard.\n{T}: Add one mana of any color.',
+      oracle_text:
+        "If Mox Diamond would enter the battlefield, you may discard a land card instead. If you do, put Mox Diamond onto the battlefield. If you don't, put it into its owner's graveyard.\n{T}: Add one mana of any color.",
       mana_cost: '{0}',
       cmc: 0,
     });
@@ -306,7 +308,8 @@ describe('processManaArtifact', () => {
     const data = makeCard({
       name: 'Chrome Mox',
       type_line: 'Artifact',
-      oracle_text: 'Imprint — When Chrome Mox enters, you may exile a nonartifact, nonland card from your hand.\n{T}: Add one mana of any type the exiled card was.',
+      oracle_text:
+        'Imprint — When Chrome Mox enters, you may exile a nonartifact, nonland card from your hand.\n{T}: Add one mana of any type the exiled card was.',
       mana_cost: '{0}',
       cmc: 0,
     });
@@ -366,7 +369,12 @@ describe('processManaCreature', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('processExploration', () => {
   it('defaults to landsPerTurn = 2', () => {
-    const data = makeCard({ name: 'Exploration', type_line: 'Enchantment', mana_cost: '{G}', cmc: 1 });
+    const data = makeCard({
+      name: 'Exploration',
+      type_line: 'Enchantment',
+      mana_cost: '{G}',
+      cmc: 1,
+    });
     const result = processExploration(data);
     expect(result.type).toBe('exploration');
     expect(result.isExploration).toBe(true);
@@ -374,15 +382,35 @@ describe('processExploration', () => {
   });
 
   it('sets landsPerTurn = 3 for Azusa', () => {
-    const data = makeCard({ name: 'Azusa, Lost but Seeking', type_line: 'Creature — Human Monk', mana_cost: '{2}{G}', cmc: 3 });
+    const data = makeCard({
+      name: 'Azusa, Lost but Seeking',
+      type_line: 'Creature — Human Monk',
+      mana_cost: '{2}{G}',
+      cmc: 3,
+    });
     const result = processExploration(data);
     expect(result.landsPerTurn).toBe(3);
   });
 
   it('correctly flags isCreature / isArtifact', () => {
-    const creature = makeCard({ name: 'Exploration', type_line: 'Creature', mana_cost: '{G}', cmc: 1 });
-    const artifact = makeCard({ name: 'Exploration', type_line: 'Artifact', mana_cost: '{G}', cmc: 1 });
-    const enchant  = makeCard({ name: 'Exploration', type_line: 'Enchantment', mana_cost: '{G}', cmc: 1 });
+    const creature = makeCard({
+      name: 'Exploration',
+      type_line: 'Creature',
+      mana_cost: '{G}',
+      cmc: 1,
+    });
+    const artifact = makeCard({
+      name: 'Exploration',
+      type_line: 'Artifact',
+      mana_cost: '{G}',
+      cmc: 1,
+    });
+    const enchant = makeCard({
+      name: 'Exploration',
+      type_line: 'Enchantment',
+      mana_cost: '{G}',
+      cmc: 1,
+    });
     expect(processExploration(creature).isCreature).toBe(true);
     expect(processExploration(artifact).isArtifact).toBe(true);
     expect(processExploration(enchant).isCreature).toBe(false);
@@ -405,7 +433,12 @@ describe('processRampSpell', () => {
   });
 
   it('falls back to sensible defaults for an unknown ramp spell', () => {
-    const data = makeCard({ name: 'Unknown Ramp Spell XYZ', type_line: 'Sorcery', mana_cost: '{3}{G}', cmc: 4 });
+    const data = makeCard({
+      name: 'Unknown Ramp Spell XYZ',
+      type_line: 'Sorcery',
+      mana_cost: '{3}{G}',
+      cmc: 4,
+    });
     const result = processRampSpell(data);
     expect(result.landsToAdd).toBe(1);
     expect(result.landsTapped).toBe(true);
@@ -436,7 +469,12 @@ describe('processRitual', () => {
   });
 
   it('falls back to safe defaults for an unknown name', () => {
-    const data = makeCard({ name: 'Unknown Ritual XYZ', type_line: 'Instant', mana_cost: '{R}', cmc: 1 });
+    const data = makeCard({
+      name: 'Unknown Ritual XYZ',
+      type_line: 'Instant',
+      mana_cost: '{R}',
+      cmc: 1,
+    });
     const result = processRitual(data);
     expect(result.manaProduced).toBe(1);
     expect(result.netGain).toBe(0);
@@ -448,7 +486,12 @@ describe('processRitual', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('processSpell', () => {
   it('builds a plain spell object', () => {
-    const data = makeCard({ name: 'Counterspell', type_line: 'Instant', mana_cost: '{U}{U}', cmc: 2 });
+    const data = makeCard({
+      name: 'Counterspell',
+      type_line: 'Instant',
+      mana_cost: '{U}{U}',
+      cmc: 2,
+    });
     const result = processSpell(data);
     expect(result.type).toBe('spell');
     expect(result.name).toBe('Counterspell');
@@ -470,7 +513,12 @@ describe('processSpell', () => {
   });
 
   it('sets cmc = 0 for a {0} cost spell', () => {
-    const data = makeCard({ name: 'Ornithopter', type_line: 'Artifact Creature', mana_cost: '{0}', cmc: 0 });
+    const data = makeCard({
+      name: 'Ornithopter',
+      type_line: 'Artifact Creature',
+      mana_cost: '{0}',
+      cmc: 0,
+    });
     const result = processSpell(data);
     expect(result.cmc).toBe(0);
   });
@@ -481,7 +529,11 @@ describe('processSpell', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('processCardData', () => {
   it('routes a land card to processLand', () => {
-    const data = makeLand({ name: 'Island', type_line: 'Basic Land — Island', oracle_text: '({T}: Add {U}.)' });
+    const data = makeLand({
+      name: 'Island',
+      type_line: 'Basic Land — Island',
+      oracle_text: '({T}: Add {U}.)',
+    });
     const result = processCardData(data);
     expect(result.type).toBe('land');
   });
@@ -525,7 +577,12 @@ describe('processCardData', () => {
   });
 
   it('routes a plain spell to processSpell', () => {
-    const data = makeCard({ name: 'Counterspell', type_line: 'Instant', mana_cost: '{U}{U}', cmc: 2 });
+    const data = makeCard({
+      name: 'Counterspell',
+      type_line: 'Instant',
+      mana_cost: '{U}{U}',
+      cmc: 2,
+    });
     const result = processCardData(data);
     expect(result.type).toBe('spell');
   });
@@ -546,5 +603,96 @@ describe('processCardData', () => {
     const result = processCardData(data);
     // The existing implementation routes MDFCs with any land face to processLand
     expect(result.type).toBe('land');
+  });
+
+  it('routes a known cost reducer to processCostReducer', () => {
+    const data = {
+      name: 'Emerald Medallion',
+      type_line: 'Artifact',
+      oracle_text: 'Green spells you cast cost {1} less to cast.',
+      mana_cost: '{2}',
+      cmc: 2,
+    };
+    const result = processCardData(data);
+    expect(result.isCostReducer).toBe(true);
+    expect(result.type).toBe('cost_reducer');
+    expect(result.reducesColor).toBe('G');
+    expect(result.reducesAmount).toBe(1);
+  });
+
+  it('routes Goblin Electromancer (creature cost reducer) to processCostReducer', () => {
+    const data = {
+      name: 'Goblin Electromancer',
+      type_line: 'Creature — Goblin Wizard',
+      oracle_text: 'Instant and sorcery spells you cast cost {1} less to cast.',
+      mana_cost: '{U}{R}',
+      cmc: 2,
+    };
+    const result = processCardData(data);
+    expect(result.isCostReducer).toBe(true);
+    expect(result.reducesType).toBe('instant_or_sorcery');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// processCostReducer
+// ─────────────────────────────────────────────────────────────────────────────
+describe('processCostReducer', () => {
+  const medallionData = {
+    name: 'Emerald Medallion',
+    type_line: 'Artifact',
+    oracle_text: 'Green spells you cast cost {1} less to cast.',
+    mana_cost: '{2}',
+    cmc: 2,
+  };
+
+  it('sets isCostReducer = true', () => {
+    expect(processCostReducer(medallionData).isCostReducer).toBe(true);
+  });
+
+  it('sets type = "cost_reducer"', () => {
+    expect(processCostReducer(medallionData).type).toBe('cost_reducer');
+  });
+
+  it('reads reducesColor from COST_REDUCER_DATA', () => {
+    expect(processCostReducer(medallionData).reducesColor).toBe('G');
+  });
+
+  it('reads reducesAmount from COST_REDUCER_DATA', () => {
+    expect(processCostReducer(medallionData).reducesAmount).toBe(1);
+  });
+
+  it('reads reducesType (null for medallions)', () => {
+    expect(processCostReducer(medallionData).reducesType).toBeNull();
+  });
+
+  it('computes cmc correctly', () => {
+    expect(processCostReducer(medallionData).cmc).toBe(2);
+  });
+
+  it('sets isCreature = false for a non-creature', () => {
+    expect(processCostReducer(medallionData).isCreature).toBe(false);
+  });
+
+  it('sets isCreature = true for a creature cost reducer', () => {
+    const baral = {
+      name: 'Baral, Chief of Compliance',
+      type_line: 'Legendary Creature — Human Wizard',
+      oracle_text: 'Instant and sorcery spells you cast cost {1} less to cast.',
+      mana_cost: '{1}{U}',
+      cmc: 2,
+    };
+    expect(processCostReducer(baral).isCreature).toBe(true);
+  });
+
+  it('reads reducesType = instant_or_sorcery for Goblin Electromancer', () => {
+    const data = {
+      name: 'Goblin Electromancer',
+      type_line: 'Creature — Goblin Wizard',
+      oracle_text: 'Instant and sorcery spells you cast cost {1} less to cast.',
+      mana_cost: '{U}{R}',
+      cmc: 2,
+    };
+    expect(processCostReducer(data).reducesType).toBe('instant_or_sorcery');
   });
 });

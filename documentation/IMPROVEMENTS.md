@@ -198,3 +198,21 @@
     - `applyManaOverrides()` in `monteCarlo.js` stamps each deck copy with either `manaAmount` (fixed) or `manaScaling: { base, growth }` (scaling) before the iteration loop.
     - `calculateManaAvailability()` in `simulationCore.js` reads `permanent.enteredOnTurn` (tracked when each permanent enters the battlefield) and computes the appropriate amount when `card.manaScaling` is set.
     - Mana-symbol display on both panels was also fixed: the full `produces` array is now rendered as a compact inline badge (any-color cards show `✦`), and the `+N Mana` text reflects the active override.
+
+33. **Cost reducer cards (Medallion cycle, Electromancer effects)** --------DONE
+    - Cards like Emerald Medallion and Goblin Electromancer reduce the generic-mana portion of spell costs, accelerating key-card deployment without producing mana themselves.
+    - New data file `card_data/CostReducers.js` defines the 19 supported reducers with fields:
+      - `reducesColor` — `'W'|'U'|'B'|'R'|'G'|null` (null = any spell)
+      - `reducesAmount` — generic discount integer (stacks)
+      - `reducesType` — `null | 'instant_or_sorcery' | 'creature'`
+    - `processCostReducer()` added to `cardProcessors.js`; `processCardData` router routes known reducer names before the ramp-spell check.
+    - `parseDeckList` in `deckParser.js` now populates a `costReducers: []` array alongside the existing card categories.
+    - Three new exports in `simulationCore.js`:
+      - `calculateCostDiscount(card, battlefield)` — sums applicable discounts from `isCostReducer` permanents, respecting color and type restrictions
+      - `canPlayCard` now accepts an optional `discount` parameter; `effectiveCmc = max(0, cmc - discount)`
+      - `tapManaSources` now accepts an optional `discount` parameter; `totalNeeded = max(colorPipTotal, totalNeeded - discount)` ensures colored pips are always fully paid
+    - **Phase 0** added to `castSpells` — cost reducers are cast before mana producers so their discount applies to everything else cast on the same turn (including Phase 1 creatures/artifacts, Phase 2 ramp spells, and key-card checks)
+    - `buildCompleteDeck` in `monteCarlo.js` includes cost reducers with `includeCostReducers` / `disabledCostReducers` toggles; key-card playability checks now compute per-card discounts via `calculateCostDiscount`
+    - New `CostReducersPanel.jsx` component mirrors the Rituals panel pattern — shows each reducer with a toggle and a human-readable scope label (e.g. "−1 to Green spells")
+    - `App.jsx` — `includeCostReducers` + `disabledCostReducers` state added to both deck slots (A and B), persisted in localStorage/URL, passed to `buildSimConfig`, and rendered in both single-deck and comparison views
+    - 32 new tests added across three files (`cardProcessors`, `simulationCore`, `monteCarlo`); total suite: 507 tests.

@@ -120,6 +120,21 @@ const spell = (overrides = {}) => ({
   ...overrides,
 });
 
+const costReducer = (overrides = {}) => ({
+  name: 'Emerald Medallion',
+  type: 'cost_reducer',
+  isCostReducer: true,
+  reducesColor: 'G',
+  reducesAmount: 1,
+  reducesType: null,
+  entersTapped: false,
+  isCreature: false,
+  cmc: 2,
+  manaCost: '{2}',
+  quantity: 1,
+  ...overrides,
+});
+
 /** Build a minimal but complete parsed-deck object. */
 const makeDeck = (overrides = {}) => ({
   lands: [],
@@ -128,6 +143,7 @@ const makeDeck = (overrides = {}) => ({
   exploration: [],
   rampSpells: [],
   rituals: [],
+  costReducers: [],
   spells: [],
   ...overrides,
 });
@@ -793,5 +809,92 @@ describe('monteCarlo — edge cases', () => {
     });
     // There should be sequences logged for at least one turn
     expect(Object.keys(result.fastestPlaySequences['FreeKey']).length).toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildCompleteDeck — costReducers
+// ─────────────────────────────────────────────────────────────────────────────
+describe('buildCompleteDeck — costReducers', () => {
+  it('includes cost reducers by default', () => {
+    const deck = makeDeck({ costReducers: [costReducer({ quantity: 2 })] });
+    const result = buildCompleteDeck(deck);
+    expect(result.filter(c => c.isCostReducer)).toHaveLength(2);
+  });
+
+  it('excludes cost reducers when includeCostReducers = false', () => {
+    const deck = makeDeck({ costReducers: [costReducer({ quantity: 1 })] });
+    const result = buildCompleteDeck(deck, { includeCostReducers: false });
+    expect(result.filter(c => c.isCostReducer)).toHaveLength(0);
+  });
+
+  it('respects disabledCostReducers set', () => {
+    const em = costReducer({ name: 'Emerald Medallion', quantity: 1 });
+    const jm = costReducer({ name: 'Jet Medallion', reducesColor: 'B', quantity: 1 });
+    const deck = makeDeck({ costReducers: [em, jm] });
+    const result = buildCompleteDeck(deck, {
+      includeCostReducers: true,
+      disabledCostReducers: new Set(['Emerald Medallion']),
+    });
+    const reducers = result.filter(c => c.isCostReducer);
+    expect(reducers).toHaveLength(1);
+    expect(reducers[0].name).toBe('Jet Medallion');
+  });
+
+  it('tolerates missing costReducers array on parsed deck (backwards compat)', () => {
+    const deck = makeDeck();
+    delete deck.costReducers;
+    expect(() => buildCompleteDeck(deck)).not.toThrow();
+  });
+
+  it('expands quantity > 1 for cost reducers', () => {
+    const deck = makeDeck({ costReducers: [costReducer({ quantity: 3 })] });
+    expect(buildCompleteDeck(deck).filter(c => c.isCostReducer)).toHaveLength(3);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// monteCarlo — cost-reducer integration
+// ─────────────────────────────────────────────────────────────────────────────
+describe('monteCarlo — cost-reducer integration', () => {
+  it('does not crash with cost reducers in the deck', () => {
+    const deck = makeDeck({
+      lands: Array.from({ length: 36 }, (_, i) => land({ name: `Forest ${i}` })),
+      costReducers: [costReducer({ quantity: 4 })],
+    });
+    expect(() => monteCarlo(deck, { iterations: 20, turns: 5 })).not.toThrow();
+  });
+
+  it('key-card playability improves with a matching cost reducer', () => {
+    // A 3-CMC Green spell should be castable a turn earlier with Emerald Medallion
+    const keySpell = spell({ name: 'GreenKey', cmc: 3, manaCost: '{2}{G}', typeLine: 'Sorcery' });
+    const deckNoReducer = makeDeck({
+      lands: Array.from({ length: 36 }, (_, i) => land({ name: `F${i}` })),
+      spells: [keySpell],
+    });
+    const deckWithReducer = makeDeck({
+      lands: Array.from({ length: 34 }, (_, i) => land({ name: `F${i}` })),
+      costReducers: [
+        costReducer({
+          name: 'Emerald Medallion',
+          reducesColor: 'G',
+          reducesAmount: 1,
+          quantity: 2,
+        }),
+      ],
+      spells: [keySpell],
+    });
+
+    const cfg = { iterations: 500, turns: 5, selectedKeyCards: new Set(['GreenKey']) };
+    const resultNo = monteCarlo(deckNoReducer, cfg);
+    const resultWith = monteCarlo(deckWithReducer, cfg);
+
+    // Turn 1 (index 0): GreenKey costs {2}{G} → not castable with 1 land without reducer
+    // With reducer in play it becomes {1}{G}, still requires 2 lands minimum.
+    // Turn 2 (index 1): With reducer discounting 1 generic, it costs {1}{G} → castable with 2 lands.
+    const playT2No = resultNo.keyCardPlayability['GreenKey'][1];
+    const playT2With = resultWith.keyCardPlayability['GreenKey'][1];
+    // The deck with the cost reducer should see at least as many T2 plays
+    expect(playT2With).toBeGreaterThanOrEqual(playT2No);
   });
 });

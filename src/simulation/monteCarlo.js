@@ -44,6 +44,7 @@ import {
   canPlayCard,
   tapManaSources,
   calculateBattlefieldDamage,
+  calculateCostDiscount,
 } from './simulationCore.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,6 +112,8 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
     disabledRampSpells = new Set(),
     includeRituals = true,
     disabledRituals = new Set(),
+    includeCostReducers = true,
+    disabledCostReducers = new Set(),
     manaOverrides = {},
   } = config;
 
@@ -125,6 +128,7 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
   if (includeExploration) pushFiltered(deck, deckToParse.exploration, disabledExploration);
   if (includeRampSpells) pushFiltered(deck, deckToParse.rampSpells, disabledRampSpells);
   if (includeRituals) pushFiltered(deck, deckToParse.rituals, disabledRituals);
+  if (includeCostReducers) pushFiltered(deck, deckToParse.costReducers, disabledCostReducers);
 
   deckToParse.spells.forEach(card => {
     for (let i = 0; i < card.quantity; i++) deck.push({ ...card });
@@ -152,6 +156,8 @@ export const monteCarlo = (deckToParse, config = {}) => {
     disabledExploration = new Set(),
     includeRampSpells = true,
     disabledRampSpells = new Set(),
+    includeCostReducers = true,
+    disabledCostReducers = new Set(),
     floodNLands = 5,
     floodTurn = 5,
     screwNLands = 2,
@@ -160,7 +166,12 @@ export const monteCarlo = (deckToParse, config = {}) => {
 
   const deck = buildCompleteDeck(deckToParse, config);
   const keyCardNames = Array.from(selectedKeyCards);
-  const simConfig = { includeRampSpells, disabledRampSpells };
+  const simConfig = {
+    includeRampSpells,
+    disabledRampSpells,
+    includeCostReducers,
+    disabledCostReducers,
+  };
 
   const results = {
     landsPerTurn: Array(turns)
@@ -577,8 +588,9 @@ export const monteCarlo = (deckToParse, config = {}) => {
       // Key-card playability
       keyCardNames.forEach(cardName => {
         const keyCard = keyCardMap.get(cardName);
+        const keyDiscount = keyCard ? calculateCostDiscount(keyCard, battlefield) : 0;
 
-        if (keyCard && canPlayCard(keyCard, manaAvailable)) {
+        if (keyCard && canPlayCard(keyCard, manaAvailable, keyDiscount)) {
           results.keyCardPlayability[cardName][turn]++;
 
           // On-curve: castable on exactly the turn equal to the card's CMC.
@@ -603,9 +615,9 @@ export const monteCarlo = (deckToParse, config = {}) => {
           }
         }
 
-        if (keyCard && canPlayCard(keyCard, manaWithBurst)) {
+        if (keyCard && canPlayCard(keyCard, manaWithBurst, keyDiscount)) {
           results.keyCardPlayabilityBurst[cardName][turn]++;
-          if (!canPlayCard(keyCard, manaAvailable)) {
+          if (!canPlayCard(keyCard, manaAvailable, keyDiscount)) {
             if (!results.fastestPlaySequencesBurst[cardName])
               results.fastestPlaySequencesBurst[cardName] = {};
             const ctb = turn + 1;

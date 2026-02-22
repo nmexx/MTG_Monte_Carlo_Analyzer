@@ -359,7 +359,7 @@ export const playLand = (
 // ─────────────────────────────────────────────────────────────────────────────
 // tapManaSources
 // ─────────────────────────────────────────────────────────────────────────────
-export const tapManaSources = (spell, battlefield) => {
+export const tapManaSources = (spell, battlefield, discount = 0) => {
   const symbols = spell.manaCost.match(/\{([^}]+)\}/g) || [];
   const colorNeeds = { W: 0, U: 0, B: 0, R: 0, G: 0 };
   let totalNeeded = 0;
@@ -373,6 +373,12 @@ export const tapManaSources = (spell, battlefield) => {
       totalNeeded += parseInt(clean);
     }
   });
+
+  // Apply cost discount — never reduce below the total colored-pip requirement
+  if (discount > 0) {
+    const colorPipTotal = Object.values(colorNeeds).reduce((s, v) => s + v, 0);
+    totalNeeded = Math.max(colorPipTotal, totalNeeded - discount);
+  }
 
   ['W', 'U', 'B', 'R', 'G'].forEach(color => {
     let needed = colorNeeds[color];
@@ -388,7 +394,10 @@ export const tapManaSources = (spell, battlefield) => {
     }
   });
 
-  const untappedSources = battlefield.filter(p => !p.tapped && (!p.summoningSick || p.card.isLand));
+  // Only tap permanents that actually produce mana (excludes cost reducers, tokens, etc.)
+  const untappedSources = battlefield.filter(
+    p => !p.tapped && p.card.produces?.length > 0 && (!p.summoningSick || p.card.isLand)
+  );
   for (const source of untappedSources) {
     if (totalNeeded <= 0) break;
     source.tapped = true;
@@ -573,6 +582,32 @@ export const calculateManaAvailability = (battlefield, turn = 999) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// calculateCostDiscount
+//   Returns the total generic-mana discount applicable to `card` based on
+//   cost-reducer permanents currently on the battlefield.
+//   Only the generic portion is discounted; colored pip requirements stay fixed.
+// ─────────────────────────────────────────────────────────────────────────────
+export const calculateCostDiscount = (card, battlefield) => {
+  let discount = 0;
+  for (const p of battlefield) {
+    const r = p.card;
+    if (!r.isCostReducer) continue;
+    // Color restriction: reducer only applies to spells containing that pip
+    if (r.reducesColor && !card.manaCost?.includes(`{${r.reducesColor}}`)) continue;
+    // Type restriction
+    if (r.reducesType === 'instant_or_sorcery') {
+      const tl = card.typeLine || card.type || '';
+      if (!/instant|sorcery/i.test(tl)) continue;
+    } else if (r.reducesType === 'creature') {
+      const tl = card.typeLine || card.type || '';
+      if (!/creature/i.test(tl)) continue;
+    }
+    discount += r.reducesAmount ?? 1;
+  }
+  return discount;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // solveColorPips  –  bipartite-matching pip feasibility solver
 // ─────────────────────────────────────────────────────────────────────────────
 /**
@@ -628,8 +663,9 @@ export const solveColorPips = (pips, sources) => {
  * per-color aggregate check, preserving backward-compatibility with
  * callers that supply a hand-crafted manaAvailable object.
  */
-export const canPlayCard = (card, manaAvailable) => {
-  if (card.cmc > manaAvailable.total) return false;
+export const canPlayCard = (card, manaAvailable, discount = 0) => {
+  const effectiveCmc = Math.max(0, card.cmc - discount);
+  if (effectiveCmc > manaAvailable.total) return false;
 
   const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
   const colorPips = [];
@@ -673,7 +709,50 @@ export const castSpells = (
   turn = 999,
   simConfig = {}
 ) => {
-  const { includeRampSpells = true, disabledRampSpells = new Set() } = simConfig;
+  const {
+    includeRampSpells = true,
+    disabledRampSpells = new Set(),
+    includeCostReducers = true,
+    disabledCostReducers = new Set(),
+  } = simConfig;
+
+  // Phase 0: cost reducers — cast before mana producers so their discount
+  // applies to everything cast on the same turn.
+  if (includeCostReducers) {
+    let reducerChanged = true;
+    while (reducerChanged) {
+      reducerChanged = false;
+      const manaAvail = calculateManaAvailability(battlefield, turn);
+      const reducerCandidates = hand.filter(
+        c => c.isCostReducer && !disabledCostReducers.has(c.name)
+      );
+      for (const reducer of reducerCandidates.sort((a, b) => a.cmc - b.cmc)) {
+        if (!canPlayCard(reducer, manaAvail)) continue;
+        hand.splice(hand.indexOf(reducer), 1);
+        battlefield.push({
+          card: reducer,
+          tapped: reducer.entersTapped || false,
+          summoningSick: reducer.isCreature ?? false,
+          enteredOnTurn: turn,
+        });
+        tapManaSources(reducer, battlefield);
+        if (turnLog) {
+          const scopeLabel = reducer.reducesColor
+            ? `{${reducer.reducesColor}} spells`
+            : reducer.reducesType === 'instant_or_sorcery'
+              ? 'instants/sorceries'
+              : reducer.reducesType === 'creature'
+                ? 'creatures'
+                : 'all spells';
+          turnLog.actions.push(
+            `Cast cost reducer: ${reducer.name} (-${reducer.reducesAmount} to ${scopeLabel})`
+          );
+        }
+        reducerChanged = true;
+        break;
+      }
+    }
+  }
 
   // Phase 1: mana-producing permanents
   let changed = true;
@@ -693,7 +772,8 @@ export const castSpells = (
     });
 
     for (const spell of castable) {
-      if (!canPlayCard(spell, manaAvailable)) continue;
+      const spellDiscount = calculateCostDiscount(spell, battlefield);
+      if (!canPlayCard(spell, manaAvailable, spellDiscount)) continue;
 
       let etbNote = '';
 
@@ -745,7 +825,7 @@ export const castSpells = (
         summoningSick: spell.isManaCreature || spell.isExploration,
         enteredOnTurn: turn,
       });
-      tapManaSources(spell, battlefield);
+      tapManaSources(spell, battlefield, spellDiscount);
 
       if (turnLog) {
         let type = 'permanent';
@@ -774,7 +854,8 @@ export const castSpells = (
       const rampInHand = hand.filter(c => c.isRampSpell && !disabledRampSpells.has(c.name));
 
       for (const rampSpell of rampInHand.sort((a, b) => a.cmc - b.cmc)) {
-        if (!canPlayCard(rampSpell, manaAvailable)) continue;
+        const rampDiscount = calculateCostDiscount(rampSpell, battlefield);
+        if (!canPlayCard(rampSpell, manaAvailable, rampDiscount)) continue;
         const eligibleInLibrary = library.filter(c => matchesRampFilter(c, rampSpell));
         const minNeeded =
           Math.max(1, (rampSpell.landsToAdd || 1) > 0 ? 1 : 0) +
@@ -783,7 +864,7 @@ export const castSpells = (
 
         hand.splice(hand.indexOf(rampSpell), 1);
         graveyard.push(rampSpell);
-        tapManaSources(rampSpell, battlefield);
+        tapManaSources(rampSpell, battlefield, rampDiscount);
 
         let sacrificedLandName = null;
         if (rampSpell.sacrificeLand) {

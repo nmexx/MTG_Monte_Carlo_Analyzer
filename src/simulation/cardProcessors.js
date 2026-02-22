@@ -7,6 +7,7 @@
 
 import { RAMP_SPELL_DATA } from '../../card_data/Ramp_Spells.js';
 import { ARTIFACT_DATA, BURST_MANA_SOURCES } from '../../card_data/Artifacts.js';
+import { COST_REDUCER_DATA } from '../../card_data/CostReducers.js';
 import { MANA_DORK_DATA } from '../../card_data/Mana_Dorks.js';
 import { EXPLORATION_EFFECTS } from '../../card_data/Exploration_Effects.js';
 import { RITUAL_DATA } from '../../card_data/Rituals.js';
@@ -553,6 +554,41 @@ export const processRitual = data => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// processCostReducer
+// ─────────────────────────────────────────────────────────────────────────────
+export const processCostReducer = data => {
+  const cardName = data.name.toLowerCase();
+  const entry = COST_REDUCER_DATA.get(cardName);
+  let cmc = data.cmc;
+  let manaCost = data.mana_cost;
+  let oracleText = data.oracle_text;
+  let typeLine = data.type_line;
+
+  if (data.card_faces && data.card_faces.length > 0) {
+    const frontFace = data.card_faces[0];
+    if (cmc === undefined || cmc === null) cmc = frontFace.cmc;
+    if (!manaCost && frontFace.mana_cost) manaCost = frontFace.mana_cost;
+    if (!oracleText && frontFace.oracle_text) oracleText = frontFace.oracle_text;
+    if (!typeLine && frontFace.type_line) typeLine = frontFace.type_line;
+  }
+
+  return {
+    name: data.name,
+    type: 'cost_reducer',
+    isCostReducer: true,
+    reducesColor: entry?.reducesColor ?? null,
+    reducesAmount: entry?.reducesAmount ?? 1,
+    reducesType: entry?.reducesType ?? null,
+    entersTapped: entry?.entersTapped ?? false,
+    isCreature: typeLine?.includes('Creature') ?? false,
+    cmc: calculateCMC(cmc, manaCost),
+    manaCost: manaCost || '',
+    oracleText,
+    typeLine,
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // processSpell
 // ─────────────────────────────────────────────────────────────────────────────
 export const processSpell = data => {
@@ -626,6 +662,7 @@ export const processCardData = data => {
   if (isArtifact && !isCreature && ARTIFACT_DATA.has(cardName) && !BURST_MANA_SOURCES.has(cardName))
     return processManaArtifact(data);
 
+  if (COST_REDUCER_DATA.has(cardName)) return processCostReducer(data);
   if (EXPLORATION_EFFECTS.has(cardName)) return processExploration(data);
   if (RAMP_SPELL_DATA.has(cardName)) return processRampSpell(data);
   if (RITUAL_DATA.has(cardName)) return processRitual(data);

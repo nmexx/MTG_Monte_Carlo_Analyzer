@@ -31,6 +31,7 @@ import {
   playLand,
   castSpells,
   calculateBattlefieldDamage,
+  calculateCostDiscount,
 } from '../src/simulation/simulationCore.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1562,5 +1563,198 @@ describe('calculateBattlefieldDamage', () => {
     );
     expect(total).toBe(5.5); // 1.5 (Crypt) + 2 (Tomb) + 1 (Pain) + 1 (Horizon)
     expect(breakdown).toHaveLength(4);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// calculateCostDiscount
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Minimal factory for a cost-reducer permanent already on the battlefield.
+ */
+const makeCostReducerPerm = (overrides = {}) => ({
+  card: {
+    name: 'Emerald Medallion',
+    isCostReducer: true,
+    reducesColor: 'G',
+    reducesAmount: 1,
+    reducesType: null,
+    ...overrides,
+  },
+  tapped: false,
+});
+
+describe('calculateCostDiscount', () => {
+  it('returns 0 when battlefield has no cost reducers', () => {
+    const card = { manaCost: '{2}{G}', cmc: 3 };
+    const bf = [perm(makeLand())];
+    expect(calculateCostDiscount(card, bf)).toBe(0);
+  });
+
+  it('returns 0 when color restriction does not match', () => {
+    // Emerald Medallion only discounts Green spells
+    const card = { manaCost: '{2}{U}', cmc: 3, typeLine: 'Sorcery' };
+    const bf = [makeCostReducerPerm({ reducesColor: 'G' })];
+    expect(calculateCostDiscount(card, bf)).toBe(0);
+  });
+
+  it('returns discount when color matches', () => {
+    const card = { manaCost: '{2}{G}', cmc: 3 };
+    const bf = [makeCostReducerPerm({ reducesColor: 'G', reducesAmount: 1 })];
+    expect(calculateCostDiscount(card, bf)).toBe(1);
+  });
+
+  it('stacks multiple reducers of the same color', () => {
+    const card = { manaCost: '{2}{G}', cmc: 3 };
+    const bf = [
+      makeCostReducerPerm({ reducesColor: 'G', reducesAmount: 1, name: 'Emerald Medallion' }),
+      makeCostReducerPerm({ reducesColor: 'G', reducesAmount: 1, name: 'The Earth Crystal' }),
+    ];
+    expect(calculateCostDiscount(card, bf)).toBe(2);
+  });
+
+  it('null reducesColor applies to any spell', () => {
+    // Helm of Awakening (null color) discounts all spells
+    const card = { manaCost: '{3}{U}', cmc: 4 };
+    const bf = [
+      makeCostReducerPerm({ name: 'Helm of Awakening', reducesColor: null, reducesAmount: 1 }),
+    ];
+    expect(calculateCostDiscount(card, bf)).toBe(1);
+  });
+
+  it('instant_or_sorcery restriction applies only to instants/sorceries', () => {
+    const instant = { manaCost: '{1}{U}', cmc: 2, typeLine: 'Instant' };
+    const creature = { manaCost: '{1}{U}', cmc: 2, typeLine: 'Creature — Human' };
+    const bf = [
+      makeCostReducerPerm({
+        name: 'Goblin Electromancer',
+        reducesColor: null,
+        reducesAmount: 1,
+        reducesType: 'instant_or_sorcery',
+      }),
+    ];
+    expect(calculateCostDiscount(instant, bf)).toBe(1);
+    expect(calculateCostDiscount(creature, bf)).toBe(0);
+  });
+
+  it('creature restriction applies only to creature spells', () => {
+    const creature = { manaCost: '{2}{G}', cmc: 3, typeLine: 'Creature — Elf' };
+    const sorcery = { manaCost: '{2}{G}', cmc: 3, typeLine: 'Sorcery' };
+    const bf = [
+      makeCostReducerPerm({
+        name: "Urza's Incubator",
+        reducesColor: null,
+        reducesAmount: 2,
+        reducesType: 'creature',
+      }),
+    ];
+    expect(calculateCostDiscount(creature, bf)).toBe(2);
+    expect(calculateCostDiscount(sorcery, bf)).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// canPlayCard — discount parameter
+// ─────────────────────────────────────────────────────────────────────────────
+describe('canPlayCard — discount', () => {
+  const mana3 = { total: 3, colors: { W: 0, U: 0, B: 0, R: 0, G: 3 } };
+  const mana2 = { total: 2, colors: { W: 0, U: 0, B: 0, R: 0, G: 2 } };
+
+  it('no discount: CMC 3 requires 3 mana', () => {
+    const card = { cmc: 3, manaCost: '{2}{G}' };
+    expect(canPlayCard(card, mana2)).toBe(false);
+    expect(canPlayCard(card, mana3)).toBe(true);
+  });
+
+  it('discount of 1 reduces effective CMC by 1', () => {
+    const card = { cmc: 3, manaCost: '{2}{G}' };
+    // 3 - 1 = 2, so mana2 (total 2) should now be enough
+    expect(canPlayCard(card, mana2, 1)).toBe(true);
+  });
+
+  it('discount cannot reduce below 0', () => {
+    // A purely generic spell — discount removes the entire cost
+    const card = { cmc: 1, manaCost: '{1}' };
+    // discount 5 → effectiveCmc = max(0, 1-5) = 0; no pips to check → castable with 0 mana
+    expect(canPlayCard(card, { total: 0, colors: {} }, 5)).toBe(true);
+  });
+
+  it('discount does not remove colored pip requirements', () => {
+    // {G} pip still needed even with discount
+    const card = { cmc: 1, manaCost: '{G}' };
+    const noGreen = { total: 5, colors: { W: 0, U: 0, B: 0, R: 0, G: 0 } };
+    // aggregate fallback: colors.G = 0 < 1 required → false
+    expect(canPlayCard(card, noGreen, 1)).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tapManaSources — discount parameter
+// ─────────────────────────────────────────────────────────────────────────────
+describe('tapManaSources — discount', () => {
+  it('taps fewer generic sources when discount > 0', () => {
+    // Spell costs {2}{G}; two forests + one island available
+    const forest1 = {
+      card: makeLand({ name: 'Forest 1', produces: ['G'], manaAmount: 1 }),
+      tapped: false,
+      summoningSick: false,
+    };
+    const forest2 = {
+      card: makeLand({ name: 'Forest 2', produces: ['G'], manaAmount: 1 }),
+      tapped: false,
+      summoningSick: false,
+    };
+    const island = {
+      card: makeLand({ name: 'Island', produces: ['U'], manaAmount: 1 }),
+      tapped: false,
+    };
+    const spell = { name: 'Explore', cmc: 3, manaCost: '{2}{G}' };
+
+    const bf = [forest1, forest2, island];
+    tapManaSources(spell, bf, 1); // discount 1 → only need to tap {1}{G} effectively
+
+    // {G} pip must always be paid — forest1 should be tapped for G
+    const tappedCount = bf.filter(p => p.tapped).length;
+    // Without discount: 3 sources tapped; with discount of 1: 2 sources tapped
+    expect(tappedCount).toBe(2);
+  });
+
+  it('cannot reduce total below the colored pip total', () => {
+    // Spell costs {G} (no generic); discount 1 should NOT eliminate the G pip
+    const forest = {
+      card: makeLand({ name: 'Forest', produces: ['G'], manaAmount: 1 }),
+      tapped: false,
+      summoningSick: false,
+    };
+    const spell = { name: 'Llanowar Elves', cmc: 1, manaCost: '{G}' };
+    const bf = [forest];
+    tapManaSources(spell, bf, 1);
+    // Forest must be tapped to pay the {G} pip
+    expect(forest.tapped).toBe(true);
+  });
+
+  it('does not tap cost-reducer permanents as mana sources', () => {
+    const forest = {
+      card: makeLand({ name: 'Forest', produces: ['G'], manaAmount: 1 }),
+      tapped: false,
+      summoningSick: false,
+    };
+    const reducer = {
+      card: {
+        name: 'Emerald Medallion',
+        isCostReducer: true,
+        produces: undefined,
+        manaAmount: undefined,
+      },
+      tapped: false,
+      summoningSick: false,
+    };
+    const spell = { name: 'Giant Growth', cmc: 1, manaCost: '{G}' };
+    const bf = [forest, reducer];
+    tapManaSources(spell, bf, 0);
+    expect(forest.tapped).toBe(true);
+    // Cost reducer should NOT be tapped (it has no produces array)
+    expect(reducer.tapped).toBe(false);
   });
 });

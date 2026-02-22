@@ -21,6 +21,7 @@ import CreaturesPanel from './components/CreaturesPanel.jsx';
 import ExplorationPanel from './components/ExplorationPanel.jsx';
 import RampSpellsPanel from './components/RampSpellsPanel.jsx';
 import RitualsPanel from './components/RitualsPanel.jsx';
+import CostReducersPanel from './components/CostReducersPanel.jsx';
 import SpellsPanel from './components/SpellsPanel.jsx';
 import SimulationSettingsPanel from './components/SimulationSettingsPanel.jsx';
 import ResultsPanel from './components/ResultsPanel.jsx';
@@ -94,6 +95,8 @@ const defaultDeckSlot = (saved = {}) => ({
   disabledRampSpells: new Set(saved.disabledRampSpells ?? []),
   includeRituals: saved.includeRituals ?? true,
   disabledRituals: new Set(saved.disabledRituals ?? []),
+  includeCostReducers: saved.includeCostReducers ?? true,
+  disabledCostReducers: new Set(saved.disabledCostReducers ?? []),
   simulationResults: null,
 });
 
@@ -111,6 +114,8 @@ const serializeDeckSlot = slot => ({
   disabledRampSpells: [...slot.disabledRampSpells],
   includeRituals: slot.includeRituals,
   disabledRituals: [...slot.disabledRituals],
+  includeCostReducers: slot.includeCostReducers,
+  disabledCostReducers: [...slot.disabledCostReducers],
 });
 
 // =============================================================================
@@ -178,6 +183,8 @@ const MTGMonteCarloAnalyzer = () => {
   const setDisabledRituals = makeSlotSetterA('disabledRituals');
   const setSimulationResults = makeSlotSetterA('simulationResults');
   const setManaOverrides = makeSlotSetterA('manaOverrides');
+  const setIncludeCostReducers = makeSlotSetterA('includeCostReducers');
+  const setDisabledCostReducers = makeSlotSetterA('disabledCostReducers');
 
   const {
     deckText,
@@ -195,6 +202,8 @@ const MTGMonteCarloAnalyzer = () => {
     disabledRituals,
     simulationResults,
     manaOverrides,
+    includeCostReducers,
+    disabledCostReducers,
   } = deckSlotA;
 
   // ── Deck Slot B ───────────────────────────────────────────────────────────
@@ -216,6 +225,8 @@ const MTGMonteCarloAnalyzer = () => {
   const setDisabledRitualsB = makeSlotSetterB('disabledRituals');
   const setSimulationResultsB = makeSlotSetterB('simulationResults');
   const setManaOverridesB = makeSlotSetterB('manaOverrides');
+  const setIncludeCostReducersB = makeSlotSetterB('includeCostReducers');
+  const setDisabledCostReducersB = makeSlotSetterB('disabledCostReducers');
 
   const {
     deckText: deckTextB,
@@ -233,6 +244,8 @@ const MTGMonteCarloAnalyzer = () => {
     disabledRituals: disabledRitualsB,
     simulationResults: simulationResultsB,
     manaOverrides: manaOverridesB,
+    includeCostReducers: includeCostReducersB,
+    disabledCostReducers: disabledCostReducersB,
   } = deckSlotB;
 
   const [error, setError] = useState('');
@@ -535,6 +548,8 @@ const MTGMonteCarloAnalyzer = () => {
     includeRituals: slot.includeRituals,
     disabledRituals: slot.disabledRituals,
     manaOverrides: slot.manaOverrides,
+    includeCostReducers: slot.includeCostReducers,
+    disabledCostReducers: slot.disabledCostReducers,
   });
 
   const runSimulation = () => {
@@ -1013,6 +1028,25 @@ const MTGMonteCarloAnalyzer = () => {
                 </details>
               )}
 
+              {parsedDeck.costReducers?.length > 0 && (
+                <details className="section-details" open>
+                  <summary className="section-summary">
+                    💎 Cost Reducers
+                    <span className="section-summary__chevron">▾</span>
+                  </summary>
+                  <div className="panel-grid">
+                    <CostReducersPanel
+                      parsedDeck={parsedDeck}
+                      includeCostReducers={includeCostReducers}
+                      setIncludeCostReducers={setIncludeCostReducers}
+                      disabledCostReducers={disabledCostReducers}
+                      setDisabledCostReducers={setDisabledCostReducers}
+                      renderManaCost={renderManaCost}
+                    />
+                  </div>
+                </details>
+              )}
+
               {(parsedDeck.spells.length > 0 ||
                 parsedDeck.creatures.length > 0 ||
                 parsedDeck.artifacts.length > 0 ||
@@ -1313,6 +1347,34 @@ const MTGMonteCarloAnalyzer = () => {
                   setIncludeRituals={setIncludeRitualsB}
                   disabledRituals={disabledRitualsB}
                   setDisabledRituals={setDisabledRitualsB}
+                  renderManaCost={renderManaCost}
+                />
+              ) : null
+            }
+          />
+
+          {/* Row: Cost Reducers */}
+          <ComparisonRow
+            left={
+              parsedDeck?.costReducers?.length > 0 ? (
+                <CostReducersPanel
+                  parsedDeck={parsedDeck}
+                  includeCostReducers={includeCostReducers}
+                  setIncludeCostReducers={setIncludeCostReducers}
+                  disabledCostReducers={disabledCostReducers}
+                  setDisabledCostReducers={setDisabledCostReducers}
+                  renderManaCost={renderManaCost}
+                />
+              ) : null
+            }
+            right={
+              parsedDeckB?.costReducers?.length > 0 ? (
+                <CostReducersPanel
+                  parsedDeck={parsedDeckB}
+                  includeCostReducers={includeCostReducersB}
+                  setIncludeCostReducers={setIncludeCostReducersB}
+                  disabledCostReducers={disabledCostReducersB}
+                  setDisabledCostReducers={setDisabledCostReducersB}
                   renderManaCost={renderManaCost}
                 />
               ) : null
