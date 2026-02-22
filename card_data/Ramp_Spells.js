@@ -212,4 +212,171 @@ export const RAMP_SPELL_DATA = new Map([
     'reshape the earth',
     { landsToAdd: 10, landsTapped: true, landsToHand: 0, sacrificeLand: false, fetchFilter: 'any' },
   ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // White catch-up ramp
+  // These cards are typically played as soon as available since they help
+  // catch up on lands when behind. fetchSubtypes: ['Plains'] means they can
+  // fetch any land with the Plains subtype (basics + duals/shocks with Plains).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── 1-CMC: Tithe – Plains to hand (instant, catches opponent land lead) ──
+  [
+    'tithe',
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 1,
+      sacrificeLand: false,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+    },
+  ],
+
+  // ── 1-CMC: Land Tax – up to 3 basics to hand each upkeep ─────────────────
+  // Modelled as a one-shot fetch of 3 basics on the turn it enters.
+  [
+    'land tax',
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 3,
+      sacrificeLand: false,
+      fetchFilter: 'basic',
+      staysOnBattlefield: true,
+    },
+  ],
+
+  // ── 1-CMC: Weathered Wayfarer – any land to hand (activated ability {W}) ─
+  // Activation cost modelled as 1 additional generic mana (simplified from {W}).
+  [
+    'weathered wayfarer',
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 1,
+      sacrificeLand: false,
+      fetchFilter: 'any',
+      staysOnBattlefield: true,
+      activationCost: 1,
+    },
+  ],
+
+  // ── 2-CMC: Gift of Estates – up to 3 Plains to hand ─────────────────────
+  [
+    'gift of estates',
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 3,
+      sacrificeLand: false,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+    },
+  ],
+
+  // ── 2-CMC: Knight of the White Orchid – Plains to battlefield untapped ───
+  // Creature; uses staysOnBattlefield since it doesn't go to the graveyard.
+  [
+    'knight of the white orchid',
+    {
+      landsToAdd: 1,
+      landsTapped: false,
+      landsToHand: 0,
+      sacrificeLand: false,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+      staysOnBattlefield: true,
+    },
+  ],
+
+  // ── 2-CMC: Loyal Warhound – Plains to battlefield untapped (ETB) ─────────
+  [
+    'loyal warhound',
+    {
+      landsToAdd: 1,
+      landsTapped: false,
+      landsToHand: 0,
+      sacrificeLand: false,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+      staysOnBattlefield: true,
+    },
+  ],
+
+  // ── 2-CMC: Oreskos Explorer – Plains to hand equal to land gap ───────────
+  // In a 4-player game the gap is often 2; modelled as 2 Plains to hand.
+  [
+    'oreskos explorer',
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 2,
+      sacrificeLand: false,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+      staysOnBattlefield: true,
+    },
+  ],
+
+  // ── 2-CMC: Boreas Charger – Plains to hand equal to land gap ─────────────
+  [
+    'boreas charger',
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 2,
+      sacrificeLand: false,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+      staysOnBattlefield: true,
+    },
+  ],
+
+  // ── 4-CMC: Archaeomancer's Map – 2 Plains to hand (ETB), stays on field ──
+  [
+    "archaeomancer's map",
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 2,
+      sacrificeLand: false,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+      staysOnBattlefield: true,
+    },
+  ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Colorless ramp
+  // These cards cost no colored mana to cast and fit in any deck.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── 1-CMC: Wayfarer's Bauble – basic land tapped (activated ability {2}) ─
+  // The activation cost of {2} + tap + sacrifice is checked before using it.
+  // Total mana needed = cast {1} + activate {2} = 3 generic mana.
+  [
+    "wayfarer's bauble",
+    {
+      landsToAdd: 1,
+      landsTapped: true,
+      landsToHand: 0,
+      sacrificeLand: false,
+      fetchFilter: 'basic',
+      activationCost: 2,
+    },
+  ],
+
+  // ── 4-CMC: Solemn Simulacrum – basic land tapped (ETB), creature stays ───
+  [
+    'solemn simulacrum',
+    {
+      landsToAdd: 1,
+      landsTapped: true,
+      landsToHand: 0,
+      sacrificeLand: false,
+      fetchFilter: 'basic',
+      staysOnBattlefield: true,
+    },
+  ],
 ]);

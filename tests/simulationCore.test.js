@@ -1473,6 +1473,204 @@ describe('castSpells', () => {
     castSpells([dork], [perm(forest)], [], log, [], null, [], 1, {});
     expect(log.actions.some(a => a.includes('Llanowar Elves'))).toBe(true);
   });
+
+  // ── staysOnBattlefield ramp (e.g. Knight of the White Orchid) ─────────────
+  it('keeps a staysOnBattlefield ramp spell on the battlefield instead of graveyard', () => {
+    const p1 = makeLand({ name: 'P1', produces: ['W'], isBasic: true, landSubtypes: ['Plains'] });
+    const p2 = makeLand({ name: 'P2', produces: ['W'], isBasic: true, landSubtypes: ['Plains'] });
+    const knight = makeSpell({
+      name: 'Knight of the White Orchid',
+      cmc: 2,
+      manaCost: '{W}{W}',
+      landsToAdd: 1,
+      landsTapped: false,
+      landsToHand: 0,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+      staysOnBattlefield: true,
+    });
+    const plains = makeLand({
+      name: 'Plains',
+      isBasic: true,
+      produces: ['W'],
+      landSubtypes: ['Plains'],
+    });
+    const bf = [perm(p1), perm(p2)];
+    const lib = [plains];
+    const gy = [];
+    castSpells([knight], bf, gy, null, [], null, lib, 2, {
+      includeRampSpells: true,
+      disabledRampSpells: new Set(),
+    });
+    // Knight stays on battlefield, NOT in graveyard
+    expect(gy.some(c => c.name === 'Knight of the White Orchid')).toBe(false);
+    expect(bf.some(p => p.card.name === 'Knight of the White Orchid')).toBe(true);
+    // Plains fetched to battlefield untapped
+    expect(bf.some(p => p.card.name === 'Plains' && !p.tapped)).toBe(true);
+  });
+
+  // ── activationCost check (e.g. Wayfarer's Bauble: cast {1} + activate {2}) ─
+  it('casts an activationCost ramp spell when total mana covers cast + activation', () => {
+    const lands = Array.from({ length: 3 }, (_, i) =>
+      makeLand({ name: `Forest ${i}`, isBasic: true, produces: ['G'] })
+    );
+    const bauble = makeSpell({
+      name: "Wayfarer's Bauble",
+      cmc: 1,
+      manaCost: '{1}',
+      landsToAdd: 1,
+      landsTapped: true,
+      landsToHand: 0,
+      fetchFilter: 'basic',
+      activationCost: 2,
+      staysOnBattlefield: false,
+    });
+    const basic = makeLand({ name: 'Plains', isBasic: true, produces: ['W'] });
+    const bf = lands.map(perm); // 3 mana available
+    const lib = [basic];
+    const gy = [];
+    castSpells([bauble], bf, gy, null, [], null, lib, 3, {
+      includeRampSpells: true,
+      disabledRampSpells: new Set(),
+    });
+    // Bauble spent (goes to graveyard) and Plains is now on battlefield tapped
+    expect(gy.some(c => c.name === "Wayfarer's Bauble")).toBe(true);
+    expect(bf.some(p => p.card.name === 'Plains' && p.tapped)).toBe(true);
+  });
+
+  it('skips an activationCost ramp spell when combined mana is insufficient', () => {
+    // Only 2 mana available; Wayfarer's Bauble needs 1 (cast) + 2 (activate) = 3
+    const lands = Array.from({ length: 2 }, (_, i) =>
+      makeLand({ name: `Forest ${i}`, isBasic: true, produces: ['G'] })
+    );
+    const bauble = makeSpell({
+      name: "Wayfarer's Bauble",
+      cmc: 1,
+      manaCost: '{1}',
+      landsToAdd: 1,
+      landsTapped: true,
+      landsToHand: 0,
+      fetchFilter: 'basic',
+      activationCost: 2,
+    });
+    const basic = makeLand({ name: 'Plains', isBasic: true, produces: ['W'] });
+    const bf = lands.map(perm);
+    const hand = [bauble];
+    const gy = [];
+    castSpells(hand, bf, gy, null, [], null, [basic], 2, {
+      includeRampSpells: true,
+      disabledRampSpells: new Set(),
+    });
+    // Not enough mana — bauble stays in hand
+    expect(hand).toHaveLength(1);
+    expect(gy).toHaveLength(0);
+  });
+
+  // ── landsToAdd: 0 hand-only fetches (e.g. Tithe) need only 1 land in library ─
+  it('casts a hand-only ramp spell when exactly 1 matching land is in the library', () => {
+    const p1 = makeLand({ name: 'P1', produces: ['W'], isBasic: true, landSubtypes: ['Plains'] });
+    const tithe = makeSpell({
+      name: 'Tithe',
+      cmc: 1,
+      manaCost: '{W}',
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 1,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+    });
+    const plains = makeLand({
+      name: 'Plains',
+      isBasic: true,
+      produces: ['W'],
+      landSubtypes: ['Plains'],
+    });
+    const bf = [perm(p1)];
+    const lib = [plains]; // exactly 1 matching land
+    const hand = [tithe];
+    const gy = [];
+    castSpells(hand, bf, gy, null, [], null, lib, 1, {
+      includeRampSpells: true,
+      disabledRampSpells: new Set(),
+    });
+    // Tithe is cast and Plains ends up in hand
+    expect(gy.some(c => c.name === 'Tithe')).toBe(true);
+    expect(hand.some(c => c.name === 'Plains')).toBe(true);
+  });
+
+  // ── subtype filter for Plains ──────────────────────────────────────────────
+  it('fetchFilter subtype fetches Plains-subtype lands but not basic forests', () => {
+    const w1 = makeLand({ name: 'W1', produces: ['W'], isBasic: true, landSubtypes: ['Plains'] });
+    const gift = makeSpell({
+      name: 'Gift of Estates',
+      cmc: 2,
+      manaCost: '{1}{W}',
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 3,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+    });
+    const plains1 = makeLand({
+      name: 'Plains 1',
+      isBasic: true,
+      produces: ['W'],
+      landSubtypes: ['Plains'],
+    });
+    const plains2 = makeLand({
+      name: 'Plains 2',
+      isBasic: true,
+      produces: ['W'],
+      landSubtypes: ['Plains'],
+    });
+    const forest = makeLand({
+      name: 'Forest',
+      isBasic: true,
+      produces: ['G'],
+      landSubtypes: ['Forest'],
+    });
+    const bf = [perm(w1), perm(w1)]; // 2 white mana for {1}{W}
+    const hand = [gift];
+    const gy = [];
+    castSpells(hand, bf, gy, null, [], null, [plains1, forest, plains2], 2, {
+      includeRampSpells: true,
+      disabledRampSpells: new Set(),
+    });
+    // Gift fetches 2 Plains but NOT the Forest
+    expect(hand.some(c => c.name === 'Plains 1')).toBe(true);
+    expect(hand.some(c => c.name === 'Plains 2')).toBe(true);
+    expect(hand.some(c => c.name === 'Forest')).toBe(false);
+  });
+
+  // ── staysOnBattlefield log message ────────────────────────────────────────
+  it('logs "Cast permanent" for staysOnBattlefield ramp and "Cast ramp spell" for others', () => {
+    const p1 = makeLand({ name: 'P1', produces: ['W'], isBasic: true, landSubtypes: ['Plains'] });
+    const p2 = makeLand({ name: 'P2', produces: ['W'], isBasic: true, landSubtypes: ['Plains'] });
+    const knight = makeSpell({
+      name: 'Knight of the White Orchid',
+      cmc: 2,
+      manaCost: '{W}{W}',
+      landsToAdd: 1,
+      landsTapped: false,
+      landsToHand: 0,
+      fetchFilter: 'subtype',
+      fetchSubtypes: ['Plains'],
+      staysOnBattlefield: true,
+    });
+    const plains = makeLand({
+      name: 'Plains',
+      isBasic: true,
+      produces: ['W'],
+      landSubtypes: ['Plains'],
+    });
+    const log = { actions: [] };
+    castSpells([knight], [perm(p1), perm(p2)], [], log, [], null, [plains], 2, {
+      includeRampSpells: true,
+      disabledRampSpells: new Set(),
+    });
+    expect(log.actions.some(a => a.startsWith('Cast permanent:'))).toBe(true);
+    expect(log.actions.some(a => a.startsWith('Cast ramp spell:'))).toBe(false);
+  });
 });
 
 // =============================================================================

@@ -521,6 +521,13 @@ export const processRampSpell = data => {
     sacrificeLand: rampData.sacrificeLand || false,
     fetchFilter: rampData.fetchFilter || 'basic',
     fetchSubtypes: rampData.fetchSubtypes || null,
+    // activationCost > 0: the card uses an activated ability that costs additional
+    // generic mana beyond the cast cost (e.g. Wayfarer's Bauble needs {2} to activate).
+    activationCost: rampData.activationCost || 0,
+    // staysOnBattlefield: the card is a permanent (creature / enchantment / artifact)
+    // that remains on the battlefield instead of going to the graveyard (e.g. Solemn
+    // Simulacrum, Knight of the White Orchid, Land Tax).
+    staysOnBattlefield: rampData.staysOnBattlefield || false,
     cmc: calculateCMC(data.cmc, data.mana_cost),
     manaCost: data.mana_cost || '',
     oracleText: data.oracle_text,

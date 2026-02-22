@@ -397,8 +397,8 @@
             onto the battlefield.
           </li>
           <li>
-            <strong>Cost reducers</strong> — Emerald Medallion, Goblin Electromancer, Baral Chief
-            of Compliance, Helm of Awakening, etc. These permanents reduce the <em>generic</em>
+            <strong>Cost reducers</strong> — Emerald Medallion, Goblin Electromancer, Baral Chief of
+            Compliance, Helm of Awakening, etc. These permanents reduce the <em>generic</em>
             portion of spell costs by a fixed amount. They are cast at the start of the spell phase
             (before mana producers) so their discount applies to everything else cast that turn.
             Colored pip requirements are never reduced.
@@ -2068,15 +2068,15 @@
           When a cost-reducer permanent is on the battlefield, the castability check computes an
           <em>effective CMC</em> for the key card before evaluating it:
         </p>
-        <p style="text-align:center; font-family: monospace; margin: 10px 0">
+        <p style="text-align: center; font-family: monospace; margin: 10px 0">
           effectiveCmc = max(0, card.cmc &minus; totalDiscount)
         </p>
         <p>
           The discount only removes generic mana — the colored pip requirements are not affected.
           Multiple reducers stack. For example, Emerald Medallion + Helm of Awakening together give
           a &minus;2 discount to any Green spell; a <code>{3}{G}</code> card becomes effectively
-          <code>{1}{G}</code>. The engine accounts for this when determining whether the key card
-          is castable and when logging play sequences.
+          <code>{1}{G}</code>. The engine accounts for this when determining whether the key card is
+          castable and when logging play sequences.
         </p>
       </div>
 

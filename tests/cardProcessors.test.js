@@ -444,6 +444,53 @@ describe('processRampSpell', () => {
     expect(result.landsTapped).toBe(true);
     expect(result.sacrificeLand).toBe(false);
   });
+
+  it('defaults activationCost to 0 and staysOnBattlefield to false when not set', () => {
+    const data = makeCard({ name: 'Cultivate', type_line: 'Sorcery', mana_cost: '{2}{G}', cmc: 3 });
+    const result = processRampSpell(data);
+    expect(result.activationCost).toBe(0);
+    expect(result.staysOnBattlefield).toBe(false);
+  });
+
+  it("sets activationCost for Wayfarer's Bauble", () => {
+    const data = makeCard({
+      name: "Wayfarer's Bauble",
+      type_line: 'Artifact',
+      mana_cost: '{1}',
+      cmc: 1,
+    });
+    const result = processRampSpell(data);
+    expect(result.activationCost).toBe(2);
+    expect(result.staysOnBattlefield).toBe(false);
+    expect(result.fetchFilter).toBe('basic');
+  });
+
+  it('sets staysOnBattlefield for Solemn Simulacrum', () => {
+    const data = makeCard({
+      name: 'Solemn Simulacrum',
+      type_line: 'Artifact Creature — Golem',
+      mana_cost: '{4}',
+      cmc: 4,
+    });
+    const result = processRampSpell(data);
+    expect(result.staysOnBattlefield).toBe(true);
+    expect(result.activationCost).toBe(0);
+    expect(result.landsTapped).toBe(true);
+  });
+
+  it('sets staysOnBattlefield and Plains subtype for Knight of the White Orchid', () => {
+    const data = makeCard({
+      name: 'Knight of the White Orchid',
+      type_line: 'Creature — Human Knight',
+      mana_cost: '{W}{W}',
+      cmc: 2,
+    });
+    const result = processRampSpell(data);
+    expect(result.staysOnBattlefield).toBe(true);
+    expect(result.fetchFilter).toBe('subtype');
+    expect(result.fetchSubtypes).toContain('Plains');
+    expect(result.landsTapped).toBe(false);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

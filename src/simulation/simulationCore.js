@@ -856,15 +856,50 @@ export const castSpells = (
       for (const rampSpell of rampInHand.sort((a, b) => a.cmc - b.cmc)) {
         const rampDiscount = calculateCostDiscount(rampSpell, battlefield);
         if (!canPlayCard(rampSpell, manaAvailable, rampDiscount)) continue;
+
+        // For cards with an activated ability (e.g. Wayfarer's Bauble), also verify
+        // that the activation cost can be paid on top of the cast cost.
+        if (rampSpell.activationCost > 0) {
+          const castCost = Math.max(0, rampSpell.cmc - rampDiscount);
+          if (castCost + rampSpell.activationCost > manaAvailable.total) continue;
+        }
+
+        // Determine how many eligible lands must exist in the library before we
+        // bother casting (avoids wasting a spell when the library is nearly dry).
+        const fieldNeeded = rampSpell.landsToAdd > 0 ? 1 : 0;
+        const handNeeded = rampSpell.landsToHand > 0 ? 1 : 0;
+        const minNeeded = Math.max(1, fieldNeeded + handNeeded);
         const eligibleInLibrary = library.filter(c => matchesRampFilter(c, rampSpell));
-        const minNeeded =
-          Math.max(1, (rampSpell.landsToAdd || 1) > 0 ? 1 : 0) +
-          (rampSpell.landsToHand > 0 ? 1 : 0);
         if (eligibleInLibrary.length < minNeeded) continue;
 
+        // Move the card out of hand: permanents stay on the battlefield,
+        // one-shot spells (sorceries / instants) go to the graveyard.
         hand.splice(hand.indexOf(rampSpell), 1);
-        graveyard.push(rampSpell);
+        if (rampSpell.staysOnBattlefield) {
+          battlefield.push({
+            card: rampSpell,
+            tapped: false,
+            summoningSick: false,
+            enteredOnTurn: turn,
+          });
+        } else {
+          graveyard.push(rampSpell);
+        }
+
+        // Tap sources for the cast cost, then tap additional sources for any
+        // activation cost (e.g. Wayfarer's Bauble pays {2} to activate).
         tapManaSources(rampSpell, battlefield, rampDiscount);
+        if (rampSpell.activationCost > 0) {
+          let remaining = rampSpell.activationCost;
+          const untapped = battlefield.filter(
+            p => !p.tapped && p.card.produces?.length > 0 && (!p.summoningSick || p.card.isLand)
+          );
+          for (const source of untapped) {
+            if (remaining <= 0) break;
+            source.tapped = true;
+            remaining -= source.card.manaAmount || 1;
+          }
+        }
 
         let sacrificedLandName = null;
         if (rampSpell.sacrificeLand) {
@@ -881,7 +916,7 @@ export const castSpells = (
         }
 
         const landsToFieldNames = [];
-        const target = rampSpell.landsToAdd || 1;
+        const target = rampSpell.landsToAdd;
         for (let li = 0; li < library.length && landsToFieldNames.length < target; li++) {
           if (matchesRampFilter(library[li], rampSpell)) {
             const [fetchedCard] = library.splice(li, 1);
@@ -917,11 +952,16 @@ export const castSpells = (
           const fieldNote =
             landsToFieldNames.length > 0
               ? ` → ${landsToFieldNames.join(', ')} (${tappedNote})`
-              : ' → no land found';
+              : rampSpell.landsToAdd > 0
+                ? ' → no land found'
+                : '';
           const handNote =
             landsToHandNames.length > 0 ? `; ${landsToHandNames.join(', ')} to hand` : '';
+          const actionVerb = rampSpell.staysOnBattlefield ? 'Cast permanent' : 'Cast ramp spell';
+          const activationNote =
+            rampSpell.activationCost > 0 ? ` (activated for {${rampSpell.activationCost}})` : '';
           turnLog.actions.push(
-            `Cast ramp spell: ${rampSpell.name}${sacNote}${fieldNote}${handNote}`
+            `${actionVerb}: ${rampSpell.name}${activationNote}${sacNote}${fieldNote}${handNote}`
           );
         }
         rampChanged = true;

@@ -275,7 +275,13 @@ describe('Ramp_Spells — structural integrity', () => {
   it('every entry has required fields with valid values', () => {
     for (const [name, data] of RAMP_SPELL_DATA) {
       expect(typeof data.landsToAdd, `${name}: landsToAdd type`).toBe('number');
-      expect(data.landsToAdd, `${name}: landsToAdd > 0`).toBeGreaterThan(0);
+      expect(data.landsToAdd, `${name}: landsToAdd >= 0`).toBeGreaterThanOrEqual(0);
+      // At least one of landsToAdd / landsToHand must be positive — the spell must
+      // actually do something useful.
+      expect(
+        (data.landsToAdd ?? 0) + (data.landsToHand ?? 0),
+        `${name}: landsToAdd + landsToHand > 0`
+      ).toBeGreaterThan(0);
       expect(typeof data.landsTapped, `${name}: landsTapped type`).toBe('boolean');
       expect(typeof data.landsToHand, `${name}: landsToHand type`).toBe('number');
       expect(typeof data.sacrificeLand, `${name}: sacrificeLand type`).toBe('boolean');
