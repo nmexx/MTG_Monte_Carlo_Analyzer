@@ -32,7 +32,16 @@ const COLOR_CONFIG = {
   G: { label: 'Green', fill: '#4ade80' },
 };
 
-const NON_LAND_KEYS = ['spells', 'creatures', 'artifacts', 'rituals', 'rampSpells', 'exploration'];
+const NON_LAND_KEYS = [
+  'spells',
+  'creatures',
+  'artifacts',
+  'rituals',
+  'rampSpells',
+  'exploration',
+  'drawSpells',
+  'treasureCards',
+];
 const getNonLandCards = deck => NON_LAND_KEYS.flatMap(k => deck[k] || []);
 
 // ─── Sub-sections ──────────────────────────────────────────────────────────────
@@ -53,6 +62,9 @@ function DerivedStats({ parsedDeck }) {
   );
   const rampPct =
     parsedDeck.totalCards > 0 ? ((rampCount / parsedDeck.totalCards) * 100).toFixed(1) : '0';
+
+  const drawCount = (parsedDeck.drawSpells || []).reduce((s, c) => s + (c.quantity || 1), 0);
+  const treasureCount = (parsedDeck.treasureCards || []).reduce((s, c) => s + (c.quantity || 1), 0);
 
   const lands = parsedDeck.lands || [];
   let tappedCount = 0,
@@ -81,6 +93,16 @@ function DerivedStats({ parsedDeck }) {
           ({rampPct}% of deck)
         </span>
       </p>
+      {drawCount > 0 && (
+        <p>
+          Card Draw Spells: <strong>{drawCount}</strong>
+        </p>
+      )}
+      {treasureCount > 0 && (
+        <p>
+          Treasure Generators: <strong>{treasureCount}</strong>
+        </p>
+      )}
       {lands.length > 0 && (
         <p style={{ lineHeight: 1.8 }}>
           Lands — Untapped: <strong>{untappedCount + fetchCount}</strong>

@@ -105,6 +105,7 @@ const defaultDeckSlot = (saved = {}) => ({
   includeTreasures: saved.includeTreasures ?? true,
   disabledTreasures: new Set(saved.disabledTreasures ?? []),
   treasureOverrides: saved.treasureOverrides ?? {},
+  ritualOverrides: saved.ritualOverrides ?? {},
   simulationResults: null,
 });
 
@@ -130,6 +131,7 @@ const serializeDeckSlot = slot => ({
   includeTreasures: slot.includeTreasures,
   disabledTreasures: [...(slot.disabledTreasures ?? [])],
   treasureOverrides: slot.treasureOverrides ?? {},
+  ritualOverrides: slot.ritualOverrides ?? {},
 });
 
 // =============================================================================
@@ -206,6 +208,7 @@ const MTGMonteCarloAnalyzer = () => {
   const setIncludeTreasures = makeSlotSetterA('includeTreasures');
   const setDisabledTreasures = makeSlotSetterA('disabledTreasures');
   const setTreasureOverrides = makeSlotSetterA('treasureOverrides');
+  const setRitualOverrides = makeSlotSetterA('ritualOverrides');
 
   const {
     deckText,
@@ -231,6 +234,7 @@ const MTGMonteCarloAnalyzer = () => {
     includeTreasures,
     disabledTreasures,
     treasureOverrides,
+    ritualOverrides,
   } = deckSlotA;
 
   // ── Deck Slot B ───────────────────────────────────────────────────────────
@@ -260,6 +264,7 @@ const MTGMonteCarloAnalyzer = () => {
   const setIncludeTreasuresB = makeSlotSetterB('includeTreasures');
   const setDisabledTreasuresB = makeSlotSetterB('disabledTreasures');
   const setTreasureOverridesB = makeSlotSetterB('treasureOverrides');
+  const setRitualOverridesB = makeSlotSetterB('ritualOverrides');
 
   const {
     deckText: deckTextB,
@@ -285,6 +290,7 @@ const MTGMonteCarloAnalyzer = () => {
     includeTreasures: includeTreasuresB,
     disabledTreasures: disabledTreasuresB,
     treasureOverrides: treasureOverridesB,
+    ritualOverrides: ritualOverridesB,
   } = deckSlotB;
 
   const [error, setError] = useState('');
@@ -595,6 +601,7 @@ const MTGMonteCarloAnalyzer = () => {
     includeTreasures: slot.includeTreasures ?? true,
     disabledTreasures: slot.disabledTreasures ?? new Set(),
     treasureOverrides: slot.treasureOverrides ?? {},
+    ritualOverrides: slot.ritualOverrides ?? {},
   });
 
   const runSimulation = () => {
@@ -1068,6 +1075,8 @@ const MTGMonteCarloAnalyzer = () => {
                       disabledRituals={disabledRituals}
                       setDisabledRituals={setDisabledRituals}
                       renderManaCost={renderManaCost}
+                      ritualOverrides={ritualOverrides}
+                      setRitualOverrides={setRitualOverrides}
                     />
                   </div>
                 </details>
@@ -1425,6 +1434,8 @@ const MTGMonteCarloAnalyzer = () => {
                   disabledRituals={disabledRituals}
                   setDisabledRituals={setDisabledRituals}
                   renderManaCost={renderManaCost}
+                  ritualOverrides={ritualOverrides}
+                  setRitualOverrides={setRitualOverrides}
                 />
               ) : null
             }
@@ -1437,6 +1448,8 @@ const MTGMonteCarloAnalyzer = () => {
                   disabledRituals={disabledRitualsB}
                   setDisabledRituals={setDisabledRitualsB}
                   renderManaCost={renderManaCost}
+                  ritualOverrides={ritualOverridesB}
+                  setRitualOverrides={setRitualOverridesB}
                 />
               ) : null
             }

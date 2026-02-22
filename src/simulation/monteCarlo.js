@@ -160,6 +160,20 @@ const applyTreasureOverrides = (deck, treasureOverrides) => {
   });
 };
 
+/**
+ * Apply per-card ritual net-gain overrides from the UI.
+ * ritualOverrides[cardNameLower] = number  → override netGain for that ritual
+ */
+const applyRitualOverrides = (deck, ritualOverrides) => {
+  if (!ritualOverrides || Object.keys(ritualOverrides).length === 0) return deck;
+  return deck.map(card => {
+    if (!card.isRitual) return card;
+    const override = ritualOverrides[card.name?.toLowerCase()];
+    if (override === undefined || override === null) return card;
+    return { ...card, netGain: Math.max(-20, Number(override)) };
+  });
+};
+
 export const buildCompleteDeck = (deckToParse, config = {}) => {
   if (!deckToParse) return [];
   const {
@@ -179,6 +193,7 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
     disabledDrawSpells = new Set(),
     manaOverrides = {},
     drawOverrides = {},
+    ritualOverrides = {},
     includeTreasures = true,
     disabledTreasures = new Set(),
     treasureOverrides = {},
@@ -203,9 +218,12 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
     for (let i = 0; i < card.quantity; i++) deck.push({ ...card });
   });
 
-  return applyTreasureOverrides(
-    applyDrawOverrides(applyManaOverrides(deck, manaOverrides), drawOverrides),
-    treasureOverrides
+  return applyRitualOverrides(
+    applyTreasureOverrides(
+      applyDrawOverrides(applyManaOverrides(deck, manaOverrides), drawOverrides),
+      treasureOverrides
+    ),
+    ritualOverrides
   );
 };
 
