@@ -186,34 +186,61 @@ export const detectTreasureFromOracle = (oracleText, typeLine) => {
 };
 
 /**
- * Detects cards that draw cards for their controller from oracle text.
+ * Detects cards that draw cards (or grant access to exiled cards) for their
+ * controller from oracle text.
  * Returns a CARD_DRAW_DATA-shaped object, or null.
  *
  * Heuristics:
+ *   Standard draw:
  *   - Must match a "draw a/N card(s)" pattern specifically for the controller.
  *   - Excludes symmetrical effects ("each player draws", "each opponent draws", etc.).
- *   - Recurring if it is a permanent AND oracle contains a "Whenever" or
- *     "At the beginning of" trigger; one-time otherwise.
+ *
+ *   Impulse draw (exile-and-play):
+ *   - Matches "exile the top N cards of your library … you may play/cast" patterns.
+ *   - Also matches the singular "exile the top card of your library" form.
+ *
+ *   Recurring vs one-time: permanent type + Whenever/"At the beginning of" trigger.
  */
 export const detectDrawFromOracle = (oracleText, typeLine) => {
   if (!oracleText) return null;
   const text = oracleText.toLowerCase();
 
-  // Must have a draw-for-you pattern
-  if (!/\bdraw (?:a card|\w+ cards?)\b/.test(text)) return null;
-  // Exclude effects that benefit all players or only opponents
-  if (/each player draws|each opponent draws|target player draws|they draw/.test(text)) return null;
-
-  // How many cards?
-  let netCards = 1;
-  const m = text.match(/\bdraw (\w+) cards?\b/);
-  if (m) {
-    const w = m[1];
-    if (w === 'a') netCards = 1;
-    else if (WORD_TO_NUM[w] !== undefined) netCards = WORD_TO_NUM[w];
-    else if (/^\d+$/.test(w)) netCards = parseInt(w, 10);
-    else if (w === 'x') netCards = 2;
+  // ── Standard "draw N cards" ─────────────────────────────────────────────
+  let netCards = null;
+  if (
+    /\bdraw (?:a card|\w+ cards?)\b/.test(text) &&
+    !/each player draws|each opponent draws|target player draws|they draw/.test(text)
+  ) {
+    netCards = 1;
+    const m = text.match(/\bdraw (\w+) cards?\b/);
+    if (m) {
+      const w = m[1];
+      if (w === 'a') netCards = 1;
+      else if (WORD_TO_NUM[w] !== undefined) netCards = WORD_TO_NUM[w];
+      else if (/^\d+$/.test(w)) netCards = parseInt(w, 10);
+      else if (w === 'x') netCards = 2;
+    }
   }
+
+  // ── Impulse draw: "exile the top N cards … you may play/cast this turn" ─
+  if (netCards === null) {
+    const mPlural = text.match(/exile the top (\w+) cards? of (?:your|a player's|their) library/);
+    const hasSingular = /exile the top card of (?:your|a player's|their) library/.test(text);
+    if (
+      (mPlural || hasSingular) &&
+      /you may (?:play|cast)|until end of turn.*you may|play.*this turn/.test(text)
+    ) {
+      netCards = 1;
+      if (mPlural) {
+        const w = mPlural[1];
+        if (WORD_TO_NUM[w] !== undefined) netCards = WORD_TO_NUM[w];
+        else if (/^\d+$/.test(w)) netCards = parseInt(w, 10);
+        else if (w === 'x') netCards = 2;
+      }
+    }
+  }
+
+  if (netCards === null) return null;
 
   const isPermanent = !/(instant|sorcery)/i.test(typeLine || '');
   const isRecurring = isPermanent && /whenever|at the beginning of/i.test(oracleText);

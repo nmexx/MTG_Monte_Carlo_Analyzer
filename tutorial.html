@@ -413,8 +413,8 @@
             <strong>Rituals</strong> — Dark Ritual, Cabal Ritual, Seething Song, etc. These are
             one-shot burst mana sources counted separately in the <em>Burst</em> playability metric.
             The <strong>net mana gain</strong> used in the simulation can be overridden per-card in
-            the <em>Rituals</em> panel — useful for kicked Cabal Ritual, X-cost rituals, or any
-            card whose output differs from the library default.
+            the <em>Rituals</em> panel — useful for kicked Cabal Ritual, X-cost rituals, or any card
+            whose output differs from the library default.
           </li>
           <li>
             <strong>Draw spells</strong> — Rhystic Study, Mystic Remora, Brainstorm, Ponder, Sylvan
@@ -423,7 +423,11 @@
             cards). They are cast after ramp spells each turn. Permanents (enchantments, artifacts,
             creatures) stay on the battlefield and draw cards each upkeep; instants and sorceries go
             to the graveyard and draw cards immediately. The per-card draw amount can be overridden
-            in the <em>Draw Spells</em> panel.
+            in the <em>Draw Spells</em> panel. <br /><br />
+            <strong>Impulse draw</strong> ("exile the top N cards of your library — you may play
+            them this turn") is treated as equivalent to drawing those cards. Cards like Reckless
+            Impulse, Wrenn's Resolve, and Light Up the Stage are recognised from their oracle text
+            by the parser's fallback detection even if they are not in the built-in library.
           </li>
           <li>
             <strong>Treasure generators</strong> — Smothering Tithe, Dockside Extortionist,
@@ -436,9 +440,9 @@
             treasure amount can be overridden in the <em>Treasure Generators</em> panel.
           </li>
           <li>
-            <strong>Spells</strong> — everything not in the above categories. They do not
-            generate mana but <em>do</em> consume mana, so their mana costs still influence the
-            color-pip math.
+            <strong>Spells</strong> — everything not in the above categories. They do not generate
+            mana but <em>do</em> consume mana, so their mana costs still influence the color-pip
+            math.
           </li>
         </ul>
 
@@ -452,8 +456,10 @@
           The simulator draws exactly one card per turn from the top of the library. Draw spells on
           the battlefield (Rhystic Study, Phyrexian Arena, Sylvan Library, etc.) draw additional
           cards during the upkeep step; one-shot draw spells (Brainstorm, Ponder, Night's Whisper,
-          Harmonize, etc.) draw their cards when cast. The amount drawn can be overridden per-card
-          in the <em>Draw Spells</em> panel.
+          Harmonize, etc.) draw their cards when cast. Impulse-draw spells (Reckless Impulse,
+          Wrenn's Resolve, Light Up the Stage, etc.) that exile cards from the top of the library
+          for same-turn play are treated identically to drawing those cards. The amount drawn can be
+          overridden per-card in the <em>Draw Spells</em> panel.
         </p>
 
         <h3>Land drops</h3>
@@ -870,13 +876,13 @@
             </ul>
           </li>
           <li>
-            <strong>3 — Draw spells</strong> — The engine casts draw
-            spells from hand once ramp spells have been resolved. Draw spell permanents (Rhystic
-            Study, Sylvan Library, Phyrexian Arena, etc.) enter the battlefield and will generate
-            card draw each subsequent upkeep; instants and sorceries (Brainstorm, Night's Whisper,
-            Harmonize, Wheel of Fortune, etc.) are cast and immediately draw their
-            <code>netCardsDrawn</code> value. Cards are cast in CMC order and the loop repeats
-            greedily until nothing more is castable.
+            <strong>3 — Draw spells</strong> — The engine casts draw spells from hand once ramp
+            spells have been resolved. Draw spell permanents (Rhystic Study, Sylvan Library,
+            Phyrexian Arena, etc.) enter the battlefield and will generate card draw each subsequent
+            upkeep; instants and sorceries (Brainstorm, Night's Whisper, Harmonize, Wheel of
+            Fortune, etc.) are cast and immediately draw their <code>netCardsDrawn</code> value.
+            Cards are cast in CMC order and the loop repeats greedily until nothing more is
+            castable.
           </li>
           <li>
             <strong>4 — Treasure generators</strong> — Lowest priority sub-phase. The engine casts
@@ -2327,10 +2333,12 @@
             <strong>Model card draw engines.</strong> Cards like Rhystic Study, Sylvan Library,
             Phyrexian Arena, or Brainstorm appear in the <em>Draw Spells</em> panel after parsing
             (115+ cards supported). Per-turn draw permanents stay on the battlefield and draw each
-            upkeep; one-shot spells draw immediately on cast. Use the <em>Draw</em> override
-            (one-time or per-turn) to model conditional or partial draw effects — for example, set
-            Rhystic Study to a lower per-turn value to account for opponents paying the
-            <code>{1}</code>.
+            upkeep; one-shot spells draw immediately on cast. Impulse-draw spells (e.g. Reckless
+            Impulse, Wrenn's Resolve, Light Up the Stage) that exile cards for same-turn play are
+            treated identically to drawing, and are detected automatically from oracle text even for
+            cards not in the built-in library. Use the <em>Draw</em> override (one-time or per-turn)
+            to model conditional or partial draw effects — for example, set Rhystic Study to a lower
+            per-turn value to account for opponents paying the <code>{1}</code>.
           </li>
           <li>
             <strong>Read the Cards Drawn per Turn chart.</strong> After running a simulation the
@@ -2356,8 +2364,8 @@
           </li>
           <li>
             <strong>Model ritual output precisely.</strong> Each card in the <em>Rituals</em> panel
-            has a <em>Net gain</em> dropdown. Switch it to <em>Custom fixed value</em> and enter
-            the exact net mana gain to use in the simulation — for example, set Cabal Ritual to
+            has a <em>Net gain</em> dropdown. Switch it to <em>Custom fixed value</em> and enter the
+            exact net mana gain to use in the simulation — for example, set Cabal Ritual to
             <strong>+4</strong> to model threshold being online, or set a Dark Petition to
             <strong>+1</strong> if spell mastery is rarely active. The override is saved to
             localStorage and the share URL.

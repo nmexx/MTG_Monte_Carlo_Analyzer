@@ -299,6 +299,38 @@ describe('detectDrawFromOracle', () => {
     const result = detectDrawFromOracle('Draw a card.', 'Sorcery');
     expect(result.cardType).toBe('sorcery');
   });
+
+  // ── Impulse draw ──────────────────────────────────────────────────────────
+  it('returns null for exile-top-N oracle with no play-this-turn clause', () => {
+    expect(detectDrawFromOracle('Exile the top two cards of your library.', 'Sorcery')).toBeNull();
+  });
+
+  it('detects impulse draw plural ("exile the top two cards … play those cards")', () => {
+    const result = detectDrawFromOracle(
+      'Exile the top two cards of your library. Until end of turn, you may play those cards.',
+      'Sorcery'
+    );
+    expect(result).not.toBeNull();
+    expect(result.netCardsDrawn).toBe(2);
+    expect(result.avgCardsPerTurn).toBe(0);
+  });
+
+  it('detects impulse draw singular ("exile the top card … play it this turn")', () => {
+    const result = detectDrawFromOracle(
+      'Exile the top card of your library. You may play it this turn.',
+      'Instant'
+    );
+    expect(result).not.toBeNull();
+    expect(result.netCardsDrawn).toBe(1);
+  });
+
+  it('defaults X-cost impulse draw to 2 ("exile the top X cards")', () => {
+    const result = detectDrawFromOracle(
+      'Exile the top X cards of your library. You may play them this turn.',
+      'Sorcery'
+    );
+    expect(result.netCardsDrawn).toBe(2);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
