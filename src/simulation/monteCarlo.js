@@ -404,7 +404,6 @@ export const monteCarlo = (deckToParse, config = {}) => {
     const battlefield = [];
     const graveyard = [];
     let cumulativeLifeLoss = 0;
-    let cumulativeTreasures = 0;
     const turnActions = [];
     const openingHand = hand.map(c => c.name);
 
@@ -429,6 +428,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
 
       // Upkeep — per-turn draw effects from draw spell permanents on battlefield
       let cardsDrawnThisTurn = 0;
+      let cumulativeTreasures = 0;
       if (includeDrawSpells) {
         battlefield.forEach(p => {
           const card = p.card;

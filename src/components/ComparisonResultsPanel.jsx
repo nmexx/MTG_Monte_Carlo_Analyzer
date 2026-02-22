@@ -398,9 +398,9 @@ const ComparisonResultsPanel = ({
       {/* ── Treasure Pool per Turn ───────────────────────────────────────────── */}
       {hasTreasures && (
         <div className="panel">
-          <h3>💎 Treasure Pool per Turn</h3>
+          <h3>💎 Treasures Generated per Turn</h3>
           <p className="card-meta">
-            Cumulative Treasures available for burst casting. Blue = {labelA} · Amber = {labelB}
+            Treasure tokens created per turn. Blue = {labelA} · Amber = {labelB}
           </p>
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={treasureCompare}>

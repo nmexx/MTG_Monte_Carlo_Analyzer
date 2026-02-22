@@ -329,10 +329,10 @@ const ResultsPanel = ({
       {/* Treasure Pool per Turn */}
       {chartData.treasureData && simulationResults?.hasBurstCards && (
         <div className="panel">
-          <h3>💎 Treasure Pool per Turn</h3>
+          <h3>💎 Treasures Generated per Turn</h3>
           <p className="card-meta">
-            Cumulative colorless mana from Treasure tokens available for burst casting. Grows each
-            turn as engines generate tokens. Included in the Burst mana pool for key-card
+            Treasure tokens created each turn from all active generators (upkeep triggers + one-shot
+            instants/sorceries cast that turn). Added to the Burst mana pool for key-card
             playability. Shaded band = ±1σ.
           </p>
           <ResponsiveContainer width="100%" height={300}>
