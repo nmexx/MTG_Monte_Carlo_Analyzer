@@ -23,6 +23,7 @@ import RampSpellsPanel from './components/RampSpellsPanel.jsx';
 import RitualsPanel from './components/RitualsPanel.jsx';
 import CostReducersPanel from './components/CostReducersPanel.jsx';
 import DrawSpellsPanel from './components/DrawSpellsPanel.jsx';
+import TreasuresPanel from './components/TreasuresPanel.jsx';
 import SpellsPanel from './components/SpellsPanel.jsx';
 import SimulationSettingsPanel from './components/SimulationSettingsPanel.jsx';
 import ResultsPanel from './components/ResultsPanel.jsx';
@@ -101,6 +102,9 @@ const defaultDeckSlot = (saved = {}) => ({
   includeDrawSpells: saved.includeDrawSpells ?? true,
   disabledDrawSpells: new Set(saved.disabledDrawSpells ?? []),
   drawOverrides: saved.drawOverrides ?? {},
+  includeTreasures: saved.includeTreasures ?? true,
+  disabledTreasures: new Set(saved.disabledTreasures ?? []),
+  treasureOverrides: saved.treasureOverrides ?? {},
   simulationResults: null,
 });
 
@@ -123,6 +127,9 @@ const serializeDeckSlot = slot => ({
   includeDrawSpells: slot.includeDrawSpells,
   disabledDrawSpells: [...(slot.disabledDrawSpells ?? [])],
   drawOverrides: slot.drawOverrides ?? {},
+  includeTreasures: slot.includeTreasures,
+  disabledTreasures: [...(slot.disabledTreasures ?? [])],
+  treasureOverrides: slot.treasureOverrides ?? {},
 });
 
 // =============================================================================
@@ -196,6 +203,9 @@ const MTGMonteCarloAnalyzer = () => {
   const setIncludeDrawSpells = makeSlotSetterA('includeDrawSpells');
   const setDisabledDrawSpells = makeSlotSetterA('disabledDrawSpells');
   const setDrawOverrides = makeSlotSetterA('drawOverrides');
+  const setIncludeTreasures = makeSlotSetterA('includeTreasures');
+  const setDisabledTreasures = makeSlotSetterA('disabledTreasures');
+  const setTreasureOverrides = makeSlotSetterA('treasureOverrides');
 
   const {
     deckText,
@@ -218,6 +228,9 @@ const MTGMonteCarloAnalyzer = () => {
     includeDrawSpells,
     disabledDrawSpells,
     drawOverrides,
+    includeTreasures,
+    disabledTreasures,
+    treasureOverrides,
   } = deckSlotA;
 
   // ── Deck Slot B ───────────────────────────────────────────────────────────
@@ -244,6 +257,9 @@ const MTGMonteCarloAnalyzer = () => {
   const setIncludeDrawSpellsB = makeSlotSetterB('includeDrawSpells');
   const setDisabledDrawSpellsB = makeSlotSetterB('disabledDrawSpells');
   const setDrawOverridesB = makeSlotSetterB('drawOverrides');
+  const setIncludeTreasuresB = makeSlotSetterB('includeTreasures');
+  const setDisabledTreasuresB = makeSlotSetterB('disabledTreasures');
+  const setTreasureOverridesB = makeSlotSetterB('treasureOverrides');
 
   const {
     deckText: deckTextB,
@@ -266,6 +282,9 @@ const MTGMonteCarloAnalyzer = () => {
     includeDrawSpells: includeDrawSpellsB,
     disabledDrawSpells: disabledDrawSpellsB,
     drawOverrides: drawOverridesB,
+    includeTreasures: includeTreasuresB,
+    disabledTreasures: disabledTreasuresB,
+    treasureOverrides: treasureOverridesB,
   } = deckSlotB;
 
   const [error, setError] = useState('');
@@ -573,6 +592,9 @@ const MTGMonteCarloAnalyzer = () => {
     includeDrawSpells: slot.includeDrawSpells ?? true,
     disabledDrawSpells: slot.disabledDrawSpells ?? new Set(),
     drawOverrides: slot.drawOverrides ?? {},
+    includeTreasures: slot.includeTreasures ?? true,
+    disabledTreasures: slot.disabledTreasures ?? new Set(),
+    treasureOverrides: slot.treasureOverrides ?? {},
   });
 
   const runSimulation = () => {
@@ -1091,12 +1113,34 @@ const MTGMonteCarloAnalyzer = () => {
                 </details>
               )}
 
+              {parsedDeck.treasureCards?.length > 0 && (
+                <details className="section-details" open>
+                  <summary className="section-summary">
+                    💎 Treasure Generators
+                    <span className="section-summary__chevron">▾</span>
+                  </summary>
+                  <div className="panel-grid">
+                    <TreasuresPanel
+                      parsedDeck={parsedDeck}
+                      includeTreasures={includeTreasures}
+                      setIncludeTreasures={setIncludeTreasures}
+                      disabledTreasures={disabledTreasures}
+                      setDisabledTreasures={setDisabledTreasures}
+                      renderManaCost={renderManaCost}
+                      treasureOverrides={treasureOverrides}
+                      setTreasureOverrides={setTreasureOverrides}
+                    />
+                  </div>
+                </details>
+              )}
+
               {(parsedDeck.spells.length > 0 ||
                 parsedDeck.creatures.length > 0 ||
                 parsedDeck.artifacts.length > 0 ||
                 parsedDeck.rituals?.length > 0 ||
                 parsedDeck.rampSpells?.length > 0 ||
                 parsedDeck.drawSpells?.length > 0 ||
+                parsedDeck.treasureCards?.length > 0 ||
                 parsedDeck.exploration?.length > 0) && (
                 <details className="section-details" open>
                   <summary className="section-summary">
@@ -1453,6 +1497,38 @@ const MTGMonteCarloAnalyzer = () => {
                   renderManaCost={renderManaCost}
                   drawOverrides={drawOverridesB}
                   setDrawOverrides={setDrawOverridesB}
+                />
+              ) : null
+            }
+          />
+
+          {/* Row: Treasure Generators */}
+          <ComparisonRow
+            left={
+              parsedDeck?.treasureCards?.length > 0 ? (
+                <TreasuresPanel
+                  parsedDeck={parsedDeck}
+                  includeTreasures={includeTreasures}
+                  setIncludeTreasures={setIncludeTreasures}
+                  disabledTreasures={disabledTreasures}
+                  setDisabledTreasures={setDisabledTreasures}
+                  renderManaCost={renderManaCost}
+                  treasureOverrides={treasureOverrides}
+                  setTreasureOverrides={setTreasureOverrides}
+                />
+              ) : null
+            }
+            right={
+              parsedDeckB?.treasureCards?.length > 0 ? (
+                <TreasuresPanel
+                  parsedDeck={parsedDeckB}
+                  includeTreasures={includeTreasuresB}
+                  setIncludeTreasures={setIncludeTreasuresB}
+                  disabledTreasures={disabledTreasuresB}
+                  setDisabledTreasures={setDisabledTreasuresB}
+                  renderManaCost={renderManaCost}
+                  treasureOverrides={treasureOverridesB}
+                  setTreasureOverrides={setTreasureOverridesB}
                 />
               ) : null
             }

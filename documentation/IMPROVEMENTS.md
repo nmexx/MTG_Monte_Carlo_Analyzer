@@ -226,3 +226,15 @@
     - **`uiHelpers.jsx`** — `prepareChartData` builds a `cardsDrawnData` array with avg, `lo`, `hi`, and `_drawnSd` fields.
     - **`ResultsPanel.jsx`** — new cyan `ComposedChart` panel (±1σ shaded band + average line) inserted after the Life Loss chart.
     - **`ComparisonResultsPanel.jsx`** — `drawnCompare` merged array + overlay line chart added after the Life Loss comparison panel, enabling direct A vs B card-flow comparison.
+
+35. **Treasure token generation simulation** --------DONE
+    - 50 most-played Commander treasure-producing cards catalogued in `card_data/Treasures.js` (33 per-turn permanents like Smothering Tithe and Bootleggers' Stash; 17 one-shot generators like Dockside Extortionist and Brass's Bounty).
+    - Card model mirrors draw spells: `isOneTreasure` (one-shot vs recurring), `treasuresProduced` (immediate ETB/cast count), `avgTreasuresPerTurn` (upkeep generation rate, fractional allowed), `staysOnBattlefield`.
+    - Override UI in `TreasuresPanel.jsx` lets users set a custom treasure count (one-time or per-turn) per card — identical UX to DrawSpellsPanel.
+    - **`cardProcessors.js`** — `processTreasureCard()` added; router entry placed before RITUAL_DATA so treasure cards take priority.
+    - **`deckParser.js`** — `treasureCards: []` array added throughout; categoriser branches to `isTreasureCard`.
+    - **`simulationCore.js`** — Phase 4 (lowest priority, cast last) casts treasure generators from hand; one-shot cards credit `simConfig.treasureTracker.produced`; permanents enter the battlefield for upkeep triggers next turn.
+    - **`monteCarlo.js`** — `applyTreasureOverrides()` mirrors `applyDrawOverrides()`; `buildCompleteDeck` includes treasure cards; per-turn upkeep loop fires Bernoulli trial for fractional `avgTreasuresPerTurn`; `cumulativeTreasures` counter persists across turns (tokens don't disappear); treasure pool added to `burstTotal` for key-card playability; `treasurePerTurn` stat + stddev/average collapse follow existing pattern.
+    - **`uiHelpers.jsx`** — `prepareChartData` builds a `treasureData` array with avg, `lo`, `hi`, and `_treasureSd` fields.
+    - **`ResultsPanel.jsx`** — new amber/gold `ComposedChart` panel (±1σ band + average line) inserted after the Cards Drawn chart; only shown when `hasBurstCards` is true.
+    - **`ComparisonResultsPanel.jsx`** — `treasureCompare` merged array + overlay line chart after Cards Drawn comparison; delta summary row added to the summary table.

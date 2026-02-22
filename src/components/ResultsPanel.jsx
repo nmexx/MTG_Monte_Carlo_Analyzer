@@ -326,6 +326,47 @@ const ResultsPanel = ({
         </div>
       )}
 
+      {/* Treasure Pool per Turn */}
+      {chartData.treasureData && simulationResults?.hasBurstCards && (
+        <div className="panel">
+          <h3>💎 Treasure Pool per Turn</h3>
+          <p className="card-meta">
+            Cumulative colorless mana from Treasure tokens available for burst casting. Grows each
+            turn as engines generate tokens. Included in the Burst mana pool for key-card
+            playability. Shaded band = ±1σ.
+          </p>
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={chartData.treasureData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="turn"
+                label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
+              />
+              <YAxis label={{ value: 'Treasures', angle: -90, position: 'insideLeft' }} />
+              <Tooltip content={makeStdTooltip({ 'Treasure Pool': '_treasureSd' })} />
+              <Legend />
+              <Area
+                type="monotone"
+                dataKey={d => [d['Treasure Pool Lo'], d['Treasure Pool Hi']]}
+                fill="rgba(245,158,11,0.18)"
+                stroke="none"
+                name="Treasure Pool ±1σ"
+                legendType="none"
+                activeDot={false}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="Treasure Pool"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                dot={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* Key Card Playability */}
       {selectedKeyCards.size > 0 && (
         <div className="panel">

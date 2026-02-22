@@ -137,6 +137,12 @@ const ComparisonResultsPanel = ({
     [`${labelB}: Cards Drawn`]: chartDataB.cardsDrawnData[i]['Cards Drawn'],
   }));
 
+  const treasureCompare = Array.from({ length: numTurns }, (_, i) => ({
+    turn: chartDataA.treasureData[i]?.turn ?? i + 1,
+    [`${labelA}: Treasure Pool`]: chartDataA.treasureData[i]?.['Treasure Pool'] ?? 0,
+    [`${labelB}: Treasure Pool`]: chartDataB.treasureData[i]?.['Treasure Pool'] ?? 0,
+  }));
+
   // ── Key card playability — union of both sets ────────────────────────────────
   const allKeyCards = new Set([...selectedKeyCardsA, ...selectedKeyCardsB]);
   const keyCompare = Array.from({ length: numTurns }, (_, i) => {
@@ -157,6 +163,9 @@ const ComparisonResultsPanel = ({
   const finalManaB = chartDataB.manaByColorData.at(-1)?.['Total Mana'] ?? 0;
   const finalLifeA = chartDataA.lifeLossData.at(-1)?.['Life Loss'] ?? 0;
   const finalLifeB = chartDataB.lifeLossData.at(-1)?.['Life Loss'] ?? 0;
+  const finalTreasureA = chartDataA.treasureData.at(-1)?.['Treasure Pool'] ?? 0;
+  const finalTreasureB = chartDataB.treasureData.at(-1)?.['Treasure Pool'] ?? 0;
+  const hasTreasures = finalTreasureA > 0 || finalTreasureB > 0;
 
   return (
     <div id="results-section">
@@ -200,6 +209,12 @@ const ComparisonResultsPanel = ({
               <p>
                 Life loss by final turn: <strong>{finalLife.toFixed(2)}</strong>
               </p>
+              {hasTreasures && (
+                <p>
+                  Treasures by final turn:{' '}
+                  <strong>{(label === labelA ? finalTreasureA : finalTreasureB).toFixed(2)}</strong>
+                </p>
+              )}
             </div>
           ))}
           <div className="comparison-summary-col comparison-summary-col--delta">
@@ -216,6 +231,17 @@ const ComparisonResultsPanel = ({
               Life loss:{' '}
               <DeltaBadge a={finalLifeA} b={finalLifeB} higherIsBetter={false} labelB={labelB} />
             </p>
+            {hasTreasures && (
+              <p>
+                Treasures:{' '}
+                <DeltaBadge
+                  a={finalTreasureA}
+                  b={finalTreasureB}
+                  higherIsBetter={true}
+                  labelB={labelB}
+                />
+              </p>
+            )}
           </div>
         </div>
 
@@ -368,6 +394,42 @@ const ComparisonResultsPanel = ({
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+
+      {/* ── Treasure Pool per Turn ───────────────────────────────────────────── */}
+      {hasTreasures && (
+        <div className="panel">
+          <h3>💎 Treasure Pool per Turn</h3>
+          <p className="card-meta">
+            Cumulative Treasures available for burst casting. Blue = {labelA} · Amber = {labelB}
+          </p>
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={treasureCompare}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="turn"
+                label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
+              />
+              <YAxis label={{ value: 'Treasures', angle: -90, position: 'insideLeft' }} />
+              <Tooltip content={SimpleTooltip} />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey={`${labelA}: Treasure Pool`}
+                stroke={DECK_A.primary}
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey={`${labelB}: Treasure Pool`}
+                stroke={DECK_B.primary}
+                strokeWidth={2}
+                dot={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* ── Key Card Playability ─────────────────────────────────────────────── */}
       {allKeyCards.size > 0 && (

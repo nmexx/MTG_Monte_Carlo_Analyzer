@@ -12,6 +12,7 @@ import { MANA_DORK_DATA } from '../../card_data/Mana_Dorks.js';
 import { EXPLORATION_EFFECTS } from '../../card_data/Exploration_Effects.js';
 import { RITUAL_DATA } from '../../card_data/Rituals.js';
 import { CARD_DRAW_DATA } from '../../card_data/Card_Draw.js';
+import { TREASURE_DATA } from '../../card_data/Treasures.js';
 import LAND_DATA, {
   FETCH_LAND_DATA,
   KNOWN_FETCH_LANDS,
@@ -597,6 +598,37 @@ export const processCostReducer = data => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// processTreasureCard
+//   Converts raw Scryfall data into a treasure-generator card object using TREASURE_DATA.
+//   · staysOnBattlefield: true  → permanent (enters battlefield after being cast)
+//   · isOneTreasure: true       → one-time trigger (ETB/cast); generates `treasuresProduced`
+//   · isOneTreasure: false      → recurring engine; generates `avgTreasuresPerTurn` per upkeep
+// ─────────────────────────────────────────────────────────────────────────────
+export const processTreasureCard = data => {
+  const cardName = data.name.toLowerCase();
+  const td = TREASURE_DATA.get(cardName) || {
+    staysOnBattlefield: false,
+    isOneTreasure: true,
+    treasuresProduced: 1,
+    avgTreasuresPerTurn: 0,
+    colors: [],
+  };
+  return {
+    name: data.name,
+    type: 'treasureCard',
+    isTreasureCard: true,
+    staysOnBattlefield: td.staysOnBattlefield,
+    isOneTreasure: td.isOneTreasure,
+    treasuresProduced: td.treasuresProduced,
+    avgTreasuresPerTurn: td.avgTreasuresPerTurn,
+    treasureColors: td.colors,
+    cmc: calculateCMC(data.cmc, data.mana_cost),
+    manaCost: data.mana_cost || '',
+    oracleText: data.oracle_text,
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // processDrawSpell
 //   Converts raw Scryfall data into a draw-spell card object using CARD_DRAW_DATA
 //   for trigger type and draw amounts.
@@ -716,6 +748,7 @@ export const processCardData = data => {
   if (COST_REDUCER_DATA.has(cardName)) return processCostReducer(data);
   if (EXPLORATION_EFFECTS.has(cardName)) return processExploration(data);
   if (RAMP_SPELL_DATA.has(cardName)) return processRampSpell(data);
+  if (TREASURE_DATA.has(cardName)) return processTreasureCard(data);
   if (RITUAL_DATA.has(cardName)) return processRitual(data);
   if (CARD_DRAW_DATA.has(cardName)) return processDrawSpell(data);
   return processSpell(data);

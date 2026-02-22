@@ -423,7 +423,15 @@
             in the <em>Draw Spells</em> panel.
           </li>
           <li>
-            <strong>Other spells</strong> — everything not in the above categories. They do not
+            <strong>Treasure generators</strong> — Smothering Tithe, Dockside Extortionist,
+            Bootleggers' Stash, Academy Manufactor, Brass's Bounty, Spell Swindle, etc. Treasure
+            creation is tracked using the <code>TREASURE_DATA</code> library (50 supported cards).
+            They are cast after draw spells each turn (lowest priority). Permanents stay on the
+            battlefield and produce Treasures each upkeep; instants and sorceries produce Treasures
+            immediately on cast. Produced Treasures accumulate as a colorless burst-mana pool that
+            is added to the <em>Burst</em> playability metric alongside rituals. The per-card
+            treasure amount can be overridden in the <em>Treasure Generators</em> panel.
+          </li> — everything not in the above categories. They do not
             generate mana but <em>do</em> consume mana, so their mana costs still influence the
             color-pip math.
           </li>
@@ -857,13 +865,21 @@
             </ul>
           </li>
           <li>
-            <strong>3 — Draw spells</strong> — Lowest priority sub-phase. The engine casts draw
+            <strong>3 — Draw spells</strong> — The engine casts draw
             spells from hand once ramp spells have been resolved. Draw spell permanents (Rhystic
             Study, Sylvan Library, Phyrexian Arena, etc.) enter the battlefield and will generate
             card draw each subsequent upkeep; instants and sorceries (Brainstorm, Night's Whisper,
             Harmonize, Wheel of Fortune, etc.) are cast and immediately draw their
             <code>netCardsDrawn</code> value. Cards are cast in CMC order and the loop repeats
             greedily until nothing more is castable.
+          </li>
+          <li>
+            <strong>4 — Treasure generators</strong> — Lowest priority sub-phase. The engine casts
+            treasure-generating cards after draw spells. Permanent generators (Smothering Tithe,
+            Bootleggers' Stash, etc.) enter the battlefield and will create Treasures each
+            subsequent upkeep; instants and sorceries (Brass's Bounty, Spell Swindle, etc.) create
+            their treasures immediately on cast. All accumulated Treasures are counted as colorless
+            burst mana for the key-card playability calculation.
           </li>
         </ol>
         <p>
@@ -1750,6 +1766,13 @@
           </li>
           <li>Rituals and hand-zero Mox artifacts as a separate <em>burst mana</em> pool.</li>
           <li>
+            <strong>Treasure token generation</strong> — Smothering Tithe, Dockside Extortionist,
+            Bootleggers' Stash, Academy Manufactor, Rhystic Chorus, Brass's Bounty, Spell Swindle,
+            and 44 more (50 cards total). Permanent generators accumulate Treasures each upkeep;
+            one-shot generators fire on cast. All Treasures are counted as colorless burst mana for
+            key-card playability. Override amounts in the <em>Treasure Generators</em> panel.
+          </li>
+          <li>
             Cost-reducer permanents (Medallion cycle, Goblin Electromancer, Baral, Helm of
             Awakening, Urza's Incubator, and more) — each reduces the generic portion of matching
             spell costs; discounts stack and are applied to both ramp-spell and key-card castability
@@ -1760,8 +1783,8 @@
           <li>London and Vancouver mulligan rules with four configurable strategies.</li>
           <li>
             Per-turn statistics: average lands, untapped lands, total mana, per-color mana, life
-            loss, and cards drawn per turn (natural draw + upkeep draw-engine triggers + one-shot
-            draw spells cast that turn).
+            loss, cards drawn per turn (natural draw + upkeep draw-engine triggers + one-shot draw
+            spells cast that turn), and cumulative Treasure pool per turn.
           </li>
           <li>
             Key-card castability per turn (with and without burst mana), on-curve castability.
@@ -2306,13 +2329,13 @@
           </li>
           <li>
             <strong>Read the Cards Drawn per Turn chart.</strong> After running a simulation the
-            results panel includes a <em>Cards Drawn per Turn</em> chart (cyan line, ±1σ band).
-            It shows how many cards enter your hand each turn from all sources combined: the
-            natural draw, upkeep triggers from draw-engine permanents (Rhystic Study, Phyrexian
-            Arena, Sylvan Library, etc.), and one-shot draw spells cast that turn (Brainstorm,
-            Night's Whisper, Harmonize, etc.). The opening hand is not counted. Use this chart to
-            quantify the concrete advantage that draw engines add — and to compare two decks'
-            card flow side by side in the Comparison panel.
+            results panel includes a <em>Cards Drawn per Turn</em> chart (cyan line, ±1σ band). It
+            shows how many cards enter your hand each turn from all sources combined: the natural
+            draw, upkeep triggers from draw-engine permanents (Rhystic Study, Phyrexian Arena,
+            Sylvan Library, etc.), and one-shot draw spells cast that turn (Brainstorm, Night's
+            Whisper, Harmonize, etc.). The opening hand is not counted. Use this chart to quantify
+            the concrete advantage that draw engines add — and to compare two decks' card flow side
+            by side in the Comparison panel.
           </li>
           <li>
             <strong>Hand size enforcement.</strong> The simulator discards down to the configured

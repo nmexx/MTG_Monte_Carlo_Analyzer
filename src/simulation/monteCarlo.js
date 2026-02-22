@@ -130,6 +130,36 @@ const applyDrawOverrides = (deck, drawOverrides) => {
   });
 };
 
+/**
+ * Apply per-card treasure amount overrides from the UI.
+ * mode='onetime'  → override isOneTreasure=true, treasuresProduced=amount
+ * mode='perturn'  → override isOneTreasure=false, avgTreasuresPerTurn=amount
+ */
+const applyTreasureOverrides = (deck, treasureOverrides) => {
+  if (!treasureOverrides || Object.keys(treasureOverrides).length === 0) return deck;
+  return deck.map(card => {
+    if (!card.isTreasureCard) return card;
+    const override = treasureOverrides[card.name?.toLowerCase()];
+    if (!override || override.mode === 'default') return card;
+    if (override.mode === 'onetime') {
+      return {
+        ...card,
+        isOneTreasure: true,
+        treasuresProduced: Math.max(0, override.amount ?? card.treasuresProduced ?? 1),
+        avgTreasuresPerTurn: 0,
+      };
+    } else if (override.mode === 'perturn') {
+      return {
+        ...card,
+        isOneTreasure: false,
+        avgTreasuresPerTurn: Math.max(0, override.amount ?? card.avgTreasuresPerTurn ?? 1),
+        treasuresProduced: 0,
+      };
+    }
+    return card;
+  });
+};
+
 export const buildCompleteDeck = (deckToParse, config = {}) => {
   if (!deckToParse) return [];
   const {
@@ -149,6 +179,9 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
     disabledDrawSpells = new Set(),
     manaOverrides = {},
     drawOverrides = {},
+    includeTreasures = true,
+    disabledTreasures = new Set(),
+    treasureOverrides = {},
   } = config;
 
   const deck = [];
@@ -164,12 +197,16 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
   if (includeRituals) pushFiltered(deck, deckToParse.rituals, disabledRituals);
   if (includeCostReducers) pushFiltered(deck, deckToParse.costReducers, disabledCostReducers);
   if (includeDrawSpells) pushFiltered(deck, deckToParse.drawSpells, disabledDrawSpells);
+  if (includeTreasures) pushFiltered(deck, deckToParse.treasureCards, disabledTreasures);
 
   deckToParse.spells.forEach(card => {
     for (let i = 0; i < card.quantity; i++) deck.push({ ...card });
   });
 
-  return applyDrawOverrides(applyManaOverrides(deck, manaOverrides), drawOverrides);
+  return applyTreasureOverrides(
+    applyDrawOverrides(applyManaOverrides(deck, manaOverrides), drawOverrides),
+    treasureOverrides
+  );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,6 +232,8 @@ export const monteCarlo = (deckToParse, config = {}) => {
     disabledCostReducers = new Set(),
     includeDrawSpells = true,
     disabledDrawSpells = new Set(),
+    includeTreasures = true,
+    disabledTreasures = new Set(),
     floodNLands = 5,
     floodTurn = 5,
     screwNLands = 2,
@@ -210,6 +249,8 @@ export const monteCarlo = (deckToParse, config = {}) => {
     disabledCostReducers,
     includeDrawSpells,
     disabledDrawSpells,
+    includeTreasures,
+    disabledTreasures,
   };
 
   const results = {
@@ -229,6 +270,9 @@ export const monteCarlo = (deckToParse, config = {}) => {
       .fill(null)
       .map(() => []),
     cardsDrawnPerTurn: Array(turns)
+      .fill(null)
+      .map(() => []),
+    treasurePerTurn: Array(turns)
       .fill(null)
       .map(() => []),
     keyCardPlayability: {},
@@ -256,7 +300,8 @@ export const monteCarlo = (deckToParse, config = {}) => {
     [...deckToParse.spells, ...(deckToParse.artifacts || [])].some(c =>
       BURST_MANA_SOURCES.has(c.name?.toLowerCase())
     ) ||
-    (deckToParse.rituals && deckToParse.rituals.length > 0);
+    deckToParse.rituals?.length > 0 ||
+    deckToParse.treasureCards?.length > 0;
 
   // Pre-build a lookup so the inner loop doesn't search all deck arrays on
   // every turn of every iteration for every key card.
@@ -359,6 +404,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
     const battlefield = [];
     const graveyard = [];
     let cumulativeLifeLoss = 0;
+    let cumulativeTreasures = 0;
     const turnActions = [];
     const openingHand = hand.map(c => c.name);
 
@@ -399,6 +445,26 @@ export const monteCarlo = (deckToParse, config = {}) => {
           if (toDraw > 0) {
             cardsDrawnThisTurn += toDraw;
             turnLog.actions.push(`${card.name}: drew ${toDraw} card${toDraw !== 1 ? 's' : ''}`);
+          }
+        });
+      }
+
+      // Upkeep — per-turn treasure generation from treasure permanents on battlefield
+      if (includeTreasures) {
+        battlefield.forEach(p => {
+          const card = p.card;
+          if (!card.isTreasureCard || card.isOneTreasure) return;
+          if (disabledTreasures.has(card.name)) return;
+          const perTurn = card.avgTreasuresPerTurn || 0;
+          if (perTurn <= 0) return;
+          const full = Math.floor(perTurn);
+          const frac = Math.random() < perTurn - full ? 1 : 0;
+          const toCreate = full + frac;
+          if (toCreate > 0) {
+            cumulativeTreasures += toCreate;
+            turnLog.actions.push(
+              `${card.name}: created ${toCreate} treasure${toCreate !== 1 ? 's' : ''}`
+            );
           }
         });
       }
@@ -569,6 +635,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
 
       // Phase 6: Cast spells
       simConfig.drawTracker = { count: 0 };
+      simConfig.treasureTracker = { produced: 0 };
       castSpells(
         hand,
         battlefield,
@@ -581,6 +648,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
         simConfig
       );
       cardsDrawnThisTurn += simConfig.drawTracker.count;
+      cumulativeTreasures += simConfig.treasureTracker.produced;
 
       // Phase 7: Calculate damage from mana sources and other permanents on the battlefield
       const { total: battlefieldDmg, breakdown: battlefieldDmgLog } = calculateBattlefieldDamage(
@@ -605,6 +673,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
       results.untappedLandsPerTurn[turn].push(untappedLandCount);
       results.lifeLossPerTurn[turn].push(cumulativeLifeLoss);
       results.cardsDrawnPerTurn[turn].push(cardsDrawnThisTurn);
+      results.treasurePerTurn[turn].push(cumulativeTreasures);
 
       const manaAvailable = calculateManaAvailability(battlefield);
       results.totalManaPerTurn[turn].push(manaAvailable.total);
@@ -620,7 +689,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
       }, 0);
       const ritualsInHand = hand.filter(c => c.isRitual && canPlayCard(c, manaAvailable));
       const burstFromRit = ritualsInHand.reduce((s, c) => s + (c.netGain || 0), 0);
-      const burstTotal = burstFromArts + burstFromRit;
+      const burstTotal = burstFromArts + burstFromRit + cumulativeTreasures;
 
       const burstColorBonus = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
       burstInHand.forEach(c => {
@@ -729,6 +798,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
   results.totalManaPerTurnStdDev = results.totalManaPerTurn.map(arr => stdDev(arr));
   results.lifeLossPerTurnStdDev = results.lifeLossPerTurn.map(arr => stdDev(arr));
   results.cardsDrawnPerTurnStdDev = results.cardsDrawnPerTurn.map(arr => stdDev(arr));
+  results.treasurePerTurnStdDev = results.treasurePerTurn.map(arr => stdDev(arr));
   results.colorsByTurnStdDev = results.colorsByTurn.map(colorObj => {
     const out = {};
     Object.keys(colorObj).forEach(color => {
@@ -744,6 +814,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
     results.totalManaPerTurn[t] = average(results.totalManaPerTurn[t]);
     results.lifeLossPerTurn[t] = average(results.lifeLossPerTurn[t]);
     results.cardsDrawnPerTurn[t] = average(results.cardsDrawnPerTurn[t]);
+    results.treasurePerTurn[t] = average(results.treasurePerTurn[t]);
     Object.keys(results.colorsByTurn[t]).forEach(color => {
       results.colorsByTurn[t][color] = average(results.colorsByTurn[t][color]);
     });

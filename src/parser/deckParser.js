@@ -29,6 +29,7 @@ const EMPTY_RESULT = (errors = []) => ({
   rampSpells: [],
   costReducers: [],
   drawSpells: [],
+  treasureCards: [],
   spells: [],
   totalCards: 0,
   landCount: 0,
@@ -95,6 +96,7 @@ export const parseDeckList = async (deckText, parserCtx = {}) => {
   const costReducers = [];
   const exploration = [];
   const drawSpells = [];
+  const treasureCards = [];
   const spells = [];
 
   for (const [cardName, quantity] of cardCounts.entries()) {
@@ -138,6 +140,7 @@ export const parseDeckList = async (deckText, parserCtx = {}) => {
     else if (processed.isRitual) rituals.push(processed);
     else if (processed.isRampSpell) rampSpells.push(processed);
     else if (processed.isDrawSpell) drawSpells.push(processed);
+    else if (processed.isTreasureCard) treasureCards.push(processed);
     else spells.push(processed);
   }
 
@@ -150,6 +153,7 @@ export const parseDeckList = async (deckText, parserCtx = {}) => {
     rituals,
     rampSpells,
     drawSpells,
+    treasureCards,
     spells,
   ];
   // MDFCs are stored in both lands[] and spells[] (isMDFCSpellSide); exclude the spell copy from the count
@@ -167,6 +171,7 @@ export const parseDeckList = async (deckText, parserCtx = {}) => {
     rituals,
     rampSpells,
     drawSpells,
+    treasureCards,
     spells,
     totalCards,
     landCount: lands.reduce((sum, c) => sum + c.quantity, 0),

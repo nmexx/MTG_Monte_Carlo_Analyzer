@@ -1023,6 +1023,55 @@ export const castSpells = (
       }
     }
   }
+
+  // Phase 4: treasure-generating cards — cast last (lowest priority of all).
+  // One-time generators (isOneTreasure: true) produce `treasuresProduced` tokens
+  // immediately via simConfig.treasureTracker.  Recurring permanents enter the
+  // battlefield and are handled by the upkeep loop in monteCarlo.js.
+  const { includeTreasures = true, disabledTreasures = new Set() } = simConfig ?? {};
+  if (includeTreasures) {
+    let treasureChanged = true;
+    while (treasureChanged) {
+      treasureChanged = false;
+      const manaAvailable = calculateManaAvailability(battlefield, turn);
+      const treasureInHand = hand.filter(c => c.isTreasureCard && !disabledTreasures.has(c.name));
+
+      for (const tc of treasureInHand.sort((a, b) => a.cmc - b.cmc)) {
+        const tcDiscount = calculateCostDiscount(tc, battlefield);
+        if (!canPlayCard(tc, manaAvailable, tcDiscount)) continue;
+
+        hand.splice(hand.indexOf(tc), 1);
+        if (tc.staysOnBattlefield) {
+          battlefield.push({
+            card: tc,
+            tapped: false,
+            summoningSick: tc.type === 'creature',
+            enteredOnTurn: turn,
+          });
+        } else {
+          graveyard.push(tc);
+        }
+        tapManaSources(tc, battlefield, tcDiscount);
+
+        // One-time treasure generation: immediately credit the tracker
+        let treasuresCreated = 0;
+        if (tc.isOneTreasure && tc.treasuresProduced > 0) {
+          treasuresCreated = tc.treasuresProduced;
+          if (simConfig?.treasureTracker) simConfig.treasureTracker.produced += treasuresCreated;
+        }
+
+        if (turnLog) {
+          const verb = tc.staysOnBattlefield ? 'Cast treasure permanent' : 'Cast treasure spell';
+          const note = tc.isOneTreasure
+            ? ` → created ${treasuresCreated} treasure${treasuresCreated !== 1 ? 's' : ''}`
+            : ' → generates treasures each turn';
+          turnLog.actions.push(`${verb}: ${tc.name}${note}`);
+        }
+        treasureChanged = true;
+        break;
+      }
+    }
+  }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
