@@ -392,9 +392,15 @@
             land-drop phases are resolved.
           </li>
           <li>
-            <strong>Ramp spells</strong> — Cultivate, Kodama's Reach, Farseek, Nature's Lore, etc.
-            Cast greedily as soon as mana allows; they search the library for lands and put them
-            onto the battlefield.
+            <strong>Ramp spells</strong> — green sorceries / instants (Cultivate, Kodama's Reach,
+            Farseek, Nature's Lore, Skyshroud Claim, Harrow, Boundless Realms, etc.), white
+            catch-up ramp (Tithe, Gift of Estates, Land Tax, Knight of the White Orchid, Loyal
+            Warhound, Oreskos Explorer, Boreas Charger, Archaeomancer's Map, Weathered Wayfarer),
+            and colorless ramp artifacts/creatures (Wayfarer's Bauble, Wanderer's Twig, Expedition
+            Map, Armillary Sphere, Journeyer's Kite, Pilgrim's Eye, Burnished Hart, Solemn
+            Simulacrum). Cast greedily as soon as mana allows; they search the library for lands
+            matching their filter (basic, any, Plains subtype, etc.) and put them onto the
+            battlefield or into hand.
           </li>
           <li>
             <strong>Cost reducers</strong> — Emerald Medallion, Goblin Electromancer, Baral Chief of
@@ -798,9 +804,24 @@
             mana creatures (Llanowar Elves, …) and Exploration effects are cast in CMC order.
           </li>
           <li>
-            <strong>2 — Ramp spells</strong> — Cultivate, Kodama's Reach, Farseek, etc. are cast
-            last, after mana producers have resolved, using any available discount from cost
-            reducers.
+            <strong>2 — Ramp spells</strong> — Cultivate, Kodama's Reach, Farseek, and all
+            supported ramp cards (see card categories above) are cast last, after mana producers
+            have resolved, using any available discount from cost reducers. Two special behaviours
+            apply to certain ramp cards:
+            <ul style="margin-top:6px">
+              <li>
+                <strong>staysOnBattlefield</strong> — creature and enchantment ramp (Solemn
+                Simulacrum, Knight of the White Orchid, Land Tax, etc.) enter the battlefield
+                instead of going to the graveyard; their ETB land-fetch still fires immediately.
+              </li>
+              <li>
+                <strong>activationCost</strong> — artifact ramp with a paid ability (Wayfarer's
+                Bauble costs <code>{2}</code> to activate, Armillary Sphere costs <code>{2}</code>,
+                Burnished Hart costs <code>{3}</code>, etc.) requires the engine to verify that
+                <em>cast cost + activation cost</em> can both be paid in the same turn before
+                committing to the play.
+              </li>
+            </ul>
           </li>
         </ol>
         <p>
@@ -1662,8 +1683,28 @@
           </li>
           <li>Exploration-type effects granting additional land drops each turn.</li>
           <li>
-            Ramp spells searching the library for lands (with correct filter restrictions — basic
-            only, forest, etc.).
+            Ramp spells searching the library for lands with correct filter restrictions —
+            basic-only, Forest/Plains subtype, or any land. Supported categories:
+            <ul style="margin-top:4px">
+              <li>
+                <strong>Green ramp</strong> — Nature's Lore, Three Visits, Farseek, Rampant Growth,
+                Cultivate, Kodama's Reach, Harrow, Skyshroud Claim, Explosive Vegetation, Hour of
+                Promise, Traverse the Outlands, Boundless Realms, Reshape the Earth, and more.
+              </li>
+              <li>
+                <strong>White catch-up ramp</strong> — Tithe, Gift of Estates, Land Tax, Weathered
+                Wayfarer, Knight of the White Orchid, Loyal Warhound, Oreskos Explorer, Boreas
+                Charger, Archaeomancer's Map. These cards fetch Plains-subtype lands (covering both
+                basic Plains and dual lands with the Plains subtype). Cards that are permanents
+                (creatures / enchantments) stay on the battlefield after resolving.
+              </li>
+              <li>
+                <strong>Colorless ramp</strong> — Wayfarer's Bauble, Wanderer's Twig, Expedition
+                Map, Armillary Sphere, Journeyer's Kite, Pilgrim's Eye, Burnished Hart, Solemn
+                Simulacrum. Most of these have an <em>activation cost</em> in addition to their
+                cast cost; the engine checks that both can be paid in the same turn before casting.
+              </li>
+            </ul>
           </li>
           <li>Rituals and hand-zero Mox artifacts as a separate <em>burst mana</em> pool.</li>
           <li>

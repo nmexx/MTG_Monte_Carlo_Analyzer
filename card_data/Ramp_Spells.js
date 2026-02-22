@@ -367,6 +367,97 @@ export const RAMP_SPELL_DATA = new Map([
     },
   ],
 
+  // ── 1-CMC: Wanderer's Twig – basic land to hand (activated ability {2}) ──
+  // {2}, Sacrifice: search for a basic land, reveal it, put into hand.
+  // Total mana needed = cast {1} + activate {2} = 3 generic mana.
+  [
+    "wanderer's twig",
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 1,
+      sacrificeLand: false,
+      fetchFilter: 'basic',
+      activationCost: 2,
+    },
+  ],
+
+  // ── 1-CMC: Expedition Map – any land to hand (activated ability {2}) ─────
+  // {2}, {T}, Sacrifice: search for any land card, put into hand.
+  // Total mana needed = cast {1} + activate {2} = 3 generic mana.
+  [
+    'expedition map',
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 1,
+      sacrificeLand: false,
+      fetchFilter: 'any',
+      activationCost: 2,
+    },
+  ],
+
+  // ── 2-CMC: Journeyer's Kite – basic land to hand (repeatable {2},{T}) ────
+  // {2}, {T}: search for a basic land, put into hand. Stays on battlefield.
+  // Modelled as a single activation on the turn cast + activated (4 total mana).
+  [
+    "journeyer's kite",
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 1,
+      sacrificeLand: false,
+      fetchFilter: 'basic',
+      activationCost: 2,
+      staysOnBattlefield: true,
+    },
+  ],
+
+  // ── 2-CMC: Armillary Sphere – up to 2 basics to hand (activated {2},{T}) ─
+  // {2}, {T}, Sacrifice: search for up to 2 basic lands and put into hand.
+  // Total mana needed = cast {2} + activate {2} = 4 generic mana.
+  [
+    'armillary sphere',
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 2,
+      sacrificeLand: false,
+      fetchFilter: 'basic',
+      activationCost: 2,
+    },
+  ],
+
+  // ── 3-CMC: Pilgrim's Eye – basic land to hand (ETB), creature stays ──────
+  [
+    "pilgrim's eye",
+    {
+      landsToAdd: 0,
+      landsTapped: false,
+      landsToHand: 1,
+      sacrificeLand: false,
+      fetchFilter: 'basic',
+      staysOnBattlefield: true,
+    },
+  ],
+
+  // ── 3-CMC: Burnished Hart – 2 basics tapped to field (activated {3},{T}) ─
+  // Artifact creature: enters battlefield, then {3},{T},{sac}: 2 basic tapped.
+  // Stays on battlefield until activation; activation cost {3} checked.
+  // Total mana needed = cast {3} + activate {3} = 6 generic mana.
+  [
+    'burnished hart',
+    {
+      landsToAdd: 2,
+      landsTapped: true,
+      landsToHand: 0,
+      sacrificeLand: false,
+      fetchFilter: 'basic',
+      activationCost: 3,
+      staysOnBattlefield: true,
+    },
+  ],
+
   // ── 4-CMC: Solemn Simulacrum – basic land tapped (ETB), creature stays ───
   [
     'solemn simulacrum',

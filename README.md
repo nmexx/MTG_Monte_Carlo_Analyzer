@@ -102,7 +102,10 @@ Each mana-producing category can be enabled/disabled wholesale or per-card:
 - **Mana Artifacts** (Sol Ring, Arcane Signet, etc.)
 - **Mana Creatures** (Birds of Paradise, Llanowar Elves, etc.)
 - **Exploration Effects** (Exploration, Azusa, Oracle of Mul Daya, etc.)
-- **Ramp Spells** (Cultivate, Rampant Growth, Kodama's Reach, etc.)
+- **Ramp Spells** — three sub-categories, all toggleable per-card:
+  - **Green ramp** (Nature's Lore, Three Visits, Farseek, Rampant Growth, Cultivate, Kodama's Reach, Harrow, Skyshroud Claim, Explosive Vegetation, Hour of Promise, Traverse the Outlands, Boundless Realms, Reshape the Earth, and more)
+  - **White catch-up ramp** (Tithe, Gift of Estates, Land Tax, Weathered Wayfarer, Knight of the White Orchid, Loyal Warhound, Oreskos Explorer, Boreas Charger, Archaeomancer's Map) — fetch Plains-subtype lands; creature/enchantment ramp cards stay on the battlefield (ETB fetch fires on cast turn)
+  - **Colorless ramp** (Wayfarer's Bauble, Wanderer's Twig, Expedition Map, Armillary Sphere, Journeyer's Kite, Pilgrim's Eye, Burnished Hart, Solemn Simulacrum) — artifact/creature ramp that requires an activation cost on top of the cast cost; the engine verifies `cast cost + activation cost ≤ available mana` before playing
 - **Rituals** (Dark Ritual, Cabal Ritual, etc.)
 - **Cost Reducers** (Emerald Medallion, Goblin Electromancer, Baral, Helm of Awakening, Urza's Incubator, etc.) — reduce the generic portion of matching spell costs; cast before mana producers each turn so their discount applies to everything else in the turn; discounts stack
 
