@@ -94,6 +94,8 @@ After parsing, a statistics panel breaks down the deck across multiple dimension
 - **Land analysis** — counts of always-untapped, always-tapped, conditional, and fetch lands
 - **Average CMC** of non-land spells
 - **Ramp & acceleration count** and percentage of deck
+- **Card Draw Spells count** — total copies of draw-spell cards in the deck (hidden when zero)
+- **Treasure Generators count** — total copies of treasure-producing cards in the deck (hidden when zero)
 - **Mana source breakdown** — bar chart of sources by category (lands, artifacts, creatures, ramp, rituals, exploration)
 - **Colour identity** — pip-frequency analysis across all non-land cards
 
@@ -106,7 +108,7 @@ Each mana-producing category can be enabled/disabled wholesale or per-card:
   - **Green ramp** (Nature's Lore, Three Visits, Farseek, Rampant Growth, Cultivate, Kodama's Reach, Harrow, Skyshroud Claim, Explosive Vegetation, Hour of Promise, Traverse the Outlands, Boundless Realms, Reshape the Earth, and more)
   - **White catch-up ramp** (Tithe, Gift of Estates, Land Tax, Weathered Wayfarer, Knight of the White Orchid, Loyal Warhound, Oreskos Explorer, Boreas Charger, Archaeomancer's Map) — fetch Plains-subtype lands; creature/enchantment ramp cards stay on the battlefield (ETB fetch fires on cast turn)
   - **Colorless ramp** (Wayfarer's Bauble, Wanderer's Twig, Expedition Map, Armillary Sphere, Journeyer's Kite, Pilgrim's Eye, Burnished Hart, Solemn Simulacrum) — artifact/creature ramp that requires an activation cost on top of the cast cost; the engine verifies `cast cost + activation cost ≤ available mana` before playing
-- **Rituals** (Dark Ritual, Cabal Ritual, etc.)
+- **Rituals** (Dark Ritual, Cabal Ritual, etc.) — per-card **net mana gain override**: set a custom fixed net gain to replace the default value from `Rituals.js`. Useful for variable-output cards (kicked Cabal Ritual, X-cost rituals, storm count). Select *Default* to revert.
 - **Cost Reducers** (Emerald Medallion, Goblin Electromancer, Baral, Helm of Awakening, Urza's Incubator, etc.) — reduce the generic portion of matching spell costs; cast before mana producers each turn so their discount applies to everything else in the turn; discounts stack
 - **Draw Spells** (115+ cards supported, powered by `card_data/Card_Draw.js`):
   - **Per-turn permanents** — Rhystic Study, Mystic Remora, Phyrexian Arena, Sylvan Library, Necropotence, Azami Lady of Scrolls, Howling Mine, Font of Mythos, Dark Prophecy, etc. — these stay on the battlefield and draw cards each upkeep (`avgCardsPerTurn`, may be fractional). The amount drawn can be overridden per-card.

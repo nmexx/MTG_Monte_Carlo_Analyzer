@@ -854,6 +854,77 @@ describe('buildCompleteDeck — costReducers', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// buildCompleteDeck — ritualOverrides
+// ─────────────────────────────────────────────────────────────────────────────
+describe('buildCompleteDeck — ritualOverrides', () => {
+  it('applies a numeric override, replacing netGain on the matched ritual', () => {
+    const deck = makeDeck({ rituals: [ritual({ name: 'Dark Ritual', netGain: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      ritualOverrides: { 'dark ritual': 5 },
+    });
+    expect(result.find(c => c.name === 'Dark Ritual').netGain).toBe(5);
+  });
+
+  it('does not affect cards not mentioned in ritualOverrides', () => {
+    const deck = makeDeck({ rituals: [ritual({ name: 'Dark Ritual', netGain: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      ritualOverrides: { 'seething song': 4 },
+    });
+    expect(result.find(c => c.name === 'Dark Ritual').netGain).toBe(2);
+  });
+
+  it('empty ritualOverrides leaves all cards unchanged', () => {
+    const deck = makeDeck({ rituals: [ritual({ name: 'Dark Ritual', netGain: 2 })] });
+    const result = buildCompleteDeck(deck, { ritualOverrides: {} });
+    expect(result.find(c => c.name === 'Dark Ritual').netGain).toBe(2);
+  });
+
+  it('does not affect non-ritual cards', () => {
+    const deck = makeDeck({
+      rituals: [ritual({ name: 'Dark Ritual', netGain: 2 })],
+      artifacts: [artifact({ name: 'Dark Ritual', netGain: 99 })], // pathological same-name artifact
+    });
+    const result = buildCompleteDeck(deck, {
+      ritualOverrides: { 'dark ritual': 10 },
+    });
+    // artifact copy should NOT have its netGain changed
+    const artifactCopy = result.find(c => c.isManaArtifact);
+    expect(artifactCopy.netGain).toBe(99);
+    // ritual copy should be updated
+    const ritualCopy = result.find(c => c.isRitual);
+    expect(ritualCopy.netGain).toBe(10);
+  });
+
+  it('override key matching is case-insensitive (lowercased card name)', () => {
+    const deck = makeDeck({ rituals: [ritual({ name: 'Cabal Ritual', netGain: 4 })] });
+    const result = buildCompleteDeck(deck, {
+      ritualOverrides: { 'cabal ritual': 6 },
+    });
+    expect(result.find(c => c.name === 'Cabal Ritual').netGain).toBe(6);
+  });
+
+  it('applies override to every copy when quantity > 1', () => {
+    const deck = makeDeck({
+      rituals: [ritual({ name: 'Dark Ritual', netGain: 2, quantity: 4 })],
+    });
+    const result = buildCompleteDeck(deck, {
+      ritualOverrides: { 'dark ritual': 3 },
+    });
+    const copies = result.filter(c => c.name === 'Dark Ritual');
+    expect(copies).toHaveLength(4);
+    expect(copies.every(c => c.netGain === 3)).toBe(true);
+  });
+
+  it('clamps override to minimum -20', () => {
+    const deck = makeDeck({ rituals: [ritual({ name: 'Dark Ritual', netGain: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      ritualOverrides: { 'dark ritual': -99 },
+    });
+    expect(result.find(c => c.name === 'Dark Ritual').netGain).toBe(-20);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // monteCarlo — cost-reducer integration
 // ─────────────────────────────────────────────────────────────────────────────
 describe('monteCarlo — cost-reducer integration', () => {

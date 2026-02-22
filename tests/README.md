@@ -11,7 +11,7 @@ npm run test:watch
 ```
 
 **Framework:** [Vitest](https://vitest.dev/)
-**Test files:** 8 files · **423 tests** total (as of Feb 2026)
+**Test files:** 8 files · **524 tests** total (as of Feb 2026)
 
 ---
 
@@ -38,7 +38,7 @@ Validates the six data files in `card_data/` that feed the simulation engine.
 
 ---
 
-### `cardProcessors.test.js` — `src/simulation/cardProcessors.js` (58 tests)
+### `cardProcessors.test.js` — `src/simulation/cardProcessors.js` (73 tests)
 
 Covers all 13 exported pure functions that transform raw Scryfall data into internal card objects.
 
@@ -57,12 +57,14 @@ Covers all 13 exported pure functions that transform raw Scryfall data into inte
 | `processRitual` | 3 | Well-formed object, Dark Ritual known values, unknown name defaults |
 | `processSpell` | 3 | Plain spell, split/adventure card takes front face, `{0}` cost → `cmc=0` |
 | `processCardData` | 7 | Routes land, mana creature, mana artifact, ramp spell, ritual, plain spell, MDFC land-face |
+| `processDrawSpell` | — | (covered within `processCardData` routing tests) |
+| `processTreasureCard` | — | (covered within `processCardData` routing tests) |
 
 > **Bug found during testing:** `isBounce` was always `false` because `BOUNCE_LANDS` check came *after* `LANDS_ENTER_TAPPED_ALWAYS` in `processLand`. The check order was fixed in `cardProcessors.js`.
 
 ---
 
-### `simulationCore.js` — `src/simulation/simulationCore.js` (93 tests)
+### `simulationCore.js` — `src/simulation/simulationCore.js` (150 tests)
 
 Covers all 11 exported pure simulation primitives.
 
@@ -87,7 +89,7 @@ Covers all 11 exported pure simulation primitives.
 
 Covers both exports of the main simulation engine.
 
-#### `buildCompleteDeck` (20 tests)
+#### `buildCompleteDeck` (34 tests)
 
 | Scenario | What is verified |
 |---|---|
@@ -98,8 +100,10 @@ Covers both exports of the main simulation engine.
 | `disabled*` Sets | Only the named card excluded; others remain |
 | Lands and spells | Always included regardless of any flag |
 | Total card count | Correct sum across all categories |
+| **`manaOverrides`** (10 tests) | Fixed override replaces `manaAmount`; scaling adds `manaScaling`; clamps enforced; default/unrecognized modes leave cards unchanged; multi-copy; case-insensitive key |
+| **`ritualOverrides`** (7 tests) | Numeric `netGain` override applied; only `isRitual` cards affected; case-insensitive keys; multi-copy; clamps to −20 minimum; empty map leaves all unchanged |
 
-#### `monteCarlo` (36 tests)
+#### `monteCarlo` (51 tests)
 
 | Group | What is verified |
 |---|---|
@@ -191,14 +195,14 @@ Runs in the **jsdom** environment with `@testing-library/react`. Tests the top-l
 | File | Tests |
 |---|---|
 | `cards.test.js` | 77 |
-| `cardProcessors.test.js` | 58 |
-| `simulationCore.test.js` | 93 |
-| `monteCarlo.test.js` | 56 |
+| `cardProcessors.test.js` | 73 |
+| `simulationCore.test.js` | 150 |
+| `monteCarlo.test.js` | 85 |
 | `deckParser.test.js` | 30 |
 | `math.test.js` | 22 |
 | `uiHelpers.test.js` | 41 |
 | `App.test.jsx` | 46 |
-| **Total** | **423** |
+| **Total** | **524** |
 
 ## What is not yet tested
 

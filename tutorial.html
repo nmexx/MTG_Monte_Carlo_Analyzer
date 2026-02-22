@@ -412,6 +412,9 @@
           <li>
             <strong>Rituals</strong> — Dark Ritual, Cabal Ritual, Seething Song, etc. These are
             one-shot burst mana sources counted separately in the <em>Burst</em> playability metric.
+            The <strong>net mana gain</strong> used in the simulation can be overridden per-card in
+            the <em>Rituals</em> panel — useful for kicked Cabal Ritual, X-cost rituals, or any
+            card whose output differs from the library default.
           </li>
           <li>
             <strong>Draw spells</strong> — Rhystic Study, Mystic Remora, Brainstorm, Ponder, Sylvan
@@ -431,7 +434,9 @@
             immediately on cast. Produced Treasures accumulate as a colorless burst-mana pool that
             is added to the <em>Burst</em> playability metric alongside rituals. The per-card
             treasure amount can be overridden in the <em>Treasure Generators</em> panel.
-          </li> — everything not in the above categories. They do not
+          </li>
+          <li>
+            <strong>Spells</strong> — everything not in the above categories. They do not
             generate mana but <em>do</em> consume mana, so their mana costs still influence the
             color-pip math.
           </li>
@@ -2348,6 +2353,20 @@
             <strong>Click play sequences.</strong> In the Key-Card results panel, each turn bar is
             clickable and shows an example hand + full turn log. Use this to spot unrealistic
             sequencing assumptions and to find the actual cards that are enabling early casts.
+          </li>
+          <li>
+            <strong>Model ritual output precisely.</strong> Each card in the <em>Rituals</em> panel
+            has a <em>Net gain</em> dropdown. Switch it to <em>Custom fixed value</em> and enter
+            the exact net mana gain to use in the simulation — for example, set Cabal Ritual to
+            <strong>+4</strong> to model threshold being online, or set a Dark Petition to
+            <strong>+1</strong> if spell mastery is rarely active. The override is saved to
+            localStorage and the share URL.
+          </li>
+          <li>
+            <strong>Read the Deck Statistics summary.</strong> After parsing, the statistics panel
+            reports the number of card draw spells and treasure generators in addition to ramp count
+            and average CMC. Use these counts as a quick sanity-check that the parser has correctly
+            categorised your support package before running the simulation.
           </li>
           <li>
             <strong>Share your configuration.</strong> After running a simulation, copy the URL —

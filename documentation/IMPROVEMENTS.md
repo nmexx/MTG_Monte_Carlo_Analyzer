@@ -238,3 +238,15 @@
     - **`uiHelpers.jsx`** — `prepareChartData` builds a `treasureData` array with avg, `lo`, `hi`, and `_treasureSd` fields.
     - **`ResultsPanel.jsx`** — new amber/gold `ComposedChart` panel (±1σ band + average line) inserted after the Cards Drawn chart; only shown when `hasBurstCards` is true.
     - **`ComparisonResultsPanel.jsx`** — `treasureCompare` merged array + overlay line chart after Cards Drawn comparison; delta summary row added to the summary table.
+36. **Deck statistics counts + ritual net-gain overrides** --------DONE
+    - **`DeckStatisticsPanel.jsx`** — two new counters appear below the Ramp & Acceleration line after parsing:
+      - *Card Draw Spells: N* — total copies from `parsedDeck.drawSpells` (conditional, hidden when zero)
+      - *Treasure Generators: N* — total copies from `parsedDeck.treasureCards` (conditional, hidden when zero)
+      - Both card categories were also added to the `NON_LAND_KEYS` array so their CMC is included when computing average spell CMC.
+    - **`RitualsPanel.jsx`** — each ritual card row now has a **Net gain** override row below its cost info:
+      - A dropdown selects *Default* (uses the built-in `netGain` from `Rituals.js`) or *Custom fixed value*.
+      - Choosing Custom reveals a number input (−10 to +20, integer) that sets the exact `netGain` used by the simulation.
+      - Useful for cards with variable output: set a lower value for Seething Song in non-storm decks, a higher value for a kicked Cabal Ritual, etc.
+    - **`monteCarlo.js`** — new `applyRitualOverrides(deck, ritualOverrides)` function applied last in the `buildCompleteDeck` return chain; only affects cards with `isRitual = true`; clamps to minimum −20; accepts `ritualOverrides = {}` in the config destructure.
+    - **`App.jsx`** — `ritualOverrides` added to `defaultDeckSlot`, `serializeDeckSlot`, slot A/B setters and destructures, `buildSimConfig`, and all three `<RitualsPanel>` render sites. Persisted in localStorage and the shareable URL hash.
+    - **Tests** — 7 new tests in `buildCompleteDeck — ritualOverrides` describe block in `monteCarlo.test.js`; total suite: 524 tests.
