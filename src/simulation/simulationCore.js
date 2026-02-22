@@ -507,9 +507,26 @@ export const calculateManaAvailability = (battlefield, turn = 999) => {
           );
           if (legendaries.length === 0) return;
         }
-        addManaSource(card.produces, card.manaAmount || 1);
+        if (card.manaScaling) {
+          const turnsActive = Math.max(0, turn - (permanent.enteredOnTurn ?? turn));
+          addManaSource(
+            card.produces,
+            card.manaScaling.base + card.manaScaling.growth * turnsActive
+          );
+        } else {
+          addManaSource(card.produces, card.manaAmount || 1);
+        }
       } else if (card.isManaCreature && !permanent.summoningSick) {
-        addManaSource(card.produces, card.manaAmount || 1);
+        if (card.manaScaling) {
+          // subtract 1 because the creature missed the turn it entered (summoning sickness)
+          const turnsActive = Math.max(0, turn - (permanent.enteredOnTurn ?? turn) - 1);
+          addManaSource(
+            card.produces,
+            card.manaScaling.base + card.manaScaling.growth * turnsActive
+          );
+        } else {
+          addManaSource(card.produces, card.manaAmount || 1);
+        }
       }
     });
 
@@ -726,6 +743,7 @@ export const castSpells = (
         card: spell,
         tapped: spell.entersTapped || false,
         summoningSick: spell.isManaCreature || spell.isExploration,
+        enteredOnTurn: turn,
       });
       tapManaSources(spell, battlefield);
 

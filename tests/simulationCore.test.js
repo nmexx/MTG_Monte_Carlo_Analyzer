@@ -699,6 +699,114 @@ describe('calculateManaAvailability', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// calculateManaAvailability — manaScaling
+// ─────────────────────────────────────────────────────────────────────────────
+describe('calculateManaAvailability — manaScaling', () => {
+  it('scaling artifact: produces base + growth*(turn − enteredOnTurn)', () => {
+    // base=1, growth=1, entered T1, queried at T3 → 1 + 1*2 = 3
+    const art = makeArtifact({
+      produces: ['C'],
+      manaAmount: 1,
+      manaScaling: { base: 1, growth: 1 },
+    });
+    const result = calculateManaAvailability([perm(art, { enteredOnTurn: 1 })], 3);
+    expect(result.total).toBe(3);
+    expect(result.colors.C).toBe(3);
+  });
+
+  it('scaling artifact: produces base when enteredOnTurn equals current turn', () => {
+    const art = makeArtifact({
+      produces: ['C'],
+      manaAmount: 2,
+      manaScaling: { base: 2, growth: 3 },
+    });
+    const result = calculateManaAvailability([perm(art, { enteredOnTurn: 2 })], 2);
+    expect(result.total).toBe(2); // turnsActive=0, growth not yet applied
+  });
+
+  it('scaling artifact: falls back to base when enteredOnTurn is absent', () => {
+    // Without enteredOnTurn, turnsActive = max(0, turn−turn) = 0
+    const art = makeArtifact({
+      produces: ['G'],
+      manaAmount: 1,
+      manaScaling: { base: 2, growth: 5 },
+    });
+    const result = calculateManaAvailability([perm(art)], 4);
+    expect(result.total).toBe(2); // base only
+  });
+
+  it('scaling artifact: zero-growth produces a constant base every turn', () => {
+    const art = makeArtifact({
+      produces: ['C'],
+      manaAmount: 3,
+      manaScaling: { base: 3, growth: 0 },
+    });
+    const r2 = calculateManaAvailability([perm(art, { enteredOnTurn: 1 })], 2);
+    const r5 = calculateManaAvailability([perm(art, { enteredOnTurn: 1 })], 5);
+    expect(r2.total).toBe(3);
+    expect(r5.total).toBe(3);
+  });
+
+  it('scaling creature: produces base on first untapped turn (turn after entering)', () => {
+    // entered T1, queried T2 — but creature had summoning sickness on T1
+    // turnsActive = max(0, 2-1-1) = 0 → base only
+    const dork = makeCreature({
+      produces: ['G'],
+      manaAmount: 1,
+      manaScaling: { base: 1, growth: 2 },
+    });
+    const result = calculateManaAvailability(
+      [perm(dork, { summoningSick: false, enteredOnTurn: 1 })],
+      2
+    );
+    expect(result.total).toBe(1);
+  });
+
+  it('scaling creature: grows by growth each turn after the first tappable turn', () => {
+    // entered T1, queried T4 → turnsActive = max(0, 4-1-1) = 2 → 1 + 2*2 = 5
+    const dork = makeCreature({
+      produces: ['G'],
+      manaAmount: 1,
+      manaScaling: { base: 1, growth: 2 },
+    });
+    const result = calculateManaAvailability(
+      [perm(dork, { summoningSick: false, enteredOnTurn: 1 })],
+      4
+    );
+    expect(result.total).toBe(5);
+    expect(result.colors.G).toBe(5);
+  });
+
+  it('scaling creature: returns 0 while summoning sick, regardless of scaling', () => {
+    const dork = makeCreature({
+      produces: ['G'],
+      manaAmount: 1,
+      manaScaling: { base: 3, growth: 1 },
+    });
+    const result = calculateManaAvailability(
+      [perm(dork, { summoningSick: true, enteredOnTurn: 1 })],
+      3
+    );
+    expect(result.total).toBe(0);
+  });
+
+  it('non-scaling artifact ignores enteredOnTurn and uses manaAmount directly', () => {
+    const art = makeArtifact({ produces: ['C'], manaAmount: 2 });
+    const result = calculateManaAvailability([perm(art, { enteredOnTurn: 1 })], 5);
+    expect(result.total).toBe(2);
+  });
+
+  it('non-scaling creature ignores enteredOnTurn and uses manaAmount directly', () => {
+    const dork = makeCreature({ produces: ['G'], manaAmount: 1 });
+    const result = calculateManaAvailability(
+      [perm(dork, { summoningSick: false, enteredOnTurn: 1 })],
+      5
+    );
+    expect(result.total).toBe(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // solveColorPips
 // ─────────────────────────────────────────────────────────────────────────────
 describe('solveColorPips', () => {

@@ -275,6 +275,100 @@ describe('buildCompleteDeck', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// buildCompleteDeck — manaOverrides
+// ─────────────────────────────────────────────────────────────────────────────
+describe('buildCompleteDeck — manaOverrides', () => {
+  it('applies a fixed override, replacing manaAmount', () => {
+    const deck = makeDeck({ artifacts: [artifact({ name: 'Sol Ring', manaAmount: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      manaOverrides: { 'sol ring': { mode: 'fixed', fixed: 5 } },
+    });
+    expect(result.find(c => c.name === 'Sol Ring').manaAmount).toBe(5);
+    expect(result.find(c => c.name === 'Sol Ring').manaScaling).toBeUndefined();
+  });
+
+  it('fixed override clamps to minimum 1', () => {
+    const deck = makeDeck({ artifacts: [artifact({ name: 'Sol Ring', manaAmount: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      manaOverrides: { 'sol ring': { mode: 'fixed', fixed: 0 } },
+    });
+    expect(result.find(c => c.name === 'Sol Ring').manaAmount).toBe(1);
+  });
+
+  it('applies a scaling override, adding manaScaling and setting manaAmount = base', () => {
+    const deck = makeDeck({
+      creatures: [creature({ name: 'Marwyn, the Nurturer', manaAmount: 1 })],
+    });
+    const result = buildCompleteDeck(deck, {
+      manaOverrides: { 'marwyn, the nurturer': { mode: 'scaling', base: 1, growth: 1 } },
+    });
+    const card = result.find(c => c.name === 'Marwyn, the Nurturer');
+    expect(card.manaScaling).toEqual({ base: 1, growth: 1 });
+    expect(card.manaAmount).toBe(1);
+  });
+
+  it('scaling override clamps base to minimum 1', () => {
+    const deck = makeDeck({ artifacts: [artifact({ name: 'Sol Ring', manaAmount: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      manaOverrides: { 'sol ring': { mode: 'scaling', base: 0, growth: 2 } },
+    });
+    expect(result.find(c => c.name === 'Sol Ring').manaScaling.base).toBe(1);
+  });
+
+  it('scaling override clamps growth to minimum 0', () => {
+    const deck = makeDeck({ artifacts: [artifact({ name: 'Sol Ring', manaAmount: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      manaOverrides: { 'sol ring': { mode: 'scaling', base: 1, growth: -3 } },
+    });
+    expect(result.find(c => c.name === 'Sol Ring').manaScaling.growth).toBe(0);
+  });
+
+  it('leaves cards unchanged when override mode is unrecognized / default', () => {
+    const deck = makeDeck({ artifacts: [artifact({ name: 'Sol Ring', manaAmount: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      manaOverrides: { 'sol ring': { mode: 'default' } },
+    });
+    const card = result.find(c => c.name === 'Sol Ring');
+    expect(card.manaAmount).toBe(2);
+    expect(card.manaScaling).toBeUndefined();
+  });
+
+  it('does not affect cards not mentioned in manaOverrides', () => {
+    const deck = makeDeck({ artifacts: [artifact({ name: 'Sol Ring', manaAmount: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      manaOverrides: { 'arcane signet': { mode: 'fixed', fixed: 3 } },
+    });
+    expect(result.find(c => c.name === 'Sol Ring').manaAmount).toBe(2);
+  });
+
+  it('empty manaOverrides leaves all cards unchanged', () => {
+    const deck = makeDeck({ artifacts: [artifact({ name: 'Sol Ring', manaAmount: 2 })] });
+    const result = buildCompleteDeck(deck, { manaOverrides: {} });
+    expect(result.find(c => c.name === 'Sol Ring').manaAmount).toBe(2);
+  });
+
+  it('override key matching is case-insensitive (lowercased card name)', () => {
+    const deck = makeDeck({ creatures: [creature({ name: 'Birds of Paradise', manaAmount: 1 })] });
+    const result = buildCompleteDeck(deck, {
+      manaOverrides: { 'birds of paradise': { mode: 'fixed', fixed: 4 } },
+    });
+    expect(result.find(c => c.name === 'Birds of Paradise').manaAmount).toBe(4);
+  });
+
+  it('applies overrides to every copy when quantity > 1', () => {
+    const deck = makeDeck({
+      creatures: [creature({ name: 'Llanowar Elves', manaAmount: 1, quantity: 4 })],
+    });
+    const result = buildCompleteDeck(deck, {
+      manaOverrides: { 'llanowar elves': { mode: 'fixed', fixed: 2 } },
+    });
+    const elves = result.filter(c => c.name === 'Llanowar Elves');
+    expect(elves).toHaveLength(4);
+    expect(elves.every(c => c.manaAmount === 2)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // monteCarlo — result shape
 // ─────────────────────────────────────────────────────────────────────────────
 describe('monteCarlo — result structure', () => {

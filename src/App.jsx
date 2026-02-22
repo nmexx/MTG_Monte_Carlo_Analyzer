@@ -87,6 +87,7 @@ const defaultDeckSlot = (saved = {}) => ({
   disabledArtifacts: new Set(saved.disabledArtifacts ?? []),
   includeCreatures: saved.includeCreatures ?? true,
   disabledCreatures: new Set(saved.disabledCreatures ?? []),
+  manaOverrides: saved.manaOverrides ?? {},
   includeExploration: saved.includeExploration ?? true,
   disabledExploration: new Set(saved.disabledExploration ?? []),
   includeRampSpells: saved.includeRampSpells ?? true,
@@ -103,6 +104,7 @@ const serializeDeckSlot = slot => ({
   disabledArtifacts: [...slot.disabledArtifacts],
   includeCreatures: slot.includeCreatures,
   disabledCreatures: [...slot.disabledCreatures],
+  manaOverrides: slot.manaOverrides,
   includeExploration: slot.includeExploration,
   disabledExploration: [...slot.disabledExploration],
   includeRampSpells: slot.includeRampSpells,
@@ -175,6 +177,7 @@ const MTGMonteCarloAnalyzer = () => {
   const setIncludeRituals = makeSlotSetterA('includeRituals');
   const setDisabledRituals = makeSlotSetterA('disabledRituals');
   const setSimulationResults = makeSlotSetterA('simulationResults');
+  const setManaOverrides = makeSlotSetterA('manaOverrides');
 
   const {
     deckText,
@@ -191,6 +194,7 @@ const MTGMonteCarloAnalyzer = () => {
     includeRituals,
     disabledRituals,
     simulationResults,
+    manaOverrides,
   } = deckSlotA;
 
   // ── Deck Slot B ───────────────────────────────────────────────────────────
@@ -211,6 +215,7 @@ const MTGMonteCarloAnalyzer = () => {
   const setIncludeRitualsB = makeSlotSetterB('includeRituals');
   const setDisabledRitualsB = makeSlotSetterB('disabledRituals');
   const setSimulationResultsB = makeSlotSetterB('simulationResults');
+  const setManaOverridesB = makeSlotSetterB('manaOverrides');
 
   const {
     deckText: deckTextB,
@@ -227,6 +232,7 @@ const MTGMonteCarloAnalyzer = () => {
     includeRituals: includeRitualsB,
     disabledRituals: disabledRitualsB,
     simulationResults: simulationResultsB,
+    manaOverrides: manaOverridesB,
   } = deckSlotB;
 
   const [error, setError] = useState('');
@@ -528,6 +534,7 @@ const MTGMonteCarloAnalyzer = () => {
     disabledCreatures: slot.disabledCreatures,
     includeRituals: slot.includeRituals,
     disabledRituals: slot.disabledRituals,
+    manaOverrides: slot.manaOverrides,
   });
 
   const runSimulation = () => {
@@ -922,6 +929,8 @@ const MTGMonteCarloAnalyzer = () => {
                       disabledArtifacts={disabledArtifacts}
                       setDisabledArtifacts={setDisabledArtifacts}
                       getManaSymbol={getManaSymbol}
+                      manaOverrides={manaOverrides}
+                      setManaOverrides={setManaOverrides}
                     />
                   </div>
                 </details>
@@ -941,6 +950,8 @@ const MTGMonteCarloAnalyzer = () => {
                       disabledCreatures={disabledCreatures}
                       setDisabledCreatures={setDisabledCreatures}
                       getManaSymbol={getManaSymbol}
+                      manaOverrides={manaOverrides}
+                      setManaOverrides={setManaOverrides}
                     />
                   </div>
                 </details>
@@ -1173,6 +1184,8 @@ const MTGMonteCarloAnalyzer = () => {
                   disabledArtifacts={disabledArtifacts}
                   setDisabledArtifacts={setDisabledArtifacts}
                   getManaSymbol={getManaSymbol}
+                  manaOverrides={manaOverrides}
+                  setManaOverrides={setManaOverrides}
                 />
               ) : null
             }
@@ -1185,6 +1198,8 @@ const MTGMonteCarloAnalyzer = () => {
                   disabledArtifacts={disabledArtifactsB}
                   setDisabledArtifacts={setDisabledArtifactsB}
                   getManaSymbol={getManaSymbol}
+                  manaOverrides={manaOverridesB}
+                  setManaOverrides={setManaOverridesB}
                 />
               ) : null
             }
@@ -1201,6 +1216,8 @@ const MTGMonteCarloAnalyzer = () => {
                   disabledCreatures={disabledCreatures}
                   setDisabledCreatures={setDisabledCreatures}
                   getManaSymbol={getManaSymbol}
+                  manaOverrides={manaOverrides}
+                  setManaOverrides={setManaOverrides}
                 />
               ) : null
             }
@@ -1213,6 +1230,8 @@ const MTGMonteCarloAnalyzer = () => {
                   disabledCreatures={disabledCreaturesB}
                   setDisabledCreatures={setDisabledCreaturesB}
                   getManaSymbol={getManaSymbol}
+                  manaOverrides={manaOverridesB}
+                  setManaOverrides={setManaOverridesB}
                 />
               ) : null
             }

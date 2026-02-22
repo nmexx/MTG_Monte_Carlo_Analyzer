@@ -364,6 +364,93 @@ body {
   align-items: center;
 }
 
+/* Card rows that contain a mana-override sub-row */
+.card-row--with-override {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--clr-row-border);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.card-row-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Mana-amount badge: shows "+2 🌿" or "+1 +1/T 🌿" */
+.mana-amount-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--clr-primary);
+  white-space: nowrap;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.mana-scaling-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--clr-muted);
+  letter-spacing: 0.02em;
+}
+
+/* Mana override controls row */
+.mana-override-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 24px;  /* indent to align with card name */
+  flex-wrap: wrap;
+}
+
+.mana-override-label {
+  font-size: 0.75rem;
+  color: var(--clr-muted);
+  white-space: nowrap;
+}
+
+.mana-override-select {
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--clr-border);
+  background: var(--clr-bg-panel);
+  color: var(--clr-text);
+  cursor: pointer;
+}
+
+.mana-override-input {
+  width: 52px;
+  font-size: 0.8rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--clr-border);
+  background: var(--clr-bg-panel);
+  color: var(--clr-text);
+  text-align: center;
+}
+
+.mana-override-input--small {
+  width: 40px;
+}
+
+.mana-override-sep {
+  font-size: 0.8rem;
+  color: var(--clr-muted);
+}
+
+.mana-override-unit {
+  font-size: 0.75rem;
+  color: var(--clr-muted);
+  white-space: nowrap;
+}
+
 .card-row-label {
   display: flex;
   align-items: center;

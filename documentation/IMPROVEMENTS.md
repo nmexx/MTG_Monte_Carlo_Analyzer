@@ -187,3 +187,14 @@
     - When a fetch land is activated in Phase 5 and retrieves a shock land, `doesLandEnterTapped` evaluates the shock using the battlefield state *before* the fetch resolved.
     - This means the land-count and subtype checks that govern shock/check/battle land conditions are slightly wrong for the turn the fetch fires.
     - Fix: call `doesLandEnterTapped` after splicing the fetch out of the battlefield but before pushing the fetched land, so the snapshot accurately reflects the post-fetch board state.
+
+32. **Per-card mana-amount overrides (fixed & scaling)** --------DONE
+    - Mana dorks and mana artifacts whose actual output varies (e.g. Marwyn the Nurturer, Priest of Titania, Mana Vault) were all modelled at a fixed conservative floor, with no way for the user to adjust the assumed value.
+    - Each card in the Mana Artifacts and Mana Creatures panels now shows a "Mana:" selector with three modes:
+      - **Default** — uses the built-in `manaAmount` from `Mana_Dorks.js` / `Artifacts.js`
+      - **Fixed** — user enters a static number; the card always taps for that amount
+      - **Scaling (per turn)** — user sets `base` and `growth`; the card produces `base + growth × turnsActive` where `turnsActive` accounts for summoning sickness (creatures skip the turn they enter)
+    - Overrides are stored in the `manaOverrides` map on each deck slot, serialised into localStorage and the shareable URL hash.
+    - `applyManaOverrides()` in `monteCarlo.js` stamps each deck copy with either `manaAmount` (fixed) or `manaScaling: { base, growth }` (scaling) before the iteration loop.
+    - `calculateManaAvailability()` in `simulationCore.js` reads `permanent.enteredOnTurn` (tracked when each permanent enters the battlefield) and computes the appropriate amount when `card.manaScaling` is set.
+    - Mana-symbol display on both panels was also fixed: the full `produces` array is now rendered as a compact inline badge (any-color cards show `✦`), and the `+N Mana` text reflects the active override.

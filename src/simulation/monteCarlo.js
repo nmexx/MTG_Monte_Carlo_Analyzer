@@ -77,6 +77,27 @@ const pushFiltered = (deck, cards, disabled) => {
   });
 };
 
+/**
+ * Apply per-card mana amount overrides from the UI.
+ * mode='fixed'   → static manaAmount
+ * mode='scaling' → manaScaling { base, growth } used per-turn in the sim
+ */
+const applyManaOverrides = (deck, manaOverrides) => {
+  if (!manaOverrides || Object.keys(manaOverrides).length === 0) return deck;
+  return deck.map(card => {
+    const override = manaOverrides[card.name?.toLowerCase()];
+    if (!override) return card;
+    if (override.mode === 'fixed') {
+      return { ...card, manaAmount: Math.max(1, override.fixed ?? 1), manaScaling: undefined };
+    } else if (override.mode === 'scaling') {
+      const base = Math.max(1, override.base ?? 1);
+      const growth = Math.max(0, override.growth ?? 0);
+      return { ...card, manaScaling: { base, growth }, manaAmount: base };
+    }
+    return card;
+  });
+};
+
 export const buildCompleteDeck = (deckToParse, config = {}) => {
   if (!deckToParse) return [];
   const {
@@ -90,6 +111,7 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
     disabledRampSpells = new Set(),
     includeRituals = true,
     disabledRituals = new Set(),
+    manaOverrides = {},
   } = config;
 
   const deck = [];
@@ -108,7 +130,7 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
     for (let i = 0; i < card.quantity; i++) deck.push({ ...card });
   });
 
-  return deck;
+  return applyManaOverrides(deck, manaOverrides);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -352,6 +374,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
               card: expl,
               tapped: expl.entersTapped || false,
               summoningSick: expl.isManaCreature || false,
+              enteredOnTurn: turn,
             });
             tapManaSources(expl, battlefield);
             const type = expl.isCreature ? 'creature' : expl.isArtifact ? 'artifact' : 'permanent';
