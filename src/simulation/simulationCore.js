@@ -1001,10 +1001,15 @@ export const castSpells = (
         tapManaSources(drawSpell, battlefield, drawDiscount);
 
         // One-shot draw: immediately draw cards into hand
+        // Supports scaling override: cards drawn = base + turn * growth (turn is 0-indexed)
         let cardsDrawn = 0;
         const drawnCardNames = [];
-        if (drawSpell.isOneTimeDraw && drawSpell.netCardsDrawn > 0) {
-          const toDraw = Math.min(drawSpell.netCardsDrawn, library.length);
+        if (drawSpell.isOneTimeDraw) {
+          const scaledCards =
+            drawSpell.drawScaling?.type === 'onetime'
+              ? Math.max(0, drawSpell.drawScaling.base + turn * drawSpell.drawScaling.growth)
+              : (drawSpell.netCardsDrawn ?? 0);
+          const toDraw = Math.min(Math.round(scaledCards), library.length);
           for (let d = 0; d < toDraw; d++) {
             const drawnCard = library.shift();
             hand.push(drawnCard);

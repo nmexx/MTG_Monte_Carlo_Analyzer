@@ -11,9 +11,11 @@
  *     stay on the battlefield and draw cards each upkeep.
  *
  * Override modes (drawOverrides):
- *   'default'  – use the value from CARD_DRAW_DATA
- *   'onetime'  – override as a one-time draw with a fixed card count
- *   'perturn'  – override as a per-turn draw with a fixed cards-per-turn value
+ *   'default'          – use the value from CARD_DRAW_DATA
+ *   'onetime'          – override as a one-time draw with a fixed card count
+ *   'perturn'          – override as a per-turn draw with a fixed cards-per-turn value
+ *   'scaling-onetime'  – one-time draw that grows: cards = base + turn * growth
+ *   'scaling-perturn'  – per-turn draw that grows: cards/turn = base + turn * growth
  *
  * Props:
  *   parsedDeck           – parsed deck object
@@ -62,9 +64,15 @@ const getDefaultDisplay = card => {
 /** Pick the display for the current override mode. */
 const getOverrideDisplay = (card, override) => {
   if (!override || override.mode === 'default') return getDefaultDisplay(card);
-  const n = override.amount ?? 1;
+  const n = override.amount ?? override.base ?? 1;
+  const g = override.growth ?? 0;
   if (override.mode === 'onetime') return { label: `+${n} (one-time)`, badge: `+${n}` };
-  return { label: `+${n}/turn`, badge: `+${n}/turn` };
+  if (override.mode === 'perturn') return { label: `+${n}/turn`, badge: `+${n}/turn` };
+  if (override.mode === 'scaling-onetime')
+    return { label: `+${n}${g > 0 ? `+${g}/turn` : ''} (scaling)`, badge: `+${n}+${g}/t ↑` };
+  if (override.mode === 'scaling-perturn')
+    return { label: `+${n}/t${g > 0 ? ` +${g}/turn` : ''} (scaling)`, badge: `+${n}/t+${g} ↑` };
+  return getDefaultDisplay(card);
 };
 
 const DrawSpellsPanel = ({
@@ -94,11 +102,23 @@ const DrawSpellsPanel = ({
       delete next[key];
       setDrawOverrides(next);
     } else if (mode === 'onetime') {
-      const amount = drawOverrides[key]?.amount ?? card.netCardsDrawn ?? 1;
+      const amount =
+        drawOverrides[key]?.amount ?? drawOverrides[key]?.base ?? card.netCardsDrawn ?? 1;
       setDrawOverrides(prev => ({ ...prev, [key]: { mode: 'onetime', amount } }));
     } else if (mode === 'perturn') {
-      const amount = drawOverrides[key]?.amount ?? card.avgCardsPerTurn ?? 1;
+      const amount =
+        drawOverrides[key]?.amount ?? drawOverrides[key]?.base ?? card.avgCardsPerTurn ?? 1;
       setDrawOverrides(prev => ({ ...prev, [key]: { mode: 'perturn', amount } }));
+    } else if (mode === 'scaling-onetime') {
+      const base =
+        drawOverrides[key]?.base ?? drawOverrides[key]?.amount ?? card.netCardsDrawn ?? 1;
+      const growth = drawOverrides[key]?.growth ?? 0;
+      setDrawOverrides(prev => ({ ...prev, [key]: { mode: 'scaling-onetime', base, growth } }));
+    } else if (mode === 'scaling-perturn') {
+      const base =
+        drawOverrides[key]?.base ?? drawOverrides[key]?.amount ?? card.avgCardsPerTurn ?? 1;
+      const growth = drawOverrides[key]?.growth ?? 0;
+      setDrawOverrides(prev => ({ ...prev, [key]: { mode: 'scaling-perturn', base, growth } }));
     }
   };
 
@@ -180,6 +200,8 @@ const DrawSpellsPanel = ({
                 <option value="default">Default ({defaultLabel})</option>
                 <option value="onetime">One-time draw</option>
                 <option value="perturn">Per-turn draw</option>
+                <option value="scaling-onetime">Scaling one-time</option>
+                <option value="scaling-perturn">Scaling per-turn</option>
               </select>
 
               {(mode === 'onetime' || mode === 'perturn') && (
@@ -201,6 +223,45 @@ const DrawSpellsPanel = ({
                       : 'Cards drawn per upkeep'
                   }
                 />
+              )}
+
+              {(mode === 'scaling-onetime' || mode === 'scaling-perturn') && (
+                <>
+                  <input
+                    type="number"
+                    className="mana-override-input"
+                    min="0"
+                    max="20"
+                    step="0.5"
+                    value={override?.base ?? 1}
+                    onChange={e =>
+                      updateOverride(card.name, {
+                        base: Math.max(0, parseFloat(e.target.value) || 0),
+                      })
+                    }
+                    title="Base cards on Turn 1"
+                  />
+                  <span className="mana-override-label" style={{ marginLeft: 4 }}>
+                    +
+                  </span>
+                  <input
+                    type="number"
+                    className="mana-override-input"
+                    min="0"
+                    max="10"
+                    step="0.5"
+                    value={override?.growth ?? 0}
+                    onChange={e =>
+                      updateOverride(card.name, {
+                        growth: Math.max(0, parseFloat(e.target.value) || 0),
+                      })
+                    }
+                    title="Additional cards added each subsequent turn"
+                  />
+                  <span className="mana-override-label" style={{ marginLeft: 2 }}>
+                    /turn
+                  </span>
+                </>
               )}
             </div>
           </div>

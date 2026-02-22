@@ -414,7 +414,12 @@
             one-shot burst mana sources counted separately in the <em>Burst</em> playability metric.
             The <strong>net mana gain</strong> used in the simulation can be overridden per-card in
             the <em>Rituals</em> panel — useful for kicked Cabal Ritual, X-cost rituals, or any card
-            whose output differs from the library default.
+            whose output differs from the library default. Three modes are available:
+            <em>Default</em> (library value), <em>Fixed value</em> (constant override), and
+            <em>Scaling per turn</em>
+            ( net&nbsp;gain&nbsp;=&nbsp;base&nbsp;+&nbsp;turn&nbsp;&times;&nbsp;growth , with turn 1
+            giving <code>base</code>). Scaling is useful for X-cost rituals or any card whose
+            potency grows as the game progresses.
           </li>
           <li>
             <strong>Draw spells</strong> — Rhystic Study, Mystic Remora, Brainstorm, Ponder, Sylvan
@@ -423,7 +428,14 @@
             cards). They are cast after ramp spells each turn. Permanents (enchantments, artifacts,
             creatures) stay on the battlefield and draw cards each upkeep; instants and sorceries go
             to the graveyard and draw cards immediately. The per-card draw amount can be overridden
-            in the <em>Draw Spells</em> panel. <br /><br />
+            in the <em>Draw Spells</em> panel with five modes: <em>Default</em>,
+            <em>One-time draw</em> (fixed card count), <em>Per-turn draw</em> (fixed cards per
+            upkeep),
+            <em>Scaling one-time</em>
+            (cards&nbsp;drawn&nbsp;=&nbsp;base&nbsp;+&nbsp;turn&nbsp;&times;&nbsp;growth), and
+            <em>Scaling per-turn</em>
+            (cards/upkeep&nbsp;=&nbsp;base&nbsp;+&nbsp;turn&nbsp;&times;&nbsp;growth). Scaling modes
+            let you model draw engines that ramp up over the course of a game. <br /><br />
             <strong>Impulse draw</strong> ("exile the top N cards of your library — you may play
             them this turn") is treated as equivalent to drawing those cards. Cards like Reckless
             Impulse, Wrenn's Resolve, and Light Up the Stage are recognised from their oracle text
@@ -459,7 +471,8 @@
           Harmonize, etc.) draw their cards when cast. Impulse-draw spells (Reckless Impulse,
           Wrenn's Resolve, Light Up the Stage, etc.) that exile cards from the top of the library
           for same-turn play are treated identically to drawing those cards. The amount drawn can be
-          overridden per-card in the <em>Draw Spells</em> panel.
+          overridden per-card in the <em>Draw Spells</em> panel, including with scaling
+          (“base&nbsp;+&nbsp;growth per turn”) for both one-time and per-turn effects.
         </p>
 
         <h3>Land drops</h3>
@@ -2169,12 +2182,12 @@
         </p>
         <p>
           The opening hand and every card name in the action log are interactive:
-          <strong>hover over any card name</strong> to see a live Scryfall card image.
-          Draw actions name the exact cards drawn
-          (e.g. <em>Cast draw spell: Night's Whisper → drew 2 cards: Counterspell, Forest</em>),
-          and discard actions identify the discarded card
-          (e.g. <em>Discarded: Island (hand size limit)</em>), so you can follow the game state
-          at each decision point without guessing.
+          <strong>hover over any card name</strong> to see a live Scryfall card image. Draw actions
+          name the exact cards drawn (e.g.
+          <em>Cast draw spell: Night's Whisper → drew 2 cards: Counterspell, Forest</em>), and
+          discard actions identify the discarded card (e.g.
+          <em>Discarded: Island (hand size limit)</em>), so you can follow the game state at each
+          decision point without guessing.
         </p>
 
         <div class="callout">

@@ -144,6 +144,8 @@ const makeDeck = (overrides = {}) => ({
   rampSpells: [],
   rituals: [],
   costReducers: [],
+  drawSpells: [],
+  treasureCards: [],
   spells: [],
   ...overrides,
 });
@@ -921,6 +923,127 @@ describe('buildCompleteDeck — ritualOverrides', () => {
       ritualOverrides: { 'dark ritual': -99 },
     });
     expect(result.find(c => c.name === 'Dark Ritual').netGain).toBe(-20);
+  });
+
+  it('accepts { mode: "fixed", value } object format', () => {
+    const deck = makeDeck({ rituals: [ritual({ name: 'Dark Ritual', netGain: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      ritualOverrides: { 'dark ritual': { mode: 'fixed', value: 7 } },
+    });
+    const card = result.find(c => c.name === 'Dark Ritual');
+    expect(card.netGain).toBe(7);
+    expect(card.ritualScaling).toBeUndefined();
+  });
+
+  it('applies scaling override: sets ritualScaling and netGain = base', () => {
+    const deck = makeDeck({ rituals: [ritual({ name: 'Dark Ritual', netGain: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      ritualOverrides: { 'dark ritual': { mode: 'scaling', base: 3, growth: 1 } },
+    });
+    const card = result.find(c => c.name === 'Dark Ritual');
+    expect(card.ritualScaling).toEqual({ base: 3, growth: 1 });
+    expect(card.netGain).toBe(3);
+  });
+
+  it('scaling override clamps growth to minimum 0', () => {
+    const deck = makeDeck({ rituals: [ritual({ name: 'Dark Ritual', netGain: 2 })] });
+    const result = buildCompleteDeck(deck, {
+      ritualOverrides: { 'dark ritual': { mode: 'scaling', base: 2, growth: -5 } },
+    });
+    expect(result.find(c => c.name === 'Dark Ritual').ritualScaling.growth).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildCompleteDeck — drawOverrides (scaling modes)
+// ─────────────────────────────────────────────────────────────────────────────
+const drawSpell = (overrides = {}) => ({
+  name: "Night's Whisper",
+  type: 'drawSpell',
+  isDrawSpell: true,
+  isOneTimeDraw: true,
+  staysOnBattlefield: false,
+  netCardsDrawn: 2,
+  avgCardsPerTurn: 0,
+  triggerType: 'cast',
+  cmc: 2,
+  manaCost: '{1}{B}',
+  quantity: 1,
+  ...overrides,
+});
+
+const perTurnDrawSpell = (overrides = {}) =>
+  drawSpell({
+    name: 'Phyrexian Arena',
+    isOneTimeDraw: false,
+    staysOnBattlefield: true,
+    netCardsDrawn: 0,
+    avgCardsPerTurn: 1,
+    triggerType: 'upkeep',
+    cmc: 3,
+    manaCost: '{1}{B}{B}',
+    ...overrides,
+  });
+
+describe('buildCompleteDeck — drawOverrides (scaling modes)', () => {
+  it('scaling-onetime sets drawScaling type=onetime and isOneTimeDraw=true', () => {
+    const deck = { ...makeDeck(), drawSpells: [drawSpell()] };
+    const result = buildCompleteDeck(deck, {
+      drawOverrides: { "night's whisper": { mode: 'scaling-onetime', base: 2, growth: 1 } },
+    });
+    const card = result.find(c => c.isDrawSpell);
+    expect(card.drawScaling).toEqual({ type: 'onetime', base: 2, growth: 1 });
+    expect(card.isOneTimeDraw).toBe(true);
+    expect(card.staysOnBattlefield).toBe(false);
+    expect(card.netCardsDrawn).toBe(2);
+  });
+
+  it('scaling-perturn sets drawScaling type=perturn and isOneTimeDraw=false', () => {
+    const deck = { ...makeDeck(), drawSpells: [perTurnDrawSpell()] };
+    const result = buildCompleteDeck(deck, {
+      drawOverrides: { 'phyrexian arena': { mode: 'scaling-perturn', base: 1, growth: 0.5 } },
+    });
+    const card = result.find(c => c.isDrawSpell);
+    expect(card.drawScaling).toEqual({ type: 'perturn', base: 1, growth: 0.5 });
+    expect(card.isOneTimeDraw).toBe(false);
+    expect(card.staysOnBattlefield).toBe(true);
+    expect(card.avgCardsPerTurn).toBe(1);
+  });
+
+  it('scaling-onetime clamps growth to minimum 0', () => {
+    const deck = { ...makeDeck(), drawSpells: [drawSpell()] };
+    const result = buildCompleteDeck(deck, {
+      drawOverrides: { "night's whisper": { mode: 'scaling-onetime', base: 2, growth: -3 } },
+    });
+    expect(result.find(c => c.isDrawSpell).drawScaling.growth).toBe(0);
+  });
+
+  it('scaling-perturn clamps base to minimum 0', () => {
+    const deck = { ...makeDeck(), drawSpells: [perTurnDrawSpell()] };
+    const result = buildCompleteDeck(deck, {
+      drawOverrides: { 'phyrexian arena': { mode: 'scaling-perturn', base: -5, growth: 1 } },
+    });
+    expect(result.find(c => c.isDrawSpell).drawScaling.base).toBe(0);
+  });
+
+  it('fixed onetime override leaves drawScaling undefined', () => {
+    const deck = { ...makeDeck(), drawSpells: [drawSpell()] };
+    const result = buildCompleteDeck(deck, {
+      drawOverrides: { "night's whisper": { mode: 'onetime', amount: 3 } },
+    });
+    const card = result.find(c => c.isDrawSpell);
+    expect(card.drawScaling).toBeUndefined();
+    expect(card.netCardsDrawn).toBe(3);
+  });
+
+  it('fixed perturn override leaves drawScaling undefined', () => {
+    const deck = { ...makeDeck(), drawSpells: [perTurnDrawSpell()] };
+    const result = buildCompleteDeck(deck, {
+      drawOverrides: { 'phyrexian arena': { mode: 'perturn', amount: 2 } },
+    });
+    const card = result.find(c => c.isDrawSpell);
+    expect(card.drawScaling).toBeUndefined();
+    expect(card.avgCardsPerTurn).toBe(2);
   });
 });
 

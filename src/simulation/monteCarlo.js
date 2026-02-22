@@ -123,7 +123,28 @@ const applyDrawOverrides = (deck, drawOverrides) => {
         ...card,
         isOneTimeDraw: false,
         staysOnBattlefield: true,
+        drawScaling: undefined,
         avgCardsPerTurn: Math.max(0, override.amount ?? card.avgCardsPerTurn ?? 1),
+      };
+    } else if (override.mode === 'scaling-onetime') {
+      const base = Math.max(0, override.base ?? 1);
+      const growth = Math.max(0, override.growth ?? 0);
+      return {
+        ...card,
+        isOneTimeDraw: true,
+        staysOnBattlefield: false,
+        drawScaling: { type: 'onetime', base, growth },
+        netCardsDrawn: base,
+      };
+    } else if (override.mode === 'scaling-perturn') {
+      const base = Math.max(0, override.base ?? 1);
+      const growth = Math.max(0, override.growth ?? 0);
+      return {
+        ...card,
+        isOneTimeDraw: false,
+        staysOnBattlefield: true,
+        drawScaling: { type: 'perturn', base, growth },
+        avgCardsPerTurn: base,
       };
     }
     return card;
@@ -162,7 +183,10 @@ const applyTreasureOverrides = (deck, treasureOverrides) => {
 
 /**
  * Apply per-card ritual net-gain overrides from the UI.
- * ritualOverrides[cardNameLower] = number  → override netGain for that ritual
+ * Supports two formats (both backward-compatible):
+ *   number (legacy)                     → fixed netGain override
+ *   { mode: 'fixed', value: number }    → fixed netGain override
+ *   { mode: 'scaling', base, growth }   → netGain = base + turn * growth per turn
  */
 const applyRitualOverrides = (deck, ritualOverrides) => {
   if (!ritualOverrides || Object.keys(ritualOverrides).length === 0) return deck;
@@ -170,7 +194,21 @@ const applyRitualOverrides = (deck, ritualOverrides) => {
     if (!card.isRitual) return card;
     const override = ritualOverrides[card.name?.toLowerCase()];
     if (override === undefined || override === null) return card;
-    return { ...card, netGain: Math.max(-20, Number(override)) };
+    // Legacy: plain number
+    if (typeof override === 'number') return { ...card, netGain: Math.max(-20, override) };
+    if (override.mode === 'fixed') {
+      return {
+        ...card,
+        netGain: Math.max(-20, Number(override.value ?? 0)),
+        ritualScaling: undefined,
+      };
+    }
+    if (override.mode === 'scaling') {
+      const base = override.base ?? 0;
+      const growth = Math.max(0, override.growth ?? 0);
+      return { ...card, ritualScaling: { base, growth }, netGain: base };
+    }
+    return card;
   });
 };
 
@@ -452,7 +490,11 @@ export const monteCarlo = (deckToParse, config = {}) => {
           const card = p.card;
           if (!card.isDrawSpell || card.isOneTimeDraw) return;
           if (disabledDrawSpells.has(card.name)) return;
-          const perTurn = card.avgCardsPerTurn || 0;
+          // Scaling per-turn draw: base + turn * growth (turn is 0-indexed, so Turn 1 = base)
+          const perTurn =
+            card.drawScaling?.type === 'perturn'
+              ? Math.max(0, card.drawScaling.base + turn * card.drawScaling.growth)
+              : card.avgCardsPerTurn || 0;
           if (perTurn <= 0) return;
           const full = Math.floor(perTurn);
           const frac = Math.random() < perTurn - full ? 1 : 0;
@@ -706,7 +748,12 @@ export const monteCarlo = (deckToParse, config = {}) => {
         return s + (known?.manaAmount ?? 1);
       }, 0);
       const ritualsInHand = hand.filter(c => c.isRitual && canPlayCard(c, manaAvailable));
-      const burstFromRit = ritualsInHand.reduce((s, c) => s + (c.netGain || 0), 0);
+      // Ritual gain: supports fixed netGain or scaling (base + turn * growth)
+      const ritualGainAt = c =>
+        c.ritualScaling
+          ? Math.max(0, c.ritualScaling.base + turn * c.ritualScaling.growth)
+          : c.netGain || 0;
+      const burstFromRit = ritualsInHand.reduce((s, c) => s + ritualGainAt(c), 0);
       const burstTotal = burstFromArts + burstFromRit + cumulativeTreasures;
 
       const burstColorBonus = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
@@ -719,7 +766,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
       });
       ritualsInHand.forEach(c => {
         const colors = c.ritualColors;
-        const gain = c.netGain || 0;
+        const gain = ritualGainAt(c);
         if (colors && colors.length > 0) {
           colors.forEach(col => {
             if (col in burstColorBonus) burstColorBonus[col] += gain;

@@ -265,3 +265,15 @@
       - `renderSequenceBody` — updated to wrap each card ref with `<CardTooltip>` via `buildActionSegments`, and to render the Opening Hand cards as individual `<CardTooltip>`-wrapped names.
     - **`CardTooltip`** import added to `uiHelpers.jsx`.
     - **Tests** — 15 new tests in `uiHelpers.test.js` (`buildActionSegments` describe block covering: `Drew:`, `Discarded:`, `Played`, fetch-sacrifice, bounce-land, `Sacrificed`, `Cannot play`, `Cast artifact:`, draw spell with named cards, draw spell with 0 drawn, draw permanent, ramp spell with land list, ramp spell with sac'd land, recurring treasure upkeep, unrecognised-pattern fallback); total suite: 562 tests.
+
+39. **Scaling per turn for ritual spells and draw spells** --------DONE
+    - **`monteCarlo.js` — `applyRitualOverrides`** — override format extended to support `{ mode: 'fixed', value }` (plain-number legacy still accepted) and `{ mode: 'scaling', base, growth }`. Scaling sets `ritualScaling: { base, growth }` on the card and leaves `netGain = base` as fallback.
+    - **`monteCarlo.js` — burst-mana calculation** — `ritualGainAt(c)` helper applies turn-scaling when `c.ritualScaling` is set: effective net gain = `base + turn × growth` (turn is 0-indexed, so Turn 1 gives `base`). Used for both `burstFromRit` total and the per-color bonus.
+    - **`monteCarlo.js` — `applyDrawOverrides`** — two new modes added:
+      - `'scaling-onetime'` — sets `drawScaling: { type: 'onetime', base, growth }`, `isOneTimeDraw: true`, `staysOnBattlefield: false`.
+      - `'scaling-perturn'` — sets `drawScaling: { type: 'perturn', base, growth }`, `isOneTimeDraw: false`, `staysOnBattlefield: true`.
+    - **`monteCarlo.js` — upkeep per-turn draw** — when a draw permanent has `drawScaling.type === 'perturn'`, `perTurn = base + turn × growth` instead of fixed `avgCardsPerTurn`.
+    - **`simulationCore.js` — one-shot draw** — when a draw spell has `drawScaling.type === 'onetime'`, cards drawn = `round(base + turn × growth)` instead of fixed `netCardsDrawn`.
+    - **`RitualsPanel.jsx`** — dropdown now has three modes: *Default*, *Fixed value*, and *Scaling per turn*. The scaling mode shows two number inputs (base and growth).
+    - **`DrawSpellsPanel.jsx`** — dropdown now has five modes: *Default*, *One-time draw*, *Per-turn draw*, *Scaling one-time*, and *Scaling per-turn*. The two scaling modes show base + growth inputs.
+    - **Tests** — 9 new tests in `monteCarlo.test.js`: 4 for ritual scaling (`{ mode: 'fixed' }` object, scaling sets `ritualScaling`, growth clamped to 0, backward-compat number) + 5 for draw scaling (`scaling-onetime`, `scaling-perturn`, growth clamp, base clamp, fixed modes leave `drawScaling` undefined); total suite: `562 → 571`.

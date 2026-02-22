@@ -11,7 +11,7 @@ npm run test:watch
 ```
 
 **Framework:** [Vitest](https://vitest.dev/)
-**Test files:** 8 files · **562 tests** total (as of Feb 2026)
+**Test files:** 8 files · **571 tests** total (as of Feb 2026)
 
 ---
 
@@ -87,11 +87,11 @@ Covers all 11 exported pure simulation primitives.
 
 ---
 
-### `monteCarlo.test.js` — `src/simulation/monteCarlo.js` (56 tests)
+### `monteCarlo.test.js` — `src/simulation/monteCarlo.js` (94 tests)
 
 Covers both exports of the main simulation engine.
 
-#### `buildCompleteDeck` (34 tests)
+#### `buildCompleteDeck` (43 tests)
 
 | Scenario | What is verified |
 |---|---|
@@ -103,7 +103,8 @@ Covers both exports of the main simulation engine.
 | Lands and spells | Always included regardless of any flag |
 | Total card count | Correct sum across all categories |
 | **`manaOverrides`** (10 tests) | Fixed override replaces `manaAmount`; scaling adds `manaScaling`; clamps enforced; default/unrecognized modes leave cards unchanged; multi-copy; case-insensitive key |
-| **`ritualOverrides`** (7 tests) | Numeric `netGain` override applied; only `isRitual` cards affected; case-insensitive keys; multi-copy; clamps to −20 minimum; empty map leaves all unchanged |
+| **`ritualOverrides`** (11 tests) | Numeric/object `netGain` override applied; `{ mode: 'fixed', value }` format; scaling sets `ritualScaling`; growth clamped to 0; only `isRitual` cards affected; case-insensitive keys; multi-copy; clamps to −20 minimum; empty map leaves all unchanged |
+| **`drawOverrides` scaling** (6 tests) | `scaling-onetime` sets `drawScaling.type='onetime'`; `scaling-perturn` sets `drawScaling.type='perturn'`; base/growth clamped to 0; fixed modes leave `drawScaling` undefined |
 
 #### `monteCarlo` (51 tests)
 
@@ -200,12 +201,12 @@ Runs in the **jsdom** environment with `@testing-library/react`. Tests the top-l
 | `cards.test.js` | 77 |
 | `cardProcessors.test.js` | 96 |
 | `simulationCore.test.js` | 150 |
-| `monteCarlo.test.js` | 85 |
+| `monteCarlo.test.js` | 94 |
 | `deckParser.test.js` | 30 |
 | `math.test.js` | 22 |
 | `uiHelpers.test.js` | 56 |
 | `App.test.jsx` | 46 |
-| **Total** | **562** |
+| **Total** | **571** |
 
 ## What is not yet tested
 
