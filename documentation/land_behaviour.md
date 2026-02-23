@@ -329,7 +329,7 @@ Terramorphic Expanse, and all basic-only fetches enter **untapped** but the
 
 ## 5. Land-to-Play Selection (`selectBestLand`)
 
-Each turn, the simulation calls `selectBestLand(hand, battlefield, library, turn)`
+Each turn, the simulation calls `selectBestLand(hand, battlefield)`
 to choose which land to play.  Priority order:
 
 1. **Classic fetch land with sufficient mana to activate** – played immediately

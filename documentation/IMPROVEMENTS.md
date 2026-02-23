@@ -30,6 +30,17 @@
    - `buildPersistableState()` helper consolidates the previously duplicated localStorage / URL-hash payload.
    - Duplicate `💎` emoji on Cost Reducers section header replaced with `⚗️`.
 
+3b. **`simulationCore.js` internal refactor** --------DONE (v3.1.6)
+   - **`parseColorPips(manaCost)`** private helper — single source of truth for extracting colored-pip arrays from mana cost strings; previously the same `/\{([^}]+)\}/g` regex + filter was copy-pasted in `tapManaSources`, `canPlayCard`, `findBestLandToFetch`, and `playLand`.
+   - **`getAllSpells(parsedDeck)`** private helper — canonical flat-array of all non-land cards across the three deck buckets; replaces inline spread-and-concat in `findBestLandToFetch` and Thriving Land ETB logic in `playLand`.
+   - **`PAIN_LAND_ACTIVE_TURNS = 5`** module constant — documents and centralises the `turn <= 5` cutoff used by `calculateBattlefieldDamage` for pain lands, horizon lands, and talismans.
+   - **`selectBestLand` signature tightened** — removed the `_library` and `_turn` parameters; both were prefixed `_` because they were never read inside the function body. Call sites in `monteCarlo.js` updated accordingly.
+   - **`castSpells` gameState object** — signature changed from nine positional args to `castSpells({ hand, battlefield, graveyard, library, turnLog }, turn, simConfig)`. The two previously unused positional args (`keyCardNames`, `parsedDeck`) were removed. All call sites in `monteCarlo.js` and the full test suite updated.
+   - **`castSpells` consolidated `simConfig` destructure** — `includeTreasures` / `disabledTreasures` are now extracted at the top of the function alongside the other five include/disabled pairs, eliminating the duplicate destructure that was buried inside Phase 4.
+   - **`_runCastingLoop` private helper** — the `while (changed) { … for (spell of candidates) { … break; } }` skeleton was identical across all five `castSpells` phases. The shared loop is now a named helper; each phase contributes only its own candidate filter and cast callback, recovering ~100 lines of structural duplication.
+   - **`calculateManaAvailability` named inner functions** — the Shadowmoor and Odyssey filter-land second passes are extracted as named inner functions `_applyFilterLands()` and `_applyOdysseyFilterLands()`, making the main function body a readable orchestrator.
+   - **`doesLandEnterTapped` / `playLand` contract clarified** — JSDoc updated to document the two-step shock/MDFC land contract: `doesLandEnterTapped` returns the *default* tapped state before life-payment override; `playLand` is the sole authority that decides whether to pay life and force the land in untapped.
+
 ---
 
 ## Missing Features

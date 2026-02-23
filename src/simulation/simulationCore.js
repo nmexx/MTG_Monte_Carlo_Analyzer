@@ -29,6 +29,65 @@ const SUBTYPE_TO_COLOR = { Plains: 'W', Island: 'U', Swamp: 'B', Mountain: 'R', 
 /** Maps a color symbol to its basic-land subtype name (used by check-land logic). */
 const COLOR_TO_SUBTYPE = { W: 'Plains', U: 'Island', B: 'Swamp', R: 'Mountain', G: 'Forest' };
 
+/**
+ * Pain lands, horizon lands, and talismans only deal damage during the early
+ * turns of the game.  Turns beyond this threshold are ignored.
+ */
+const PAIN_LAND_ACTIVE_TURNS = 5;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Private helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Extracts all colored-pip symbols from a mana cost string and returns them
+ * as a plain string array.  e.g. '{2}{G}{U}' → ['G', 'U'].
+ * Used wherever the same /\{([^}]+)\}/g + filter pattern was duplicated.
+ */
+const parseColorPips = manaCost =>
+  (manaCost?.match(/\{([^}]+)\}/g) ?? [])
+    .map(s => s.replace(/[{}]/g, ''))
+    .filter(c => ['W', 'U', 'B', 'R', 'G'].includes(c));
+
+/**
+ * Returns a flat array of every non-land card across the three spell buckets
+ * of a parsed deck.  Single canonical definition consumed by fetchland scoring,
+ * Thriving Land pip analysis, and any future caller.
+ */
+const getAllSpells = parsedDeck => [
+  ...(parsedDeck?.spells ?? []),
+  ...(parsedDeck?.creatures ?? []),
+  ...(parsedDeck?.artifacts ?? []),
+];
+
+/**
+ * Repeatedly scans a candidate list until no additional cast is possible.
+ * Recomputes mana availability after each successful cast because every cast
+ * changes the battlefield.
+ *
+ * @param {object[]} battlefield - current battlefield permanents (mutated)
+ * @param {number}   turn        - current turn (0-based)
+ * @param {Function} getCandidates(manaAvailable) - returns sorted spell array
+ * @param {Function} tryCast(spell, manaAvailable, discount)
+ *   Should mutate state and return `true` on a successful cast, or `false` to
+ *   skip this candidate due to a secondary constraint (e.g. ETB cost unpayable).
+ */
+const _runCastingLoop = (battlefield, turn, getCandidates, tryCast) => {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const manaAvailable = calculateManaAvailability(battlefield, turn);
+    for (const spell of getCandidates(manaAvailable)) {
+      const discount = calculateCostDiscount(spell, battlefield);
+      if (!canPlayCard(spell, manaAvailable, discount)) continue;
+      if (tryCast(spell, manaAvailable, discount)) {
+        changed = true;
+        break;
+      }
+    }
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Utilities
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,10 +124,16 @@ export const matchesRampFilter = (land, rampSpell) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // doesLandEnterTapped
+//   Returns the *default* tapped-entry state for a land before any life-payment
+//   override is applied.  Shock lands and MDFC lands return `true` here because
+//   their base rule is "enters tapped" — `playLand` is the sole authority that
+//   decides whether to pay the life cost and force the land in untapped.
+//   No caller outside of `playLand` should use this return value for shock/MDFC
+//   lands without understanding that contract.
 // ─────────────────────────────────────────────────────────────────────────────
 export const doesLandEnterTapped = (land, battlefield, turn, commanderMode) => {
-  if (land.isShockLand) return true;
-  if (land.isMDFCLand) return true;
+  if (land.isShockLand) return true; // playLand may override by paying 2 life
+  if (land.isMDFCLand) return true; // playLand may override by paying 3 life
 
   if (land.isFast) {
     return battlefield.filter(p => p.card.isLand).length > 2;
@@ -105,7 +170,7 @@ export const doesLandEnterTapped = (land, battlefield, turn, commanderMode) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // selectBestLand
 // ─────────────────────────────────────────────────────────────────────────────
-export const selectBestLand = (hand, battlefield, _library, _turn) => {
+export const selectBestLand = (hand, battlefield) => {
   const lands = hand.filter(c => c.isLand);
   if (lands.length === 0) return null;
 
@@ -162,21 +227,13 @@ export const findBestLandToFetch = (
 
   const neededColors = new Set();
   if (keyCardNames && keyCardNames.length > 0 && parsedDeck) {
-    const keyCards = [];
-    keyCardNames.forEach(cardName => {
-      const card =
-        parsedDeck.spells.find(c => c.name === cardName) ||
-        parsedDeck.creatures.find(c => c.name === cardName) ||
-        parsedDeck.artifacts.find(c => c.name === cardName);
-      if (card) keyCards.push(card);
-    });
-    keyCards.sort((a, b) => a.cmc - b.cmc);
+    const allSpells = getAllSpells(parsedDeck);
+    const keyCards = keyCardNames
+      .map(name => allSpells.find(c => c.name === name))
+      .filter(Boolean)
+      .sort((a, b) => a.cmc - b.cmc);
     keyCards.forEach(card => {
-      const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
-      symbols.forEach(symbol => {
-        const clean = symbol.replace(/[{}]/g, '');
-        if (['W', 'U', 'B', 'R', 'G'].includes(clean)) neededColors.add(clean);
-      });
+      parseColorPips(card.manaCost).forEach(c => neededColors.add(c));
     });
   }
 
@@ -233,21 +290,16 @@ export const playLand = (
   if (land.isThriving && keyCardNames && keyCardNames.length > 0 && parsedDeck) {
     const primaryColor = land.produces[0] ?? null;
     if (primaryColor) {
-      const allCards = [
-        ...(parsedDeck.spells || []),
-        ...(parsedDeck.creatures || []),
-        ...(parsedDeck.artifacts || []),
-      ];
+      const allCards = getAllSpells(parsedDeck);
       const freq = {};
       keyCardNames.forEach(cardName => {
         const kc = allCards.find(c => c.name === cardName);
-        if (kc?.manaCost) {
-          (kc.manaCost.match(/\{([^}]+)\}/g) || []).forEach(s => {
-            const c = s.replace(/[{}]/g, '');
-            if (['W', 'U', 'B', 'R', 'G'].includes(c) && c !== primaryColor) {
+        if (kc) {
+          parseColorPips(kc.manaCost)
+            .filter(c => c !== primaryColor)
+            .forEach(c => {
               freq[c] = (freq[c] || 0) + 1;
-            }
-          });
+            });
         }
       });
       const ranked = Object.entries(freq).sort((a, b) => b[1] - a[1]);
@@ -360,18 +412,13 @@ export const playLand = (
 // tapManaSources
 // ─────────────────────────────────────────────────────────────────────────────
 export const tapManaSources = (spell, battlefield, discount = 0) => {
-  const symbols = spell.manaCost.match(/\{([^}]+)\}/g) || [];
+  const colorPips = parseColorPips(spell.manaCost);
   const colorNeeds = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-  let totalNeeded = 0;
-
-  symbols.forEach(symbol => {
+  colorPips.forEach(c => colorNeeds[c]++);
+  let totalNeeded = colorPips.length;
+  (spell.manaCost?.match(/\{([^}]+)\}/g) ?? []).forEach(symbol => {
     const clean = symbol.replace(/[{}]/g, '');
-    if (['W', 'U', 'B', 'R', 'G'].includes(clean)) {
-      colorNeeds[clean]++;
-      totalNeeded++;
-    } else if (!isNaN(parseInt(clean))) {
-      totalNeeded += parseInt(clean);
-    }
+    if (!isNaN(parseInt(clean))) totalNeeded += parseInt(clean);
   });
 
   // Apply cost discount — never reduce below the total colored-pip requirement
@@ -544,39 +591,46 @@ export const calculateManaAvailability = (battlefield, turn = 999) => {
   // Mode 2: {A} or {B}, {T} → {A}{A}/{A}{B}/{B}{B}.
   // Activation requires one mana source that produces A or B (the land's own
   // colors). Generic colorless ({C}) cannot pay this cost.
-  filterLandsToProcess.forEach(card => {
-    const coloredIdx = sources.findIndex(s => s.produces.some(c => card.produces.includes(c)));
-    if (coloredIdx >= 0) {
-      const [removed] = sources.splice(coloredIdx, 1);
-      total--;
-      removed.produces.forEach(c => {
-        if (c in colors) colors[c] = Math.max(0, colors[c] - 1);
-      });
-      addManaSource(card.produces, 2);
-    } else {
-      addManaSource(['C'], 1);
-    }
-  });
+  const _applyFilterLands = () => {
+    filterLandsToProcess.forEach(card => {
+      const coloredIdx = sources.findIndex(s => s.produces.some(c => card.produces.includes(c)));
+      if (coloredIdx >= 0) {
+        const [removed] = sources.splice(coloredIdx, 1);
+        total--;
+        removed.produces.forEach(c => {
+          if (c in colors) colors[c] = Math.max(0, colors[c] - 1);
+        });
+        addManaSource(card.produces, 2);
+      } else {
+        addManaSource(['C'], 1);
+      }
+    });
+  };
 
   // ── Second pass B: Odyssey / Fallout Filter Lands ─────────────────────────
   // Mode 1: {T} → {C} (no cost, always available).
   // Mode 2: {1}, {T} → {A}{A}/{A}{B}/{B}{B}.
   // Activation costs any 1 generic mana — colorless ({C}) qualifies.
   // Prefer consuming a colorless source to avoid spending a coloured pip.
-  odysseyFilterLandsToProcess.forEach(card => {
-    if (total >= 1) {
-      const cIdx = sources.findIndex(s => s.produces.includes('C'));
-      const removeIdx = cIdx >= 0 ? cIdx : 0;
-      const [removed] = sources.splice(removeIdx, 1);
-      total--;
-      removed.produces.forEach(c => {
-        if (c in colors) colors[c] = Math.max(0, colors[c] - 1);
-      });
-      addManaSource(card.produces, 2);
-    } else {
-      addManaSource(['C'], 1);
-    }
-  });
+  const _applyOdysseyFilterLands = () => {
+    odysseyFilterLandsToProcess.forEach(card => {
+      if (total >= 1) {
+        const cIdx = sources.findIndex(s => s.produces.includes('C'));
+        const removeIdx = cIdx >= 0 ? cIdx : 0;
+        const [removed] = sources.splice(removeIdx, 1);
+        total--;
+        removed.produces.forEach(c => {
+          if (c in colors) colors[c] = Math.max(0, colors[c] - 1);
+        });
+        addManaSource(card.produces, 2);
+      } else {
+        addManaSource(['C'], 1);
+      }
+    });
+  };
+
+  _applyFilterLands();
+  _applyOdysseyFilterLands();
 
   return { total, colors, sources };
 };
@@ -667,13 +721,7 @@ export const canPlayCard = (card, manaAvailable, discount = 0) => {
   const effectiveCmc = Math.max(0, card.cmc - discount);
   if (effectiveCmc > manaAvailable.total) return false;
 
-  const symbols = card.manaCost.match(/\{([^}]+)\}/g) || [];
-  const colorPips = [];
-  symbols.forEach(symbol => {
-    const clean = symbol.replace(/[{}]/g, '');
-    if (['W', 'U', 'B', 'R', 'G'].includes(clean)) colorPips.push(clean);
-  });
-
+  const colorPips = parseColorPips(card.manaCost);
   if (colorPips.length === 0) return true;
 
   // Precise path: bipartite matching prevents double-counting shared sources
@@ -696,16 +744,17 @@ export const canPlayCard = (card, manaAvailable, discount = 0) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // castSpells
-//   NEW: simConfig = { includeRampSpells, disabledRampSpells, includeDrawSpells, disabledDrawSpells }
+//   (v3.1.6) first argument is a `gameState` object so call-sites no longer
+//   depend on positional ordering of mutable refs.  The unused `keyCardNames`
+//   and `parsedDeck` positional parameters have been removed.
+//
+//   gameState  = { hand, battlefield, graveyard, library, turnLog }
+//   simConfig  = { includeRampSpells, disabledRampSpells, includeCostReducers,
+//                  disabledCostReducers, includeDrawSpells, disabledDrawSpells,
+//                  includeTreasures, disabledTreasures, ... }
 // ─────────────────────────────────────────────────────────────────────────────
 export const castSpells = (
-  hand,
-  battlefield,
-  graveyard,
-  turnLog,
-  keyCardNames,
-  parsedDeck,
-  library,
+  { hand, battlefield, graveyard, library, turnLog = null },
   turn = 999,
   simConfig = {}
 ) => {
@@ -716,20 +765,21 @@ export const castSpells = (
     disabledCostReducers = new Set(),
     includeDrawSpells = true,
     disabledDrawSpells = new Set(),
+    includeTreasures = true,
+    disabledTreasures = new Set(),
   } = simConfig;
 
   // Phase 0: cost reducers — cast before mana producers so their discount
   // applies to everything cast on the same turn.
   if (includeCostReducers) {
-    let reducerChanged = true;
-    while (reducerChanged) {
-      reducerChanged = false;
-      const manaAvail = calculateManaAvailability(battlefield, turn);
-      const reducerCandidates = hand.filter(
-        c => c.isCostReducer && !disabledCostReducers.has(c.name)
-      );
-      for (const reducer of reducerCandidates.sort((a, b) => a.cmc - b.cmc)) {
-        if (!canPlayCard(reducer, manaAvail)) continue;
+    _runCastingLoop(
+      battlefield,
+      turn,
+      () =>
+        hand
+          .filter(c => c.isCostReducer && !disabledCostReducers.has(c.name))
+          .sort((a, b) => a.cmc - b.cmc),
+      reducer => {
         hand.splice(hand.indexOf(reducer), 1);
         battlefield.push({
           card: reducer,
@@ -750,45 +800,40 @@ export const castSpells = (
             `Cast cost reducer: ${reducer.name} (-${reducer.reducesAmount} to ${scopeLabel})`
           );
         }
-        reducerChanged = true;
-        break;
+        return true;
       }
-    }
+    );
   }
 
   // Phase 1: mana-producing permanents
-  let changed = true;
-  while (changed) {
-    changed = false;
-    const manaAvailable = calculateManaAvailability(battlefield, turn);
-    const creatures = hand.filter(c => c.isManaCreature);
-    const exploration = hand.filter(c => c.isExploration);
-    const artifacts = hand.filter(
-      c => c.isManaArtifact && !BURST_MANA_SOURCES.has(c.name?.toLowerCase())
-    );
-
-    const castable = [...creatures, ...exploration, ...artifacts].sort((a, b) => {
-      const aPrio = MOX_PRIORITY_ARTIFACTS.has(a.name?.toLowerCase()) ? -1 : a.cmc;
-      const bPrio = MOX_PRIORITY_ARTIFACTS.has(b.name?.toLowerCase()) ? -1 : b.cmc;
-      return aPrio - bPrio;
-    });
-
-    for (const spell of castable) {
-      const spellDiscount = calculateCostDiscount(spell, battlefield);
-      if (!canPlayCard(spell, manaAvailable, spellDiscount)) continue;
-
+  _runCastingLoop(
+    battlefield,
+    turn,
+    () => {
+      const creatures = hand.filter(c => c.isManaCreature);
+      const exploration = hand.filter(c => c.isExploration);
+      const artifacts = hand.filter(
+        c => c.isManaArtifact && !BURST_MANA_SOURCES.has(c.name?.toLowerCase())
+      );
+      return [...creatures, ...exploration, ...artifacts].sort((a, b) => {
+        const aPrio = MOX_PRIORITY_ARTIFACTS.has(a.name?.toLowerCase()) ? -1 : a.cmc;
+        const bPrio = MOX_PRIORITY_ARTIFACTS.has(b.name?.toLowerCase()) ? -1 : b.cmc;
+        return aPrio - bPrio;
+      });
+    },
+    (spell, _mana, spellDiscount) => {
       let etbNote = '';
 
       if (spell.etbCost === 'discardLand' || spell.isMoxDiamond) {
         const landsInHand = hand.filter(c => c.isLand);
-        if (landsInHand.length === 0) continue;
+        if (landsInHand.length === 0) return false;
         const landToDiscard = landsInHand.find(l => l.entersTappedAlways) || landsInHand[0];
         etbNote = ` (discarded ${landToDiscard.name})`;
         hand.splice(hand.indexOf(landToDiscard), 1);
         graveyard.push(landToDiscard);
       } else if (spell.etbCost === 'imprintNonland' || spell.isChromeMox) {
         const nonLandsInHand = hand.filter(c => !c.isLand);
-        if (nonLandsInHand.length === 0) continue;
+        if (nonLandsInHand.length === 0) return false;
         const cardToImprint = nonLandsInHand[0];
         etbNote = ` (imprinted ${cardToImprint.name})`;
         hand.splice(hand.indexOf(cardToImprint), 1);
@@ -841,29 +886,25 @@ export const castSpells = (
           `Cast ${type}: ${spell.name}${explorationSuffix}${tappedSuffix}${etbNote}`
         );
       }
-
-      changed = true;
-      break;
+      return true;
     }
-  }
+  );
 
   // Phase 2: ramp spells
   if (includeRampSpells) {
-    let rampChanged = true;
-    while (rampChanged) {
-      rampChanged = false;
-      const manaAvailable = calculateManaAvailability(battlefield, turn);
-      const rampInHand = hand.filter(c => c.isRampSpell && !disabledRampSpells.has(c.name));
-
-      for (const rampSpell of rampInHand.sort((a, b) => a.cmc - b.cmc)) {
-        const rampDiscount = calculateCostDiscount(rampSpell, battlefield);
-        if (!canPlayCard(rampSpell, manaAvailable, rampDiscount)) continue;
-
+    _runCastingLoop(
+      battlefield,
+      turn,
+      () =>
+        hand
+          .filter(c => c.isRampSpell && !disabledRampSpells.has(c.name))
+          .sort((a, b) => a.cmc - b.cmc),
+      (rampSpell, manaAvailable, rampDiscount) => {
         // For cards with an activated ability (e.g. Wayfarer's Bauble), also verify
         // that the activation cost can be paid on top of the cast cost.
         if (rampSpell.activationCost > 0) {
           const castCost = Math.max(0, rampSpell.cmc - rampDiscount);
-          if (castCost + rampSpell.activationCost > manaAvailable.total) continue;
+          if (castCost + rampSpell.activationCost > manaAvailable.total) return false;
         }
 
         // Determine how many eligible lands must exist in the library before we
@@ -872,7 +913,7 @@ export const castSpells = (
         const handNeeded = rampSpell.landsToHand > 0 ? 1 : 0;
         const minNeeded = Math.max(1, fieldNeeded + handNeeded);
         const eligibleInLibrary = library.filter(c => matchesRampFilter(c, rampSpell));
-        if (eligibleInLibrary.length < minNeeded) continue;
+        if (eligibleInLibrary.length < minNeeded) return false;
 
         // Move the card out of hand: permanents stay on the battlefield,
         // one-shot spells (sorceries / instants) go to the graveyard.
@@ -966,10 +1007,9 @@ export const castSpells = (
             `${actionVerb}: ${rampSpell.name}${activationNote}${sacNote}${fieldNote}${handNote}`
           );
         }
-        rampChanged = true;
-        break;
+        return true;
       }
-    }
+    );
   }
 
   // Phase 3: draw spells — cast after ramp spells; lowest priority.
@@ -977,16 +1017,14 @@ export const castSpells = (
   // immediately draw their cards.  Permanent draw spells enter the battlefield
   // and will produce cards every upkeep (handled in monteCarlo.js).
   if (includeDrawSpells) {
-    let drawChanged = true;
-    while (drawChanged) {
-      drawChanged = false;
-      const manaAvailable = calculateManaAvailability(battlefield, turn);
-      const drawInHand = hand.filter(c => c.isDrawSpell && !disabledDrawSpells.has(c.name));
-
-      for (const drawSpell of drawInHand.sort((a, b) => a.cmc - b.cmc)) {
-        const drawDiscount = calculateCostDiscount(drawSpell, battlefield);
-        if (!canPlayCard(drawSpell, manaAvailable, drawDiscount)) continue;
-
+    _runCastingLoop(
+      battlefield,
+      turn,
+      () =>
+        hand
+          .filter(c => c.isDrawSpell && !disabledDrawSpells.has(c.name))
+          .sort((a, b) => a.cmc - b.cmc),
+      (drawSpell, _mana, drawDiscount) => {
         hand.splice(hand.indexOf(drawSpell), 1);
         if (drawSpell.staysOnBattlefield) {
           battlefield.push({
@@ -1027,28 +1065,24 @@ export const castSpells = (
             : ' → draws each turn';
           turnLog.actions.push(`${verb}: ${drawSpell.name}${drawNote}`);
         }
-        drawChanged = true;
-        break;
+        return true;
       }
-    }
+    );
   }
 
   // Phase 4: treasure-generating cards — cast last (lowest priority of all).
   // One-time generators (isOneTreasure: true) produce `treasuresProduced` tokens
   // immediately via simConfig.treasureTracker.  Recurring permanents enter the
   // battlefield and are handled by the upkeep loop in monteCarlo.js.
-  const { includeTreasures = true, disabledTreasures = new Set() } = simConfig ?? {};
   if (includeTreasures) {
-    let treasureChanged = true;
-    while (treasureChanged) {
-      treasureChanged = false;
-      const manaAvailable = calculateManaAvailability(battlefield, turn);
-      const treasureInHand = hand.filter(c => c.isTreasureCard && !disabledTreasures.has(c.name));
-
-      for (const tc of treasureInHand.sort((a, b) => a.cmc - b.cmc)) {
-        const tcDiscount = calculateCostDiscount(tc, battlefield);
-        if (!canPlayCard(tc, manaAvailable, tcDiscount)) continue;
-
+    _runCastingLoop(
+      battlefield,
+      turn,
+      () =>
+        hand
+          .filter(c => c.isTreasureCard && !disabledTreasures.has(c.name))
+          .sort((a, b) => a.cmc - b.cmc),
+      (tc, _mana, tcDiscount) => {
         hand.splice(hand.indexOf(tc), 1);
         if (tc.staysOnBattlefield) {
           battlefield.push({
@@ -1076,10 +1110,9 @@ export const castSpells = (
             : ' → generates treasures each turn';
           turnLog.actions.push(`${verb}: ${tc.name}${note}`);
         }
-        treasureChanged = true;
-        break;
+        return true;
       }
-    }
+    );
   }
 };
 
@@ -1112,8 +1145,8 @@ export const calculateBattlefieldDamage = (battlefield, turn) => {
     breakdown.push(`Ancient Tomb damage: -${tombDmg} life`);
   }
 
-  // Pain Lands & Starting Town (turns 1-5 simplified)
-  if (turn <= 5) {
+  // Pain Lands & Starting Town (only active during early turns)
+  if (turn <= PAIN_LAND_ACTIVE_TURNS) {
     const painDmg = battlefield
       .filter(p => p.card.isLand && (p.card.isPainLand || p.card.name === 'starting town'))
       .reduce((s, p) => s + (p.card.lifeloss ?? 1), 0);

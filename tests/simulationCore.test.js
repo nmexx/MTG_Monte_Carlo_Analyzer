@@ -311,25 +311,25 @@ describe('doesLandEnterTapped', () => {
 describe('selectBestLand', () => {
   it('returns null when hand has no lands', () => {
     const hand = [makeCreature(), makeSpell()];
-    expect(selectBestLand(hand, [], [], 1)).toBeNull();
+    expect(selectBestLand(hand, [])).toBeNull();
   });
 
   it('returns the only land when hand has one', () => {
     const forest = makeLand();
     const hand = [forest];
-    expect(selectBestLand(hand, [], [], 1)).toBe(forest);
+    expect(selectBestLand(hand, [])).toBe(forest);
   });
 
   it('prefers an untapped land over a tapped land', () => {
     const tapped = makeLand({ name: 'Tap City', entersTappedAlways: true });
     const untapped = makeLand({ name: 'Quick Hills', entersTappedAlways: false });
     const hand = [tapped, untapped];
-    expect(selectBestLand(hand, [], [], 1)).toBe(untapped);
+    expect(selectBestLand(hand, [])).toBe(untapped);
   });
 
   it('returns null when the only land is a bounce land and battlefield is empty', () => {
     const bounce = makeLand({ name: 'Simic Growth Chamber', isBounce: true });
-    const result = selectBestLand([bounce], [], [], 1);
+    const result = selectBestLand([bounce], []);
     expect(result).toBeNull();
   });
 
@@ -337,7 +337,7 @@ describe('selectBestLand', () => {
     const bounce = makeLand({ name: 'Simic Growth Chamber', isBounce: true });
     const regular = makeLand({ name: 'Forest', isBounce: false });
     const bf = [perm(regular)];
-    const result = selectBestLand([bounce], bf, [], 1);
+    const result = selectBestLand([bounce], bf);
     expect(result).toBe(bounce);
   });
 
@@ -351,7 +351,7 @@ describe('selectBestLand', () => {
     const regular = makeLand({ name: 'Forest', isFetch: false });
     const hand = [fetch, regular];
     const bf = [perm(makeLand({ name: 'Island' }))];
-    const result = selectBestLand(hand, bf, [], 1);
+    const result = selectBestLand(hand, bf);
     expect(result).toBe(fetch);
   });
 });
@@ -1381,7 +1381,7 @@ describe('castSpells', () => {
     const dork = makeCreature({ name: 'Llanowar Elves', cmc: 1, manaCost: '{G}' });
     const hand = [dork];
     const bf = [perm(forest)];
-    castSpells(hand, bf, [], null, [], null, [], 1, {});
+    castSpells({ hand, battlefield: bf, graveyard: [], library: [], turnLog: null }, 1, {});
     expect(hand).toHaveLength(0);
     expect(bf.some(p => p.card.name === 'Llanowar Elves')).toBe(true);
   });
@@ -1389,7 +1389,7 @@ describe('castSpells', () => {
   it('does not cast a mana creature when mana is insufficient', () => {
     const dork = makeCreature({ name: 'Llanowar Elves', cmc: 1, manaCost: '{G}' });
     const hand = [dork];
-    castSpells(hand, [], [], null, [], null, [], 1, {});
+    castSpells({ hand, battlefield: [], graveyard: [], library: [], turnLog: null }, 1, {});
     expect(hand).toHaveLength(1);
   });
 
@@ -1404,7 +1404,7 @@ describe('castSpells', () => {
     });
     const hand = [signet];
     const bf = [perm(island), perm(makeLand({ name: 'Swamp', produces: ['B'] }))];
-    castSpells(hand, bf, [], null, [], null, [], 1, {});
+    castSpells({ hand, battlefield: bf, graveyard: [], library: [], turnLog: null }, 1, {});
     expect(hand).toHaveLength(0);
     expect(bf.some(p => p.card.name === 'Arcane Signet')).toBe(true);
   });
@@ -1429,7 +1429,7 @@ describe('castSpells', () => {
     ];
     const hand = [cultivate];
     const gy = [];
-    castSpells(hand, bf, gy, null, [], null, lib, 3, {
+    castSpells({ hand, battlefield: bf, graveyard: gy, library: lib, turnLog: null }, 3, {
       includeRampSpells: true,
       disabledRampSpells: new Set(),
     });
@@ -1448,7 +1448,9 @@ describe('castSpells', () => {
     const cultivate = makeSpell({ name: 'Cultivate', cmc: 3, manaCost: '{2}{G}' });
     const bf = [perm(forest1), perm(forest2), perm(forest3)];
     const hand = [cultivate];
-    castSpells(hand, bf, [], null, [], null, [], 3, { includeRampSpells: false });
+    castSpells({ hand, battlefield: bf, graveyard: [], library: [], turnLog: null }, 3, {
+      includeRampSpells: false,
+    });
     expect(hand).toHaveLength(1);
   });
 
@@ -1459,7 +1461,7 @@ describe('castSpells', () => {
     const cultivate = makeSpell({ name: 'Cultivate', cmc: 3, manaCost: '{2}{G}' });
     const bf = [perm(f1), perm(f2), perm(f3)];
     const hand = [cultivate];
-    castSpells(hand, bf, [], null, [], null, [], 3, {
+    castSpells({ hand, battlefield: bf, graveyard: [], library: [], turnLog: null }, 3, {
       includeRampSpells: true,
       disabledRampSpells: new Set(['Cultivate']),
     });
@@ -1470,7 +1472,11 @@ describe('castSpells', () => {
     const forest = makeLand({ produces: ['G'] });
     const dork = makeCreature({ name: 'Llanowar Elves', cmc: 1, manaCost: '{G}' });
     const log = { actions: [] };
-    castSpells([dork], [perm(forest)], [], log, [], null, [], 1, {});
+    castSpells(
+      { hand: [dork], battlefield: [perm(forest)], graveyard: [], library: [], turnLog: log },
+      1,
+      {}
+    );
     expect(log.actions.some(a => a.includes('Llanowar Elves'))).toBe(true);
   });
 
@@ -1498,7 +1504,7 @@ describe('castSpells', () => {
     const bf = [perm(p1), perm(p2)];
     const lib = [plains];
     const gy = [];
-    castSpells([knight], bf, gy, null, [], null, lib, 2, {
+    castSpells({ hand: [knight], battlefield: bf, graveyard: gy, library: lib, turnLog: null }, 2, {
       includeRampSpells: true,
       disabledRampSpells: new Set(),
     });
@@ -1529,7 +1535,7 @@ describe('castSpells', () => {
     const bf = lands.map(perm); // 3 mana available
     const lib = [basic];
     const gy = [];
-    castSpells([bauble], bf, gy, null, [], null, lib, 3, {
+    castSpells({ hand: [bauble], battlefield: bf, graveyard: gy, library: lib, turnLog: null }, 3, {
       includeRampSpells: true,
       disabledRampSpells: new Set(),
     });
@@ -1557,7 +1563,7 @@ describe('castSpells', () => {
     const bf = lands.map(perm);
     const hand = [bauble];
     const gy = [];
-    castSpells(hand, bf, gy, null, [], null, [basic], 2, {
+    castSpells({ hand, battlefield: bf, graveyard: gy, library: [basic], turnLog: null }, 2, {
       includeRampSpells: true,
       disabledRampSpells: new Set(),
     });
@@ -1589,7 +1595,7 @@ describe('castSpells', () => {
     const lib = [plains]; // exactly 1 matching land
     const hand = [tithe];
     const gy = [];
-    castSpells(hand, bf, gy, null, [], null, lib, 1, {
+    castSpells({ hand, battlefield: bf, graveyard: gy, library: lib, turnLog: null }, 1, {
       includeRampSpells: true,
       disabledRampSpells: new Set(),
     });
@@ -1632,10 +1638,14 @@ describe('castSpells', () => {
     const bf = [perm(w1), perm(w1)]; // 2 white mana for {1}{W}
     const hand = [gift];
     const gy = [];
-    castSpells(hand, bf, gy, null, [], null, [plains1, forest, plains2], 2, {
-      includeRampSpells: true,
-      disabledRampSpells: new Set(),
-    });
+    castSpells(
+      { hand, battlefield: bf, graveyard: gy, library: [plains1, forest, plains2], turnLog: null },
+      2,
+      {
+        includeRampSpells: true,
+        disabledRampSpells: new Set(),
+      }
+    );
     // Gift fetches 2 Plains but NOT the Forest
     expect(hand.some(c => c.name === 'Plains 1')).toBe(true);
     expect(hand.some(c => c.name === 'Plains 2')).toBe(true);
@@ -1664,10 +1674,20 @@ describe('castSpells', () => {
       landSubtypes: ['Plains'],
     });
     const log = { actions: [] };
-    castSpells([knight], [perm(p1), perm(p2)], [], log, [], null, [plains], 2, {
-      includeRampSpells: true,
-      disabledRampSpells: new Set(),
-    });
+    castSpells(
+      {
+        hand: [knight],
+        battlefield: [perm(p1), perm(p2)],
+        graveyard: [],
+        library: [plains],
+        turnLog: log,
+      },
+      2,
+      {
+        includeRampSpells: true,
+        disabledRampSpells: new Set(),
+      }
+    );
     expect(log.actions.some(a => a.startsWith('Cast permanent:'))).toBe(true);
     expect(log.actions.some(a => a.startsWith('Cast ramp spell:'))).toBe(false);
   });

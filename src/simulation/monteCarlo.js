@@ -546,7 +546,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
 
       // Phase 1: first land drop
       let landsPlayedThisTurn = 0;
-      const firstLand = selectBestLand(hand, battlefield, library, turn);
+      const firstLand = selectBestLand(hand, battlefield);
       if (firstLand) {
         const ll = playLand(
           firstLand,
@@ -605,7 +605,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
 
       // Phase 4: additional land drops
       while (landsPlayedThisTurn < maxLandsPerTurn) {
-        const land = selectBestLand(hand, battlefield, library, turn);
+        const land = selectBestLand(hand, battlefield);
         if (!land) break;
         const ll = playLand(
           land,
@@ -702,17 +702,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
       // Phase 6: Cast spells
       simConfig.drawTracker = { count: 0 };
       simConfig.treasureTracker = { produced: 0 };
-      castSpells(
-        hand,
-        battlefield,
-        graveyard,
-        turnLog,
-        keyCardNames,
-        deckToParse,
-        library,
-        turn,
-        simConfig
-      );
+      castSpells({ hand, battlefield, graveyard, library, turnLog }, turn, simConfig);
       cardsDrawnThisTurn += simConfig.drawTracker.count;
       cumulativeTreasures += simConfig.treasureTracker.produced;
 
