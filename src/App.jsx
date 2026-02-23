@@ -320,15 +320,15 @@ const MTGMonteCarloAnalyzer = () => {
     });
 
     try {
-      setDeckSlotA(prev => ({
-        ...prev,
-        simulationResults: monteCarlo(parsedDeck, buildSimConfig(deckSlotA)),
-      }));
+      // Compute results eagerly (before calling setters) so monteCarlo blocks
+      // the main thread while the overlay is already visible.  Calling it inside
+      // an updater function would defer execution until React's batch-flush,
+      // by which point setIsSimulating(false) is already queued — hiding the overlay.
+      const resultsA = monteCarlo(parsedDeck, buildSimConfig(deckSlotA));
+      setDeckSlotA(prev => ({ ...prev, simulationResults: resultsA }));
       if (comparisonMode) {
-        setDeckSlotB(prev => ({
-          ...prev,
-          simulationResults: monteCarlo(parsedDeckB, buildSimConfig(deckSlotB)),
-        }));
+        const resultsB = monteCarlo(parsedDeckB, buildSimConfig(deckSlotB));
+        setDeckSlotB(prev => ({ ...prev, simulationResults: resultsB }));
       }
     } catch (err) {
       setError('Simulation error: ' + err.message);
