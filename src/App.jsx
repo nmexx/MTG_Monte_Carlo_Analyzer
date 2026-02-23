@@ -299,11 +299,13 @@ const MTGMonteCarloAnalyzer = () => {
   });
 
   // =============================================================================
-  // Run simulation — flushSync forces the loading overlay to paint before the
-  // CPU-intensive monteCarlo loop blocks the main thread.
+  // Run simulation — flushSync forces React to commit the overlay to the DOM
+  // synchronously, then setTimeout(0) yields a macrotask so the browser can
+  // actually paint it before the blocking monteCarlo loop takes the main thread.
+  // rAF alone fires *before* paint; flushSync alone commits but doesn't paint.
   // (Web Worker offload is tracked as improvement #24.)
   // =============================================================================
-  const runSimulation = () => {
+  const runSimulation = async () => {
     if (!parsedDeck) {
       setError('Please parse a deck first');
       return;
@@ -313,17 +315,17 @@ const MTGMonteCarloAnalyzer = () => {
       return;
     }
 
-    // Commit the loading overlay synchronously so it paints before the loop
+    // Step 1: commit the overlay to the DOM synchronously.
     flushSync(() => {
       setIsSimulating(true);
       setError('');
     });
 
+    // Step 2: yield a macrotask so the browser paints the overlay before
+    // monteCarlo blocks the main thread.
+    await new Promise(r => setTimeout(r, 0));
+
     try {
-      // Compute results eagerly (before calling setters) so monteCarlo blocks
-      // the main thread while the overlay is already visible.  Calling it inside
-      // an updater function would defer execution until React's batch-flush,
-      // by which point setIsSimulating(false) is already queued — hiding the overlay.
       const resultsA = monteCarlo(parsedDeck, buildSimConfig(deckSlotA));
       setDeckSlotA(prev => ({ ...prev, simulationResults: resultsA }));
       if (comparisonMode) {
