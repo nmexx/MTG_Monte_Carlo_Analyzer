@@ -11,6 +11,7 @@
  *   iterations         – number
  *   enableMulligans    – boolean
  *   selectedKeyCards   – Set<string>
+ *   commanderName      – string (auto-tracked key card when commander mode is on)
  *   selectedTurnForSequences – number
  *   exportResultsAsPNG – () => void
  *   renderSequenceBody – (data, accentColor) => JSX
@@ -86,12 +87,22 @@ const ResultsPanel = ({
   iterations,
   enableMulligans,
   selectedKeyCards,
+  commanderName,
   selectedTurnForSequences,
   exportResultsAsPNG,
   exportResultsAsCSV,
   renderSequenceBody,
 }) => {
   if (!simulationResults || !chartData) return null;
+
+  // Commander card is auto-tracked in the simulation but lives outside
+  // selectedKeyCards (it's in the command zone, not the deck slot).  Merge
+  // it in so charts/tables render even when selectedKeyCards is empty.
+  const commanderTrimmed = commanderName?.trim() ?? '';
+  const effectiveKeyCards =
+    commanderTrimmed && !selectedKeyCards.has(commanderTrimmed)
+      ? new Set([...selectedKeyCards, commanderTrimmed])
+      : selectedKeyCards;
 
   return (
     <div id="results-section">
@@ -422,7 +433,7 @@ const ResultsPanel = ({
       )}
 
       {/* Key Card Playability */}
-      {selectedKeyCards.size > 0 && (
+      {effectiveKeyCards.size > 0 && (
         <div className="panel">
           <h3>Key Cards Playability (%)</h3>
           <ResponsiveContainer width="100%" height={300}>
@@ -435,7 +446,7 @@ const ResultsPanel = ({
               <YAxis label={{ value: 'Playable (%)', angle: -90, position: 'insideLeft' }} />
               <Tooltip />
               <Legend />
-              {Array.from(selectedKeyCards).map((cardName, idx) => {
+              {Array.from(effectiveKeyCards).map((cardName, idx) => {
                 const colors = ['#667eea', '#f59e0b', '#22c55e', '#dc2626', '#60a5fa'];
                 const color = colors[idx % colors.length];
                 const burstKey = `${cardName} (+burst)`;
@@ -480,7 +491,7 @@ const ResultsPanel = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {Array.from(selectedKeyCards).map((cardName, idx) => {
+                    {Array.from(effectiveKeyCards).map((cardName, idx) => {
                       const colors = ['#667eea', '#f59e0b', '#22c55e', '#dc2626', '#60a5fa'];
                       const color = colors[idx % colors.length];
                       const perTurn = simulationResults.keyCardPlayability?.[cardName] ?? [];
@@ -546,7 +557,7 @@ const ResultsPanel = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {Array.from(selectedKeyCards).map((cardName, idx) => {
+                    {Array.from(effectiveKeyCards).map((cardName, idx) => {
                       const colors = ['#667eea', '#f59e0b', '#22c55e', '#dc2626', '#60a5fa'];
                       const color = colors[idx % colors.length];
                       const cmc = simulationResults.keyCardOnCurveCMC?.[cardName];

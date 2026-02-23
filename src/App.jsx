@@ -798,6 +798,7 @@ const MTGMonteCarloAnalyzer = () => {
             iterations={iterations}
             enableMulligans={enableMulligans}
             selectedKeyCards={deckSlotA.selectedKeyCards}
+            commanderName={commanderName}
             selectedTurnForSequences={selectedTurnForSequences}
             exportResultsAsPNG={exportResultsAsPNG}
             exportResultsAsCSV={exportResultsAsCSV}
