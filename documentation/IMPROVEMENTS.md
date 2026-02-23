@@ -52,6 +52,14 @@
    - **Guard burst mana computation** — the burst-mana block (filter hand for `BURST_MANA_SOURCES`, reduce rituals, build `burstColorBonus`, construct `manaWithBurst`) ran unconditionally on every turn of every iteration even when the deck contained no burst cards (`results.hasBurstCards = false`). Wrapped in `if (results.hasBurstCards) { … }` with `burstInHand`, `ritualsInHand`, and `manaWithBurst` declared outside so the key-card playability block retains access.
    - **Remove redundant flood/screw length guards** — `results.landsPerTurn[floodTurnIdx].length > 0` was checked before computing flood/screw rates, but `landsPerTurn[t]` is always populated (one entry per iteration) after the main loop completes. Guards removed.
 
+3d. **`cardProcessors.js` internal refactor** --------DONE (v3.1.8)
+   - **`extractManaProduction` uses `Set`** — the `!produces.includes(color)` dedup guard inside a `forEach` was O(n²). Replaced the array accumulator with a `Set`; the `any color` early-return is also hoisted before the regex so it short-circuits immediately.
+   - **`processLand` mana production delegates to `extractManaProduction`** — the `{T}: Add` block inside `processLand` duplicated the same regex + `any color` logic already encapsulated in `extractManaProduction`. Replaced the ~10-line inline block with a single `extractManaProduction(oracleText)` call.
+   - **Remove 7 dead `entersTappedAlways` branches in `processLand`** — `PAIN_LANDS`, `FIVE_COLOR_PAIN_LANDS`, `FILTER_LANDS`, `HORIZON_LANDS`, `UTILITY_LANDS_UNTAPPED`, `ODYSSEY_FILTER_LANDS`, and `MDFC_LANDS` all assigned `entersTappedAlways = false`, which is already the variable's initial value. Removed all seven no-op branches (18-arm chain → 11 arms); added a comment explaining that those land types are handled dynamically by `doesLandEnterTapped` / `playLand`.
+   - **`processExploration` Azusa check fixed** — `cardName.includes('azusa')` was a substring match that would mis-fire for any future card containing "azusa" in its name. Changed to an exact equality check: `cardName === 'azusa, lost but seeking'`.
+   - **`resolveCardFaceFields` helper extracted** — the identical 6-line block that patches `cmc`, `manaCost`, `oracleText`, `typeLine` from `card_faces[0]` was copy-pasted in both `processCostReducer` and `processSpell`. Extracted to a single private `resolveCardFaceFields(data)` helper; both functions now destructure its return value.
+   - **`processCardData` hoists `resolvedOracle` / `resolvedTypeLine`** — `data.type_line || frontFace.type_line` was computed twice (for `isCreature` and `isArtifact`) and then repeated again at the bottom for the oracle-fallback block. Both values are now declared once after the land early-return and reused throughout the function.
+
 ---
 
 ## Missing Features

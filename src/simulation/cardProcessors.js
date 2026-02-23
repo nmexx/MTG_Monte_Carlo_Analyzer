@@ -51,18 +51,13 @@ import LAND_DATA, {
 
 export const extractManaProduction = oracleText => {
   if (!oracleText) return [];
-  const produces = [];
-  const manaSymbols = oracleText.match(/\{[WUBRGC]\}/g);
-  if (manaSymbols) {
-    manaSymbols.forEach(symbol => {
-      const color = symbol.replace(/[{}]/g, '');
-      if (!produces.includes(color)) produces.push(color);
-    });
-  }
   if (oracleText.includes('any color') || oracleText.includes('mana of any color')) {
     return ['W', 'U', 'B', 'R', 'G'];
   }
-  return produces;
+  const producesSet = new Set();
+  const manaSymbols = oracleText.match(/\{[WUBRGC]\}/g);
+  if (manaSymbols) manaSymbols.forEach(symbol => producesSet.add(symbol.replace(/[{}]/g, '')));
+  return [...producesSet];
 };
 
 export const extractManaAmount = oracleText => {
@@ -377,25 +372,16 @@ export const processLand = (data, face, _isMDFC) => {
     ['plains', 'island', 'swamp', 'mountain', 'forest', 'wastes'].includes(name);
 
   // Mana production
-  const produces = [];
+  let produces;
   if (FIVE_COLOR_PAIN_LANDS.has(name)) {
-    produces.push('W', 'U', 'B', 'R', 'G');
+    produces = ['W', 'U', 'B', 'R', 'G'];
   } else if (oracleText.includes('{T}: Add')) {
-    const manaSymbols = oracleText.match(/\{[WUBRGC]\}/g);
-    if (manaSymbols) {
-      manaSymbols.forEach(symbol => {
-        const color = symbol.replace(/[{}]/g, '');
-        if (!produces.includes(color)) produces.push(color);
-      });
-    }
-    if (oracleText.includes('any color') || oracleText.includes('mana of any color')) {
-      produces.push('W', 'U', 'B', 'R', 'G');
-    }
+    produces = extractManaProduction(oracleText);
+  } else {
+    produces = [];
   }
   if (produces.length === 0 && ldEntry?.color_identity?.length) {
-    ldEntry.color_identity.forEach(c => {
-      if (!produces.includes(c)) produces.push(c);
-    });
+    produces = [...ldEntry.color_identity];
   }
 
   const manaAmount = ldEntry?.sim_flags?.manaAmount ?? 1;
@@ -426,27 +412,16 @@ export const processLand = (data, face, _isMDFC) => {
     isCheck = true;
   } else if (FAST_LANDS.has(name)) {
     isFast = true;
-  } else if (PAIN_LANDS.has(name)) {
-    entersTappedAlways = false;
-  } else if (FIVE_COLOR_PAIN_LANDS.has(name)) {
-    entersTappedAlways = false;
-  } else if (FILTER_LANDS.has(name)) {
-    entersTappedAlways = false;
-  } else if (HORIZON_LANDS.has(name)) {
-    entersTappedAlways = false;
   } else if (MAN_LANDS.has(name)) {
     entersTappedAlways = true;
   } else if (STORAGE_LANDS.has(name)) {
     entersTappedAlways = true;
   } else if (CROWD_LANDS.has(name)) {
     entersTappedAlways = undefined; // determined at runtime in doesLandEnterTapped
-  } else if (UTILITY_LANDS_UNTAPPED.has(name)) {
-    entersTappedAlways = false;
-  } else if (ODYSSEY_FILTER_LANDS.has(name)) {
-    entersTappedAlways = false;
-  } else if (MDFC_LANDS.has(name)) {
-    entersTappedAlways = false; // doesLandEnterTapped + playLand handle ETB dynamically (pay 3 life)
   } else {
+    // PAIN_LANDS, FILTER_LANDS, HORIZON_LANDS, MDFC_LANDS, etc. all leave
+    // entersTappedAlways = false (the default); their per-turn behaviour is
+    // handled dynamically by doesLandEnterTapped / playLand.
     const hasEntersTappedText =
       oracleText.toLowerCase().includes('enters the battlefield tapped') ||
       oracleText.toLowerCase().includes('enters tapped');
@@ -618,7 +593,7 @@ export const processManaCreature = data => {
 export const processExploration = data => {
   const cardName = data.name.toLowerCase();
   let landsPerTurn = 2;
-  if (cardName.includes('azusa')) landsPerTurn = 3;
+  if (cardName === 'azusa, lost but seeking') landsPerTurn = 3;
   const isCreature = data.type_line?.includes('Creature');
   const isArtifact = data.type_line?.includes('Artifact');
   return {
@@ -696,23 +671,32 @@ export const processRitual = data => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// processCostReducer
+// resolveCardFaceFields
+//   Patches missing top-level fields from card_faces[0] for split / transform
+//   / modal DFC cards.  Returns a plain object with the four resolved fields.
 // ─────────────────────────────────────────────────────────────────────────────
-export const processCostReducer = data => {
-  const cardName = data.name.toLowerCase();
-  const entry = COST_REDUCER_DATA.get(cardName);
+const resolveCardFaceFields = data => {
   let cmc = data.cmc;
   let manaCost = data.mana_cost;
   let oracleText = data.oracle_text;
   let typeLine = data.type_line;
-
-  if (data.card_faces && data.card_faces.length > 0) {
+  if (data.card_faces?.length > 0) {
     const frontFace = data.card_faces[0];
     if (cmc === undefined || cmc === null) cmc = frontFace.cmc;
     if (!manaCost && frontFace.mana_cost) manaCost = frontFace.mana_cost;
     if (!oracleText && frontFace.oracle_text) oracleText = frontFace.oracle_text;
     if (!typeLine && frontFace.type_line) typeLine = frontFace.type_line;
   }
+  return { cmc, manaCost, oracleText, typeLine };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// processCostReducer
+// ─────────────────────────────────────────────────────────────────────────────
+export const processCostReducer = data => {
+  const cardName = data.name.toLowerCase();
+  const entry = COST_REDUCER_DATA.get(cardName);
+  const { cmc, manaCost, oracleText, typeLine } = resolveCardFaceFields(data);
 
   return {
     name: data.name,
@@ -810,18 +794,7 @@ export const processDrawSpell = (data, drawDataOverride) => {
 // processSpell
 // ─────────────────────────────────────────────────────────────────────────────
 export const processSpell = data => {
-  let cmc = data.cmc;
-  let manaCost = data.mana_cost;
-  let oracleText = data.oracle_text;
-  let typeLine = data.type_line;
-
-  if (data.card_faces && data.card_faces.length > 0) {
-    const frontFace = data.card_faces[0];
-    if (cmc === undefined || cmc === null) cmc = frontFace.cmc;
-    if (!manaCost && frontFace.mana_cost) manaCost = frontFace.mana_cost;
-    if (!oracleText && frontFace.oracle_text) oracleText = frontFace.oracle_text;
-    if (!typeLine && frontFace.type_line) typeLine = frontFace.type_line;
-  }
+  const { cmc, manaCost, oracleText, typeLine } = resolveCardFaceFields(data);
   const calculatedCMC = calculateCMC(cmc, manaCost);
   if (calculatedCMC === 0 && data.name) {
     console.warn(
@@ -870,12 +843,14 @@ export const processCardData = data => {
   const isLand = !isMDFC && data.type_line?.toLowerCase().includes('land');
   if (isLand) return processLand(data, data, false);
 
-  const hasManaTap = hasManaTapAbility(data.oracle_text || frontFace.oracle_text);
+  const resolvedOracle = data.oracle_text || frontFace.oracle_text;
+  const resolvedTypeLine = data.type_line || frontFace.type_line;
+  const hasManaTap = hasManaTapAbility(resolvedOracle);
   const cardName = data.name.toLowerCase();
-  const isCreature = (data.type_line || frontFace.type_line)?.includes('Creature');
+  const isCreature = resolvedTypeLine?.includes('Creature');
   if (isCreature && hasManaTap) return processManaCreature(data);
 
-  const isArtifact = (data.type_line || frontFace.type_line)?.includes('Artifact');
+  const isArtifact = resolvedTypeLine?.includes('Artifact');
   if (isArtifact && !isCreature && hasManaTap) return processManaArtifact(data);
   if (isArtifact && !isCreature && ARTIFACT_DATA.has(cardName) && !BURST_MANA_SOURCES.has(cardName))
     return processManaArtifact(data);
@@ -889,9 +864,6 @@ export const processCardData = data => {
 
   // Oracle-text fallbacks for cards not in the hand-authored maps.
   // Uses the resolved oracle text / type line so MDFCs are handled correctly.
-  const resolvedOracle = data.oracle_text || frontFace.oracle_text;
-  const resolvedTypeLine = data.type_line || frontFace.type_line;
-
   const oracleTd = detectTreasureFromOracle(resolvedOracle, resolvedTypeLine);
   if (oracleTd) return processTreasureCard(data, oracleTd);
 
