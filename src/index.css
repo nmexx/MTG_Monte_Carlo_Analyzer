@@ -5,6 +5,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family:
     'Inter',
@@ -276,7 +280,9 @@ body {
   font-family: monospace;
   resize: vertical;
   color-scheme: dark;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 
 /* ─── Focus rings ────────────────────────────────────────────────────────── */
@@ -303,7 +309,10 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: opacity var(--transition), transform var(--transition), box-shadow var(--transition);
+  transition:
+    opacity var(--transition),
+    transform var(--transition),
+    box-shadow var(--transition);
 }
 
 .btn-primary:hover,
@@ -648,7 +657,9 @@ body {
   background: var(--clr-bg);
   color: var(--clr-text);
   color-scheme: dark;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 
 .range-display {
@@ -1365,7 +1376,9 @@ body {
   box-shadow: var(--shadow-sm);
   user-select: none;
   color: var(--clr-text);
-  transition: background var(--transition), box-shadow var(--transition);
+  transition:
+    background var(--transition),
+    box-shadow var(--transition);
 }
 
 .section-summary:focus-visible {
@@ -1473,4 +1486,98 @@ body {
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--clr-border) var(--clr-bg);
+}
+
+/* ─── Select styling ─────────────────────────────────────────────────────── */
+select.settings-input,
+.mulligan-select,
+.mana-override-select,
+.flood-screw-input[type='text'],
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+/* ─── Mobile layout ──────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .app-root {
+    padding: 10px;
+  }
+
+  .app-header {
+    padding: 20px 16px;
+    gap: 10px;
+  }
+
+  .app-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .app-header p {
+    font-size: 0.85rem;
+  }
+
+  .app-toolbar {
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .app-toolbar__left,
+  .app-toolbar__right {
+    flex-wrap: wrap;
+  }
+
+  .panel {
+    padding: 14px 12px;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-run {
+    font-size: 1rem;
+    padding: 13px 20px;
+  }
+
+  .comparison-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flood-screw-rates {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sim-progress-track {
+    width: 220px;
+  }
+
+  .mode-toggle {
+    width: 100%;
+  }
+
+  .mode-toggle__btn {
+    flex: 1;
+    text-align: center;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
