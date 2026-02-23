@@ -297,6 +297,23 @@ describe('buildActionSegments', () => {
     expect(getText(segs)).toBe("Brass's Bounty: created 5 treasures");
   });
 
+  it('parses "CardName: drew N cards: name1, name2" (upkeep per-turn draw with names)', () => {
+    const action = 'Curiosity: drew 1 card: Mountain';
+    const segs = buildActionSegments(action);
+    expect(getCards(segs)).toContain('Curiosity');
+    expect(getCards(segs)).toContain('Mountain');
+    expect(getText(segs)).toBe(action);
+  });
+
+  it('parses "CardName: drew N cards: name1, name2" with multiple drawn cards', () => {
+    const action = 'Phyrexian Arena: drew 2 cards: Lightning Bolt, Island';
+    const segs = buildActionSegments(action);
+    expect(getCards(segs)).toContain('Phyrexian Arena');
+    expect(getCards(segs)).toContain('Lightning Bolt');
+    expect(getCards(segs)).toContain('Island');
+    expect(getText(segs)).toBe(action);
+  });
+
   it('falls back to plain text for unrecognised patterns', () => {
     const action = 'Mana Crypt damage: -1 life (avg)';
     const segs = buildActionSegments(action);

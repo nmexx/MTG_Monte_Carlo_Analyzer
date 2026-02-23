@@ -98,6 +98,7 @@ export const getFetchTitle = fetchType => {
 //     "Cannot play <name> (<reason>)"
 //     "Cast <type>: <name>[etb/sac/imprint notes][ → land list; land to hand]"
 //     "Cast draw spell: <name> → drew N cards: <n1>, <n2>"
+//     "<name>: drew N card(s): drawn1, drawn2"  [upkeep per-turn draw]
 //     "<name>: created N treasure(s)"
 // ─────────────────────────────────────────────────────────────────────────────
 export const buildActionSegments = action => {
@@ -118,6 +119,19 @@ export const buildActionSegments = action => {
   // ── "Discarded: <name> (<reason>)" ────────────────────────────────────────
   const discM = action.match(/^(Discarded: )(.+?)( \([^)]+\))$/);
   if (discM) return [p(discM[1]), c(discM[2]), p(discM[3])];
+
+  // ── "<name>: drew N card(s): drawn1, drawn2" [upkeep per-turn draw] ──────────
+  const drewUpkeepWithNamesM = action.match(/^(.+?)(: drew \d+ cards?: )(.+)$/);
+  if (drewUpkeepWithNamesM)
+    return [
+      c(drewUpkeepWithNamesM[1]),
+      p(drewUpkeepWithNamesM[2]),
+      ...fromList(drewUpkeepWithNamesM[3]),
+    ];
+
+  // ── "<name>: drew N card(s)" [upkeep draw, no card names] ─────────────────
+  const drewUpkeepM = action.match(/^(.+?)(: drew \d+ cards?)$/);
+  if (drewUpkeepM) return [c(drewUpkeepM[1]), p(drewUpkeepM[2])];
 
   // ── "<name>: created N treasure(s)" [upkeep treasure entries] ─────────────
   const treasM = action.match(/^(.+?)(: created \d+ treasures?)$/);

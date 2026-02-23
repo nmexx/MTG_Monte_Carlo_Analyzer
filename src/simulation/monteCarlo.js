@@ -499,12 +499,18 @@ export const monteCarlo = (deckToParse, config = {}) => {
           const full = Math.floor(perTurn);
           const frac = Math.random() < perTurn - full ? 1 : 0;
           const toDraw = full + frac;
+          const drawnNames = [];
           for (let d = 0; d < toDraw && library.length > 0; d++) {
-            hand.push(library.shift());
+            const drawnCard = library.shift();
+            hand.push(drawnCard);
+            drawnNames.push(drawnCard.name);
           }
           if (toDraw > 0) {
             cardsDrawnThisTurn += toDraw;
-            turnLog.actions.push(`${card.name}: drew ${toDraw} card${toDraw !== 1 ? 's' : ''}`);
+            const drawnList = drawnNames.length > 0 ? `: ${drawnNames.join(', ')}` : '';
+            turnLog.actions.push(
+              `${card.name}: drew ${toDraw} card${toDraw !== 1 ? 's' : ''}${drawnList}`
+            );
           }
         });
       }

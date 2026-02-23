@@ -277,3 +277,10 @@
     - **`RitualsPanel.jsx`** — dropdown now has three modes: *Default*, *Fixed value*, and *Scaling per turn*. The scaling mode shows two number inputs (base and growth).
     - **`DrawSpellsPanel.jsx`** — dropdown now has five modes: *Default*, *One-time draw*, *Per-turn draw*, *Scaling one-time*, and *Scaling per-turn*. The two scaling modes show base + growth inputs.
     - **Tests** — 9 new tests in `monteCarlo.test.js`: 4 for ritual scaling (`{ mode: 'fixed' }` object, scaling sets `ritualScaling`, growth clamped to 0, backward-compat number) + 5 for draw scaling (`scaling-onetime`, `scaling-perturn`, growth clamp, base clamp, fixed modes leave `drawScaling` undefined); total suite: `562 → 571`.
+
+40. **Named drawn cards in upkeep per-turn draw action log** --------DONE
+    - **`monteCarlo.js` — upkeep draw loop** — card names are now collected while drawing (`drawnNames` array) and appended to the log entry as `: name1, name2`, giving format `<cardName>: drew N card(s): name1, name2` (mirrors the existing `simulationCore.js` one-shot draw format).
+    - **`uiHelpers.jsx` — `buildActionSegments`** — two new parse branches added before the treasure pattern:
+      - `<name>: drew N card(s): drawn1, drawn2` — renders the source card name as a tooltip link and each drawn card name as a tooltip link.
+      - `<name>: drew N card(s)` (no names) — renders the source card name as a tooltip link (edge-case guard).
+    - **Tests** — 2 new tests in `uiHelpers.test.js` (upkeep draw with single drawn card; upkeep draw with multiple drawn cards); total suite: `571 → 573`.
