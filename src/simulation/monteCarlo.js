@@ -573,7 +573,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
 
       // Phase 2: Exploration effects (cast after first land)
       if (includeExploration) {
-        const manaAvailable = calculateManaAvailability(battlefield);
+        const manaAvailable = calculateManaAvailability(battlefield, turn);
         const explorationInHand = hand.filter(
           c => c.isExploration && !disabledExploration.has(c.name)
         );
@@ -590,7 +590,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
             tapManaSources(expl, battlefield, explDiscount);
             const type = expl.isCreature ? 'creature' : expl.isArtifact ? 'artifact' : 'permanent';
             turnLog.actions.push(`Cast ${type}: ${expl.name} (Exploration effect)`);
-            const nm = calculateManaAvailability(battlefield);
+            const nm = calculateManaAvailability(battlefield, turn);
             Object.assign(manaAvailable, nm);
           }
         }
@@ -630,7 +630,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
       // Phase 5: Activate fetch lands already on battlefield
       const fetchLands = battlefield.filter(p => p.card.isFetch && !p.tapped);
       for (const fetchPermanent of fetchLands) {
-        const manaAvailable = calculateManaAvailability(battlefield);
+        const manaAvailable = calculateManaAvailability(battlefield, turn);
         const fetchCost = fetchPermanent.card.fetchcost || 0;
         const canAffordFetch = fetchCost === 0 || manaAvailable.total >= fetchCost;
 
@@ -731,7 +731,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
       results.cardsDrawnPerTurn[turn].push(cardsDrawnThisTurn);
       results.treasurePerTurn[turn].push(cumulativeTreasures);
 
-      const manaAvailable = calculateManaAvailability(battlefield);
+      const manaAvailable = calculateManaAvailability(battlefield, turn);
       results.totalManaPerTurn[turn].push(manaAvailable.total);
       ['W', 'U', 'B', 'R', 'G'].forEach(color => {
         results.colorsByTurn[turn][color].push(manaAvailable.colors[color] || 0);
