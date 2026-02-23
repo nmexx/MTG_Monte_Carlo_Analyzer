@@ -14,6 +14,9 @@ body {
     sans-serif;
   background-color: var(--clr-bg);
   color: var(--clr-text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ─── Design tokens ──────────────────────────────────────────────────────── */
@@ -35,7 +38,11 @@ body {
   --clr-bg-warn: #2a1a00;
   --clr-generic-pip: #475569;
   --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.45);
-  --radius-lg: 12px;
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45), 0 1px 4px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --glow-primary: 0 0 0 3px rgba(102, 126, 234, 0.25);
+  --transition: 0.18s ease;
+  --radius-lg: 14px;
   --radius-md: 8px;
   --radius-sm: 6px;
   --radius-xs: 4px;
@@ -110,11 +117,13 @@ body {
   border-radius: var(--radius-sm);
   font-size: 0.8rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
   text-decoration: none;
   transition:
-    background 0.15s,
-    border-color 0.15s;
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition);
   white-space: nowrap;
 }
 
@@ -167,7 +176,8 @@ body {
   padding: 20px;
   border-radius: var(--radius-lg);
   margin-bottom: 20px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--clr-border);
 }
 
 /* Panels that also appear inside a panel-grid don't need margin-bottom */
@@ -266,6 +276,21 @@ body {
   font-family: monospace;
   resize: vertical;
   color-scheme: dark;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+/* ─── Focus rings ────────────────────────────────────────────────────────── */
+.deck-textarea:focus,
+.settings-input:focus,
+.mulligan-select:focus,
+.custom-rule-input:focus,
+.flood-screw-input:focus,
+.deck-label-input:focus,
+.mana-override-input:focus,
+.mana-override-select:focus {
+  outline: none;
+  border-color: var(--clr-primary);
+  box-shadow: var(--glow-primary);
 }
 
 /* ─── Buttons ────────────────────────────────────────────────────────────── */
@@ -276,7 +301,23 @@ body {
   border: none;
   border-radius: var(--radius-md);
   font-weight: 600;
+  letter-spacing: 0.02em;
   cursor: pointer;
+  transition: opacity var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+.btn-primary:hover,
+.btn-run:not(:disabled):hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:active,
+.btn-run:not(:disabled):active {
+  transform: translateY(0);
+  box-shadow: none;
+  opacity: 1;
 }
 
 .btn-primary {
@@ -316,8 +357,9 @@ body {
 .error-banner {
   background: #450a0a;
   color: #fca5a5;
-  padding: 15px;
+  padding: 12px 15px;
   border-radius: var(--radius-md);
+  border-left: 3px solid #ef4444;
   margin-bottom: 20px;
   font-size: 0.875rem;
 }
@@ -327,6 +369,7 @@ body {
   background: #2d1a00;
   color: #fde68a;
   border: 1px solid #92400e;
+  border-left: 3px solid #f59e0b;
   padding: 10px 12px;
   border-radius: var(--radius-md);
   margin-bottom: 10px;
@@ -359,11 +402,17 @@ body {
 
 /* ─── Shared card rows ───────────────────────────────────────────────────── */
 .card-row {
-  padding: 8px 0;
+  padding: 8px 4px;
   border-bottom: 1px solid var(--clr-row-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  transition: background var(--transition);
+  border-radius: var(--radius-xs);
+}
+
+.card-row:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 /* Card rows that contain a mana-override sub-row */
@@ -407,7 +456,7 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding-left: 24px;  /* indent to align with card name */
+  padding-left: 24px; /* indent to align with card name */
   flex-wrap: wrap;
 }
 
@@ -556,10 +605,19 @@ body {
   justify-content: space-between;
   align-items: center;
   background: transparent;
+  transition: background var(--transition);
+}
+
+.spell-row:hover {
+  background: rgba(102, 126, 234, 0.08);
 }
 
 .spell-row--selected {
   background: var(--clr-bg-accent);
+}
+
+.spell-row--selected:hover {
+  background: rgba(30, 58, 95, 0.9);
 }
 
 .spell-card-name {
@@ -590,6 +648,7 @@ body {
   background: var(--clr-bg);
   color: var(--clr-text);
   color-scheme: dark;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
 .range-display {
@@ -870,8 +929,13 @@ body {
   font-size: 0.875rem;
   cursor: pointer;
   transition:
-    background 0.15s,
-    color 0.15s;
+    background var(--transition),
+    color var(--transition);
+}
+
+.mode-toggle__btn:not(.mode-toggle__btn--active):hover {
+  background: var(--clr-border);
+  color: var(--clr-text);
 }
 
 .mode-toggle__btn--active {
@@ -1269,9 +1333,9 @@ body {
 
 .sim-progress-bar {
   height: 100%;
-  background: var(--clr-primary);
+  background: linear-gradient(90deg, var(--clr-primary) 0%, var(--clr-primary-end) 100%);
   border-radius: 3px;
-  transition: width 0.15s ease;
+  transition: width 0.2s ease;
 }
 
 /* ─── Collapsible deck sections ──────────────────────────────────────────── */
@@ -1288,6 +1352,7 @@ body {
   cursor: pointer;
   font-weight: 700;
   font-size: 0.875rem;
+  letter-spacing: 0.01em;
   padding: 9px 14px;
   background: var(--clr-bg-panel);
   border-radius: var(--radius-md);
@@ -1300,7 +1365,12 @@ body {
   box-shadow: var(--shadow-sm);
   user-select: none;
   color: var(--clr-text);
-  transition: background 0.15s;
+  transition: background var(--transition), box-shadow var(--transition);
+}
+
+.section-summary:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-primary);
 }
 
 .section-summary:hover {
@@ -1379,4 +1449,28 @@ body {
 
 .prob-bar-value {
   position: relative;
+}
+
+/* ─── Scrollbars ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--clr-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--clr-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--clr-faint);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--clr-border) var(--clr-bg);
 }
