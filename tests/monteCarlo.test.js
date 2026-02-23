@@ -1092,3 +1092,59 @@ describe('monteCarlo — cost-reducer integration', () => {
     expect(playT2With).toBeGreaterThanOrEqual(playT2No);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// monteCarlo — onProgress callback
+// ─────────────────────────────────────────────────────────────────────────────
+describe('monteCarlo — onProgress callback', () => {
+  const minimalDeck = () => ({
+    lands: [land({ quantity: 24 })],
+    creatures: [],
+    artifacts: [],
+    rampSpells: [],
+    rituals: [],
+    explorations: [],
+    costReducers: [],
+    drawSpells: [],
+    treasures: [],
+    spells: [],
+    totalCards: 24,
+  });
+
+  it('calls onProgress with final (iterations, iterations) after completion', () => {
+    const calls = [];
+    monteCarlo(minimalDeck(), { iterations: 500, turns: 3 }, (completed, total) => {
+      calls.push({ completed, total });
+    });
+    expect(calls.length).toBeGreaterThan(0);
+    const last = calls[calls.length - 1];
+    expect(last.completed).toBe(500);
+    expect(last.total).toBe(500);
+  });
+
+  it('calls onProgress with correct total on every invocation', () => {
+    const calls = [];
+    monteCarlo(minimalDeck(), { iterations: 1000, turns: 3 }, (completed, total) => {
+      calls.push({ completed, total });
+    });
+    calls.forEach(({ total }) => expect(total).toBe(1000));
+  });
+
+  it('reports non-decreasing completed counts', () => {
+    const completedValues = [];
+    monteCarlo(minimalDeck(), { iterations: 1000, turns: 3 }, completed => {
+      completedValues.push(completed);
+    });
+    for (let i = 1; i < completedValues.length; i++) {
+      expect(completedValues[i]).toBeGreaterThanOrEqual(completedValues[i - 1]);
+    }
+  });
+
+  it('does not throw when onProgress is null', () => {
+    expect(() => monteCarlo(minimalDeck(), { iterations: 100, turns: 3 }, null)).not.toThrow();
+  });
+
+  it('does not throw when onProgress is omitted', () => {
+    expect(() => monteCarlo(minimalDeck(), { iterations: 100, turns: 3 })).not.toThrow();
+  });
+});

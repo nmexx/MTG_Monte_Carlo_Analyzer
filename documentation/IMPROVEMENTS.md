@@ -10,9 +10,12 @@
 
 ## Performance / Architecture
 
-1. **Move simulation to a Web Worker** `[High]` *(partially addressed in v3.1.5; tracked as #24)*
-   - The `monteCarlo` loop now uses `flushSync` instead of `setTimeout(100ms)` to guarantee the loading overlay paints before the CPU-intensive loop — no arbitrary delay, correct React 18 pattern.
-   - Full Web Worker offload (for real progress bar and no UI janking at 50k+ iterations) is still the goal and remains tracked as #24.
+1. **Move simulation to a Web Worker** --------DONE (v3.2.0)
+   - The `monteCarlo` loop now runs in a dedicated ES-module Web Worker (`src/simulation/simulationWorker.js`).
+   - Sets in the config are serialised to arrays before `postMessage` and rehydrated inside the Worker.
+   - The Worker posts `PROGRESS` messages every 250 iterations; `App.jsx` updates a `simProgress` state variable, driving a live percentage and animated progress bar in the overlay.
+   - In comparison mode, Deck A fills 0→50% and Deck B fills 50→100%.
+   - The `flushSync` + `setTimeout(0)` workaround has been removed; the Worker unblocks the main thread entirely so the overlay renders immediately.
 
 2. **Split App.jsx into modules** --------DONE
    - The file is 4000+ lines and mixes simulation engine, data processing, and UI.
@@ -174,10 +177,15 @@
 
 ## New — Performance / Architecture
 
-24. **Web Worker with real progress bar** `[High]` *(highest-ROI unfinished item from #1)*
-    - At 10k iterations the UI hitches noticeably; blocking becomes severe at 50k+.
-    - Offload the `monteCarlo` loop to a Worker, post progress messages back, and render a live % bar.
-    - The engine is already pure and config-driven — it can be transferred with a single `import`.
+24. **Web Worker with real progress bar** --------DONE (v3.2.0)
+    - `monteCarlo` now accepts an optional `onProgress(completed, total)` third argument; the engine calls it every 250 iterations and once at completion.
+    - `src/simulation/simulationWorker.js` (new ES-module Worker): receives serialised config (Sets→Arrays), rehydrates, runs `monteCarlo` with the progress callback, posts `PROGRESS` / `RESULT` / `ERROR` messages.
+    - `App.jsx`: `runSimulation` creates a Worker per run, serialises Sets via `serializeConfig`, handles the three message types, and tears down the Worker on completion or error.
+    - Progress bar (`sim-progress-track` / `sim-progress-bar`) displayed in the overlay with a CSS transition; percentage shown next to iteration count.
+    - In comparison mode Deck A drives 0→50%, Deck B 50→100%.
+    - `flushSync` import removed from `App.jsx`; direct `monteCarlo` import removed.
+    - **Files changed**: `src/simulation/monteCarlo.js`, `src/simulation/simulationWorker.js` *(new)*, `src/App.jsx`, `src/index.css`
+    - **Tests**: 5 new tests in `monteCarlo — onProgress callback` describe block in `monteCarlo.test.js`.
 
 25. **Batch / ranked deck comparison (N variants)** `[Very High]`
     - Extend the current A/B mode to support N named deck slots.

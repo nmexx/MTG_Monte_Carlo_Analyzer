@@ -282,7 +282,7 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // monteCarlo
 // ─────────────────────────────────────────────────────────────────────────────
-export const monteCarlo = (deckToParse, config = {}) => {
+export const monteCarlo = (deckToParse, config = {}, onProgress = null) => {
   const {
     iterations = 10000,
     turns = 7,
@@ -386,6 +386,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
 
   // ── Main iteration loop ───────────────────────────────────────────────────
   for (let iter = 0; iter < iterations; iter++) {
+    if (onProgress && iter % 250 === 0) onProgress(iter, iterations);
     const shuffled = shuffle(deck);
     let hand = shuffled.slice(0, handSize);
     let library = shuffled.slice(handSize);
@@ -845,6 +846,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
       });
     } // end turn loop
   } // end iteration loop
+  if (onProgress) onProgress(iterations, iterations);
 
   // Flood / screw rates — computed from raw per-turn arrays BEFORE averaging
   const floodTurnIdx = floodTurn - 1;

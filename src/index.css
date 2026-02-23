@@ -1251,6 +1251,22 @@ body {
   color: var(--clr-muted);
 }
 
+.sim-progress-track {
+  width: 260px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.sim-progress-bar {
+  height: 100%;
+  background: var(--clr-primary);
+  border-radius: 3px;
+  transition: width 0.15s ease;
+}
+
 /* ─── Collapsible deck sections ──────────────────────────────────────────── */
 .section-details {
   margin-bottom: 20px;
@@ -1471,6 +1487,10 @@ body {
 /* Simulation overlay ────────────────────────────────────────────────────── */
 .sim-overlay {
   background: rgba(15, 23, 42, 0.88);
+}
+
+.sim-progress-track {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* Sticky run-button fade ────────────────────────────────────────────────── */

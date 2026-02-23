@@ -67,6 +67,42 @@ const MOCK_PARSED_DECK = {
 import { parseDeckList } from '../src/parser/deckParser.js';
 import { monteCarlo } from '../src/simulation/monteCarlo.js';
 
+// ─── Worker mock ──────────────────────────────────────────────────────────────
+// jsdom has no Web Worker support. MockWorker mirrors the simulationWorker.js
+// protocol: on RUN it calls the (already mocked) monteCarlo, rehydrates Set
+// fields, then posts a RESULT message synchronously via Promise.resolve().
+const _WORKER_SET_FIELDS = [
+  'selectedKeyCards',
+  'disabledExploration',
+  'disabledRampSpells',
+  'disabledArtifacts',
+  'disabledCreatures',
+  'disabledRituals',
+  'disabledCostReducers',
+  'disabledDrawSpells',
+  'disabledTreasures',
+];
+class MockWorker {
+  constructor() {
+    this.onmessage = null;
+    this.onerror = null;
+  }
+  postMessage(data) {
+    if (data.type !== 'RUN') return;
+    const { deckId, deckToParse, config } = data;
+    const rehydrated = { ...config };
+    _WORKER_SET_FIELDS.forEach(f => {
+      rehydrated[f] = new Set(config[f] ?? []);
+    });
+    const results = monteCarlo(deckToParse, rehydrated);
+    Promise.resolve().then(() => {
+      if (this.onmessage) this.onmessage({ data: { type: 'RESULT', deckId, results } });
+    });
+  }
+  terminate() {}
+}
+global.Worker = MockWorker;
+
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
 
 beforeEach(() => {

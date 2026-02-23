@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { flushSync } from 'react-dom';
 import LZString from 'lz-string';
 
-// ─── Simulation & Parsing ─────────────────────────────────────────────────────
-import { monteCarlo } from './simulation/monteCarlo.js';
+// ─── Simulation & Parsing ─────────────────────────────────────────────────────────────────────────────
 import { parseDeckList } from './parser/deckParser.js';
 
 // ─── UI Utilities ─────────────────────────────────────────────────────────────
@@ -134,6 +132,7 @@ const MTGMonteCarloAnalyzer = () => {
   const [screwTurn, setScrewTurn] = useState(() => _s.screwTurn ?? 3);
 
   const [isSimulating, setIsSimulating] = useState(false);
+  const [simProgress, setSimProgress] = useState(0);
 
   // ── Share URL ──────────────────────────────────────────────────────────────
   const [shareCopied, setShareCopied] = useState(false);
@@ -259,6 +258,28 @@ const MTGMonteCarloAnalyzer = () => {
   );
 
   // =============================================================================
+  // serializeConfig — converts Set fields to Arrays for postMessage transfer
+  // =============================================================================
+  const SET_CONFIG_FIELDS = [
+    'selectedKeyCards',
+    'disabledExploration',
+    'disabledRampSpells',
+    'disabledArtifacts',
+    'disabledCreatures',
+    'disabledRituals',
+    'disabledCostReducers',
+    'disabledDrawSpells',
+    'disabledTreasures',
+  ];
+  const serializeConfig = config => {
+    const out = { ...config };
+    SET_CONFIG_FIELDS.forEach(f => {
+      out[f] = [...(config[f] ?? [])];
+    });
+    return out;
+  };
+
+  // =============================================================================
   // buildSimConfig — assembles the monteCarlo config object for a given slot
   // =============================================================================
   const buildSimConfig = slot => ({
@@ -299,13 +320,9 @@ const MTGMonteCarloAnalyzer = () => {
   });
 
   // =============================================================================
-  // Run simulation — flushSync forces React to commit the overlay to the DOM
-  // synchronously, then setTimeout(0) yields a macrotask so the browser can
-  // actually paint it before the blocking monteCarlo loop takes the main thread.
-  // rAF alone fires *before* paint; flushSync alone commits but doesn't paint.
-  // (Web Worker offload is tracked as improvement #24.)
+  // runSimulation — offloads monteCarlo to a Web Worker (improvement #24)
   // =============================================================================
-  const runSimulation = async () => {
+  const runSimulation = () => {
     if (!parsedDeck) {
       setError('Please parse a deck first');
       return;
@@ -315,28 +332,65 @@ const MTGMonteCarloAnalyzer = () => {
       return;
     }
 
-    // Step 1: commit the overlay to the DOM synchronously.
-    flushSync(() => {
-      setIsSimulating(true);
-      setError('');
+    setIsSimulating(true);
+    setSimProgress(0);
+    setError('');
+
+    const worker = new Worker(new URL('./simulation/simulationWorker.js', import.meta.url), {
+      type: 'module',
     });
+    const totalDecks = comparisonMode ? 2 : 1;
+    const configB = comparisonMode ? serializeConfig(buildSimConfig(deckSlotB)) : null;
 
-    // Step 2: yield a macrotask so the browser paints the overlay before
-    // monteCarlo blocks the main thread.
-    await new Promise(r => setTimeout(r, 0));
-
-    try {
-      const resultsA = monteCarlo(parsedDeck, buildSimConfig(deckSlotA));
-      setDeckSlotA(prev => ({ ...prev, simulationResults: resultsA }));
-      if (comparisonMode) {
-        const resultsB = monteCarlo(parsedDeckB, buildSimConfig(deckSlotB));
-        setDeckSlotB(prev => ({ ...prev, simulationResults: resultsB }));
-      }
-    } catch (err) {
-      setError('Simulation error: ' + err.message);
-    } finally {
+    const finish = () => {
+      worker.terminate();
       setIsSimulating(false);
-    }
+    };
+
+    worker.onerror = err => {
+      setError('Simulation error: ' + (err.message ?? 'unknown'));
+      finish();
+    };
+
+    worker.onmessage = ({ data }) => {
+      if (data.type === 'PROGRESS') {
+        // Deck A fills 0→100% (single) or 0→50% (comparison);
+        // Deck B fills 50→100% in comparison mode.
+        const offset = data.deckId === 'B' ? 50 : 0;
+        const share = 100 / totalDecks;
+        setSimProgress(Math.round(offset + (data.completed / data.total) * share));
+      } else if (data.type === 'RESULT') {
+        if (data.deckId === 'A') {
+          setDeckSlotA(prev => ({ ...prev, simulationResults: data.results }));
+          if (comparisonMode) {
+            setSimProgress(50);
+            worker.postMessage({
+              type: 'RUN',
+              deckId: 'B',
+              deckToParse: parsedDeckB,
+              config: configB,
+            });
+          } else {
+            setSimProgress(100);
+            finish();
+          }
+        } else {
+          setDeckSlotB(prev => ({ ...prev, simulationResults: data.results }));
+          setSimProgress(100);
+          finish();
+        }
+      } else if (data.type === 'ERROR') {
+        setError('Simulation error: ' + data.message);
+        finish();
+      }
+    };
+
+    worker.postMessage({
+      type: 'RUN',
+      deckId: 'A',
+      deckToParse: parsedDeck,
+      config: serializeConfig(buildSimConfig(deckSlotA)),
+    });
   };
 
   // =============================================================================
@@ -534,7 +588,10 @@ const MTGMonteCarloAnalyzer = () => {
           <div className="sim-spinner" />
           <div className="sim-overlay__text">Simulating...</div>
           <div className="sim-overlay__sub">
-            {iterations.toLocaleString()} iterations &middot; please wait
+            {iterations.toLocaleString()} iterations &middot; {simProgress}%
+          </div>
+          <div className="sim-progress-track">
+            <div className="sim-progress-bar" style={{ width: `${simProgress}%` }} />
           </div>
         </div>
       )}
