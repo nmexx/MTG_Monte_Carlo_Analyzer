@@ -558,9 +558,6 @@ const MTGMonteCarloAnalyzer = () => {
     setSelectedTurnForSequences,
     commanderMode,
     setCommanderMode,
-    commanderName: deckSlotA.commanderName,
-    setCommanderName: v => setDeckSlotA(prev => ({ ...prev, commanderName: v })),
-    comparisonMode,
     enableMulligans,
     setEnableMulligans,
     mulliganRule,
@@ -760,6 +757,24 @@ const MTGMonteCarloAnalyzer = () => {
             >
               Parse Deck
             </button>
+            {commanderMode && (
+              <div className="commander-name-field" style={{ marginTop: 10 }}>
+                <label className="settings-label" htmlFor="commander-name-input">
+                  🎩 Commander card
+                </label>
+                <input
+                  id="commander-name-input"
+                  type="text"
+                  className="settings-input"
+                  placeholder="e.g. Kenrith, the Returned King"
+                  value={deckSlotA.commanderName}
+                  onChange={e => setDeckSlotA(prev => ({ ...prev, commanderName: e.target.value }))}
+                />
+                <div className="commander-name-hint">
+                  Always tracked as a key card (command zone — always available).
+                </div>
+              </div>
+            )}
           </div>
 
           {parsedDeck && (

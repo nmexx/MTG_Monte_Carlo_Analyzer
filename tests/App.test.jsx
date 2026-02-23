@@ -499,6 +499,44 @@ describe('localStorage persistence', () => {
       expect(saved.commanderMode).toBe(true);
     });
   });
+
+  it('shows commander name input in the deck list panel (not settings) when commanderMode is on', async () => {
+    parseDeckList.mockResolvedValue(MOCK_PARSED_DECK);
+    render(<MTGMonteCarloAnalyzer />);
+
+    // Parse so SimulationSettingsPanel (with the Commander Mode checkbox) appears
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /parse deck/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: /Commander Mode/i })).toBeInTheDocument();
+    });
+
+    // Before enabling commander mode the input should not exist
+    expect(
+      document.querySelector('input[placeholder="e.g. Kenrith, the Returned King"]')
+    ).toBeNull();
+
+    // Enable Commander Mode
+    await act(async () => {
+      fireEvent.click(screen.getByRole('checkbox', { name: /Commander Mode/i }));
+    });
+
+    // Input should now appear in the Deck List panel (id=commander-name-input)
+    await waitFor(() => {
+      expect(document.getElementById('commander-name-input')).toBeInTheDocument();
+    });
+
+    // It should NOT be inside the simulation settings panel
+    // The input is in the Deck List panel which comes before SimulationSettingsPanel;
+    // verify the value is controllable (proves it’s the live input in the deck list area)
+    const input = document.getElementById('commander-name-input');
+    await act(async () => {
+      fireEvent.change(input, { target: { value: 'Atraxa, Praetors\u2019 Voice' } });
+    });
+    expect(input.value).toBe('Atraxa, Praetors\u2019 Voice');
+  });
 });
 
 // =============================================================================

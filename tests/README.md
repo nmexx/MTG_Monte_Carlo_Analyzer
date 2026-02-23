@@ -186,7 +186,7 @@ Runs in the **jsdom** environment with `@testing-library/react`. Tests the top-l
 | `Run Simulation flow` | After parsing a deck, "Start Simulation" button appears; clicking it invokes `monteCarlo` exactly once |
 | `localStorage persistence` | Deck text persisted to `localStorage.slotA.deckText` on change (new nested schema); saved deck text, `apiMode`, and `comparisonMode` all restored on re-mount; `labelA` persisted when changed in comparison mode; defaults used when `localStorage` is empty |
 | `Comparison mode` | "Single Deck" and "Compare Two Decks" toggle buttons render; single-deck is default (active class present); clicking Compare renders two `deck-textarea` elements; Deck A/B label inputs default to "Deck A" / "Deck B"; clicking Single Deck reverts to single-deck UI; both Parse Deck buttons independently call `parseDeckList`; "Parsing failed (Deck B)" shown on Deck B null parse; guard error "Please parse Deck B first" fires when only Deck A is parsed before simulation; `monteCarlo` called twice when both decks are parsed and simulation runs |
-| `localStorage persistence` (extended) | `turns` saved to `localStorage` when changed via SimulationSettingsPanel; `commanderMode` saved when Commander Mode checkbox is toggled |
+| `localStorage persistence` (extended) | `turns` saved to `localStorage` when changed via SimulationSettingsPanel; `commanderMode` saved when Commander Mode checkbox is toggled; commander name input appears in the Deck List panel (not SimulationSettingsPanel) once Commander Mode is enabled |
 
 > **Setup note:** `vite.config.js` now includes a `test` block (`globals: true`, `environment: 'jsdom'`,
 > `setupFiles: ['./tests/setup.js']`). The setup file extends vitest's `expect` with
@@ -205,8 +205,8 @@ Runs in the **jsdom** environment with `@testing-library/react`. Tests the top-l
 | `deckParser.test.js` | 30 |
 | `math.test.js` | 22 |
 | `uiHelpers.test.js` | 58 |
-| `App.test.jsx` | 46 |
-| **Total** | **573** |
+| `App.test.jsx` | 47 |
+| **Total** | **574** |
 
 ## What is not yet tested
 

@@ -23,9 +23,6 @@ const SimulationSettingsPanel = ({
   setSelectedTurnForSequences,
   commanderMode,
   setCommanderMode,
-  commanderName,
-  setCommanderName,
-  comparisonMode = false,
   enableMulligans,
   setEnableMulligans,
   mulliganRule,
@@ -126,24 +123,6 @@ const SimulationSettingsPanel = ({
           Assumes multiplayer environment: Crowd lands enter untapped, longer game simulation
           recommended. The first mulligan is free — you redraw 7 cards without bottoming any
           (official Commander rule).
-        </div>
-      )}
-      {commanderMode && !comparisonMode && (
-        <div className="commander-name-field">
-          <label className="settings-label" htmlFor="commander-name-input">
-            Commander card
-          </label>
-          <input
-            id="commander-name-input"
-            type="text"
-            className="settings-input"
-            placeholder="e.g. Kenrith, the Returned King"
-            value={commanderName}
-            onChange={e => setCommanderName(e.target.value)}
-          />
-          <div className="commander-name-hint">
-            Always tracked as a key card (command zone — always available).
-          </div>
         </div>
       )}
     </div>

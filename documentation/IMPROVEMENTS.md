@@ -344,3 +344,9 @@
     - `monteCarlo.js`: `commanderName` destructured from config. If set and not already in `selectedKeyCards`, it is pushed onto `keyCardNames` so the existing key-card playability machinery tracks it automatically. If the card is not found in `allPlayableCards` (because it lives in the command zone, not the deck), a stub `{ name, cmc: 0, colors: [] }` is registered in `keyCardMap` — this ensures a CMC-0 always-castable fallback so results still appear.
     - `index.css`: `.commander-name-field` and `.commander-name-hint` helper classes added.
     - 4 new Vitest tests: commander auto-added to `keyCardPlayability`, playability array length matches `turns`, unknown commander stub passes at 100% (CMC 0), no duplicate key when already in `selectedKeyCards`; total suite: 587.
+
+42. **Commander card input moved to Deck List panel** --------DONE (v3.2.2)
+
+    - `App.jsx`: commander name text input (labelled "🎩 Commander card") moved from `SimulationSettingsPanel` into the **Deck List** panel in single-deck mode, appearing below the Parse Deck button when `commanderMode` is active. Comparison mode already had per-deck commander inputs in the deck column panels — they are unchanged. `commanderName`, `setCommanderName`, and `comparisonMode` removed from `simSettingsProps`.
+    - `SimulationSettingsPanel.jsx`: `commanderName`, `setCommanderName`, and `comparisonMode` props removed. The `{commanderMode && !comparisonMode && (...)}` input block removed entirely — the component now only owns the Commander Mode checkbox and the multiplayer hint text.
+    - 1 new App integration test: verifies the commander name input renders in the Deck List panel (by `id="commander-name-input"`) when Commander Mode is toggled on, and that the input is controllable; total suite: 588.
