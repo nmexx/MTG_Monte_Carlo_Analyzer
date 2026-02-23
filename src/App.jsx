@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import LZString from 'lz-string';
 
 // ─── Simulation & Parsing ─────────────────────────────────────────────────────
@@ -14,22 +15,16 @@ import {
   prepareChartData,
 } from './utils/uiHelpers.jsx';
 
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+import { useDeckSlot, serializeDeckSlot } from './hooks/useDeckSlot.js';
+import { useCardLookup, SCRYFALL_SOFT_LIMIT, SCRYFALL_HARD_LIMIT } from './hooks/useCardLookup.js';
+
 // ─── Panel Components ─────────────────────────────────────────────────────────
-import LandsPanel from './components/LandsPanel.jsx';
-import ArtifactsPanel from './components/ArtifactsPanel.jsx';
-import CreaturesPanel from './components/CreaturesPanel.jsx';
-import ExplorationPanel from './components/ExplorationPanel.jsx';
-import RampSpellsPanel from './components/RampSpellsPanel.jsx';
-import RitualsPanel from './components/RitualsPanel.jsx';
-import CostReducersPanel from './components/CostReducersPanel.jsx';
-import DrawSpellsPanel from './components/DrawSpellsPanel.jsx';
-import TreasuresPanel from './components/TreasuresPanel.jsx';
-import SpellsPanel from './components/SpellsPanel.jsx';
 import SimulationSettingsPanel from './components/SimulationSettingsPanel.jsx';
 import ResultsPanel from './components/ResultsPanel.jsx';
 import ComparisonResultsPanel from './components/ComparisonResultsPanel.jsx';
-import DeckStatisticsPanel from './components/DeckStatisticsPanel.jsx';
-import ComparisonRow from './components/ComparisonRow.jsx';
+import DeckPanels from './components/DeckPanels.jsx';
+import ComparisonPanelGrid from './components/ComparisonPanelGrid.jsx';
 
 import html2canvas from 'html2canvas';
 
@@ -80,220 +75,29 @@ if (_urlState) {
 }
 
 // =============================================================================
-// Deck slot — all per-deck mutable state in one object
-// =============================================================================
-const defaultDeckSlot = (saved = {}) => ({
-  deckText: saved.deckText ?? '',
-  parsedDeck: null,
-  selectedKeyCards: new Set(saved.selectedKeyCards ?? []),
-  includeArtifacts: saved.includeArtifacts ?? true,
-  disabledArtifacts: new Set(saved.disabledArtifacts ?? []),
-  includeCreatures: saved.includeCreatures ?? true,
-  disabledCreatures: new Set(saved.disabledCreatures ?? []),
-  manaOverrides: saved.manaOverrides ?? {},
-  includeExploration: saved.includeExploration ?? true,
-  disabledExploration: new Set(saved.disabledExploration ?? []),
-  includeRampSpells: saved.includeRampSpells ?? true,
-  disabledRampSpells: new Set(saved.disabledRampSpells ?? []),
-  includeRituals: saved.includeRituals ?? true,
-  disabledRituals: new Set(saved.disabledRituals ?? []),
-  includeCostReducers: saved.includeCostReducers ?? true,
-  disabledCostReducers: new Set(saved.disabledCostReducers ?? []),
-  includeDrawSpells: saved.includeDrawSpells ?? true,
-  disabledDrawSpells: new Set(saved.disabledDrawSpells ?? []),
-  drawOverrides: saved.drawOverrides ?? {},
-  includeTreasures: saved.includeTreasures ?? true,
-  disabledTreasures: new Set(saved.disabledTreasures ?? []),
-  treasureOverrides: saved.treasureOverrides ?? {},
-  ritualOverrides: saved.ritualOverrides ?? {},
-  simulationResults: null,
-});
-
-const serializeDeckSlot = slot => ({
-  deckText: slot.deckText,
-  selectedKeyCards: [...slot.selectedKeyCards],
-  includeArtifacts: slot.includeArtifacts,
-  disabledArtifacts: [...slot.disabledArtifacts],
-  includeCreatures: slot.includeCreatures,
-  disabledCreatures: [...slot.disabledCreatures],
-  manaOverrides: slot.manaOverrides,
-  includeExploration: slot.includeExploration,
-  disabledExploration: [...slot.disabledExploration],
-  includeRampSpells: slot.includeRampSpells,
-  disabledRampSpells: [...slot.disabledRampSpells],
-  includeRituals: slot.includeRituals,
-  disabledRituals: [...slot.disabledRituals],
-  includeCostReducers: slot.includeCostReducers,
-  disabledCostReducers: [...slot.disabledCostReducers],
-  includeDrawSpells: slot.includeDrawSpells,
-  disabledDrawSpells: [...(slot.disabledDrawSpells ?? [])],
-  drawOverrides: slot.drawOverrides ?? {},
-  includeTreasures: slot.includeTreasures,
-  disabledTreasures: [...(slot.disabledTreasures ?? [])],
-  treasureOverrides: slot.treasureOverrides ?? {},
-  ritualOverrides: slot.ritualOverrides ?? {},
-});
-
-// =============================================================================
-// hasCastables — true when a deck has any non-land spells to track
-// =============================================================================
-const hasCastables = deck =>
-  deck &&
-  (deck.spells.length > 0 ||
-    deck.creatures.length > 0 ||
-    deck.artifacts.length > 0 ||
-    deck.rituals?.length > 0 ||
-    deck.rampSpells?.length > 0 ||
-    deck.drawSpells?.length > 0 ||
-    deck.exploration?.length > 0);
-
-// Scryfall API usage limits per browser session.
-// Cards already in the local cache never count against these.
-const SCRYFALL_SOFT_LIMIT = 60; // show advisory warning
-const SCRYFALL_HARD_LIMIT = 150; // block further API calls
-
-// =============================================================================
 const MTGMonteCarloAnalyzer = () => {
   // URL hash state takes priority over localStorage, read once at startup.
   const [_s] = useState(() => _urlState ?? getSaved());
+
   // ── Data source ────────────────────────────────────────────────────────────
   const [apiMode, setApiMode] = useState(() => _s.apiMode ?? 'local');
-  const [cardsDatabase, setCardsDatabase] = useState(null);
-  // Mutable lookup cache — intentionally a ref so updates don't trigger re-renders
-  const lookupCacheRef = useRef(new Map());
-
-  // ── Scryfall API rate limiting ─────────────────────────────────────────────
-  // Count is state (for display in JSX) and also mirrored in sessionStorage
-  // so it survives React re-renders but resets when the tab is closed.
-  const [scryfallCallCount, setScryfallCallCount] = useState(() =>
-    parseInt(sessionStorage.getItem('scryfall_call_count') || '0', 10)
-  );
 
   // ── Comparison mode ────────────────────────────────────────────────────────
   const [comparisonMode, setComparisonMode] = useState(() => _s.comparisonMode ?? false);
   const [labelA, setLabelA] = useState(() => _s.labelA ?? 'Deck A');
   const [labelB, setLabelB] = useState(() => _s.labelB ?? 'Deck B');
 
-  // ── Shared slot-setter factory ───────────────────────────────────────────
-  const makeSetterForSlot = setSlot => key => valOrFn =>
-    setSlot(prev => ({
-      ...prev,
-      [key]: typeof valOrFn === 'function' ? valOrFn(prev[key]) : valOrFn,
-    }));
+  // ── Deck slots ─────────────────────────────────────────────────────────────
+  const { slot: deckSlotA, setSlot: setDeckSlotA } = useDeckSlot(_s.slotA ?? _s);
+  const { slot: deckSlotB, setSlot: setDeckSlotB } = useDeckSlot(_s.slotB ?? {});
 
-  // ── Deck Slot A ───────────────────────────────────────────────────────────
-  const [deckSlotA, setDeckSlotA] = useState(() => defaultDeckSlot(_s.slotA ?? _s));
-  const makeSlotSetterA = makeSetterForSlot(setDeckSlotA);
+  const { parsedDeck, simulationResults } = deckSlotA;
+  const { parsedDeck: parsedDeckB, simulationResults: simulationResultsB } = deckSlotB;
 
-  const setDeckText = makeSlotSetterA('deckText');
-  const setParsedDeck = makeSlotSetterA('parsedDeck');
-  const setSelectedKeyCards = makeSlotSetterA('selectedKeyCards');
-  const setIncludeArtifacts = makeSlotSetterA('includeArtifacts');
-  const setDisabledArtifacts = makeSlotSetterA('disabledArtifacts');
-  const setIncludeCreatures = makeSlotSetterA('includeCreatures');
-  const setDisabledCreatures = makeSlotSetterA('disabledCreatures');
-  const setIncludeExploration = makeSlotSetterA('includeExploration');
-  const setDisabledExploration = makeSlotSetterA('disabledExploration');
-  const setIncludeRampSpells = makeSlotSetterA('includeRampSpells');
-  const setDisabledRampSpells = makeSlotSetterA('disabledRampSpells');
-  const setIncludeRituals = makeSlotSetterA('includeRituals');
-  const setDisabledRituals = makeSlotSetterA('disabledRituals');
-  const setSimulationResults = makeSlotSetterA('simulationResults');
-  const setManaOverrides = makeSlotSetterA('manaOverrides');
-  const setIncludeCostReducers = makeSlotSetterA('includeCostReducers');
-  const setDisabledCostReducers = makeSlotSetterA('disabledCostReducers');
-  const setIncludeDrawSpells = makeSlotSetterA('includeDrawSpells');
-  const setDisabledDrawSpells = makeSlotSetterA('disabledDrawSpells');
-  const setDrawOverrides = makeSlotSetterA('drawOverrides');
-  const setIncludeTreasures = makeSlotSetterA('includeTreasures');
-  const setDisabledTreasures = makeSlotSetterA('disabledTreasures');
-  const setTreasureOverrides = makeSlotSetterA('treasureOverrides');
-  const setRitualOverrides = makeSlotSetterA('ritualOverrides');
-
-  const {
-    deckText,
-    parsedDeck,
-    selectedKeyCards,
-    includeArtifacts,
-    disabledArtifacts,
-    includeCreatures,
-    disabledCreatures,
-    includeExploration,
-    disabledExploration,
-    includeRampSpells,
-    disabledRampSpells,
-    includeRituals,
-    disabledRituals,
-    simulationResults,
-    manaOverrides,
-    includeCostReducers,
-    disabledCostReducers,
-    includeDrawSpells,
-    disabledDrawSpells,
-    drawOverrides,
-    includeTreasures,
-    disabledTreasures,
-    treasureOverrides,
-    ritualOverrides,
-  } = deckSlotA;
-
-  // ── Deck Slot B ───────────────────────────────────────────────────────────
-  const [deckSlotB, setDeckSlotB] = useState(() => defaultDeckSlot(_s.slotB ?? {}));
-  const makeSlotSetterB = makeSetterForSlot(setDeckSlotB);
-
-  const setDeckTextB = makeSlotSetterB('deckText');
-  const setParsedDeckB = makeSlotSetterB('parsedDeck');
-  const setSelectedKeyCardsB = makeSlotSetterB('selectedKeyCards');
-  const setIncludeArtifactsB = makeSlotSetterB('includeArtifacts');
-  const setDisabledArtifactsB = makeSlotSetterB('disabledArtifacts');
-  const setIncludeCreaturesB = makeSlotSetterB('includeCreatures');
-  const setDisabledCreaturesB = makeSlotSetterB('disabledCreatures');
-  const setIncludeExplorationB = makeSlotSetterB('includeExploration');
-  const setDisabledExplorationB = makeSlotSetterB('disabledExploration');
-  const setIncludeRampSpellsB = makeSlotSetterB('includeRampSpells');
-  const setDisabledRampSpellsB = makeSlotSetterB('disabledRampSpells');
-  const setIncludeRitualsB = makeSlotSetterB('includeRituals');
-  const setDisabledRitualsB = makeSlotSetterB('disabledRituals');
-  const setSimulationResultsB = makeSlotSetterB('simulationResults');
-  const setManaOverridesB = makeSlotSetterB('manaOverrides');
-  const setIncludeCostReducersB = makeSlotSetterB('includeCostReducers');
-  const setDisabledCostReducersB = makeSlotSetterB('disabledCostReducers');
-  const setIncludeDrawSpellsB = makeSlotSetterB('includeDrawSpells');
-  const setDisabledDrawSpellsB = makeSlotSetterB('disabledDrawSpells');
-  const setDrawOverridesB = makeSlotSetterB('drawOverrides');
-  const setIncludeTreasuresB = makeSlotSetterB('includeTreasures');
-  const setDisabledTreasuresB = makeSlotSetterB('disabledTreasures');
-  const setTreasureOverridesB = makeSlotSetterB('treasureOverrides');
-  const setRitualOverridesB = makeSlotSetterB('ritualOverrides');
-
-  const {
-    deckText: deckTextB,
-    parsedDeck: parsedDeckB,
-    selectedKeyCards: selectedKeyCardsB,
-    includeArtifacts: includeArtifactsB,
-    disabledArtifacts: disabledArtifactsB,
-    includeCreatures: includeCreaturesB,
-    disabledCreatures: disabledCreaturesB,
-    includeExploration: includeExplorationB,
-    disabledExploration: disabledExplorationB,
-    includeRampSpells: includeRampSpellsB,
-    disabledRampSpells: disabledRampSpellsB,
-    includeRituals: includeRitualsB,
-    disabledRituals: disabledRitualsB,
-    simulationResults: simulationResultsB,
-    manaOverrides: manaOverridesB,
-    includeCostReducers: includeCostReducersB,
-    disabledCostReducers: disabledCostReducersB,
-    includeDrawSpells: includeDrawSpellsB,
-    disabledDrawSpells: disabledDrawSpellsB,
-    drawOverrides: drawOverridesB,
-    includeTreasures: includeTreasuresB,
-    disabledTreasures: disabledTreasuresB,
-    treasureOverrides: treasureOverridesB,
-    ritualOverrides: ritualOverridesB,
-  } = deckSlotB;
-
+  // ── Card lookup (file upload + optional Scryfall API) ──────────────────────
   const [error, setError] = useState('');
+  const { cardsDatabase, lookupCacheRef, scryfallCallCount, handleFileUpload, lookupCard } =
+    useCardLookup(apiMode, setError);
 
   // ── Mulligan settings ──────────────────────────────────────────────────────
   const [enableMulligans, setEnableMulligans] = useState(() => _s.enableMulligans ?? false);
@@ -334,36 +138,63 @@ const MTGMonteCarloAnalyzer = () => {
   // ── Share URL ──────────────────────────────────────────────────────────────
   const [shareCopied, setShareCopied] = useState(false);
 
-  const handleShareUrl = () => {
-    const payload = {
-      apiMode,
-      comparisonMode,
-      labelA,
-      labelB,
-      slotA: serializeDeckSlot(deckSlotA),
-      slotB: serializeDeckSlot(deckSlotB),
-      iterations,
-      turns,
-      handSize,
-      maxSequences,
-      selectedTurnForSequences,
-      commanderMode,
-      enableMulligans,
-      mulliganRule,
-      mulliganStrategy,
-      customMulliganRules,
-      floodNLands,
-      floodTurn,
-      screwNLands,
-      screwTurn,
-    };
-    const hash = encodeStateToHash(payload);
+  // =============================================================================
+  // buildPersistableState — single source of truth for localStorage + URL hash
+  // =============================================================================
+  const buildPersistableState = () => ({
+    apiMode,
+    comparisonMode,
+    labelA,
+    labelB,
+    slotA: serializeDeckSlot(deckSlotA),
+    slotB: serializeDeckSlot(deckSlotB),
+    iterations,
+    turns,
+    handSize,
+    maxSequences,
+    selectedTurnForSequences,
+    commanderMode,
+    enableMulligans,
+    mulliganRule,
+    mulliganStrategy,
+    customMulliganRules,
+    floodNLands,
+    floodTurn,
+    screwNLands,
+    screwTurn,
+  });
+
+  // ── Share URL handler ──────────────────────────────────────────────────────
+  const handleShareUrl = useCallback(() => {
+    const hash = encodeStateToHash(buildPersistableState());
     const url = `${window.location.origin}${window.location.pathname}#${hash}`;
     navigator.clipboard.writeText(url).then(() => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
     });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    apiMode,
+    comparisonMode,
+    labelA,
+    labelB,
+    deckSlotA,
+    deckSlotB,
+    iterations,
+    turns,
+    handSize,
+    maxSequences,
+    selectedTurnForSequences,
+    commanderMode,
+    enableMulligans,
+    mulliganRule,
+    mulliganStrategy,
+    customMulliganRules,
+    floodNLands,
+    floodTurn,
+    screwNLands,
+    screwTurn,
+  ]);
 
   // ── Derived chart data ─────────────────────────────────────────────────────
   const chartData = useMemo(
@@ -375,37 +206,14 @@ const MTGMonteCarloAnalyzer = () => {
     [simulationResultsB, turns]
   );
 
-  // ── Persist settings & deck text to localStorage ──────────────────────────
+  // ── Persist to localStorage ────────────────────────────────────────────────
   useEffect(() => {
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          apiMode,
-          comparisonMode,
-          labelA,
-          labelB,
-          slotA: serializeDeckSlot(deckSlotA),
-          slotB: serializeDeckSlot(deckSlotB),
-          iterations,
-          turns,
-          handSize,
-          maxSequences,
-          selectedTurnForSequences,
-          commanderMode,
-          enableMulligans,
-          mulliganRule,
-          mulliganStrategy,
-          customMulliganRules,
-          floodNLands,
-          floodTurn,
-          screwNLands,
-          screwTurn,
-        })
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistableState()));
     } catch (err) {
       console.warn('localStorage save failed:', err);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     deckSlotA,
     deckSlotB,
@@ -429,144 +237,30 @@ const MTGMonteCarloAnalyzer = () => {
     screwTurn,
   ]);
 
-  // ============================================================================
-  // File upload — builds the lookup cache from a local Scryfall Default Cards JSON
-  // ============================================================================
-  const handleFileUpload = async event => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (file.size > 1024 * 1024 * 1024) {
-      setError(
-        'File too large (max 1 GB). The Scryfall Default Cards file should be around 200-300 MB.'
-      );
-      return;
-    }
-
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-
-      if (!Array.isArray(data)) {
-        setError('Invalid JSON format. Expected an array of card objects.');
-        return;
-      }
-
-      setCardsDatabase(data);
-
-      const lookupMap = new Map();
-
-      data.forEach(card => {
-        if (
-          card.layout === 'token' ||
-          card.layout === 'double_faced_token' ||
-          card.set_type === 'token' ||
-          card.type_line?.includes('Token')
-        ) {
-          return;
-        }
-
-        const name = card.name.toLowerCase();
-        if (lookupMap.has(name)) {
-          const existing = lookupMap.get(name);
-          if ((card.cmc || 0) > (existing.cmc || 0)) lookupMap.set(name, card);
-        } else {
-          lookupMap.set(name, card);
-        }
+  // =============================================================================
+  // Parse deck — resolves card data via cache + optional Scryfall API
+  // =============================================================================
+  const handleParseDeck = useCallback(
+    async (text, setSlot, label) => {
+      const deck = await parseDeckList(text, {
+        cardLookupMap: lookupCacheRef.current,
+        apiMode,
+        lookupCard,
       });
-
-      lookupCacheRef.current = lookupMap;
-      setError('');
-    } catch (err) {
-      setError('Invalid JSON file. Please check the file format.');
-      console.error(err);
-    }
-  };
-
-  // ============================================================================
-  // Card lookup (local map + optional Scryfall API fallback)
-  // ============================================================================
-  const lookupCard = async cardName => {
-    const cache = lookupCacheRef.current;
-    const searchName = cardName.toLowerCase().trim();
-
-    if (cache.has(searchName)) return cache.get(searchName);
-
-    for (const [name, card] of cache.entries()) {
-      if (name.startsWith(searchName) || name.includes(searchName)) return card;
-    }
-
-    if (apiMode === 'scryfall') {
-      // Hard limit — stop making API calls for the rest of this session
-      if (scryfallCallCount >= SCRYFALL_HARD_LIMIT) return null;
-
-      try {
-        const response = await fetch(
-          `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cardName)}`
-        );
-        if (response.ok) {
-          const data = await response.json();
-
-          // Track every real API request made
-          const newCount = scryfallCallCount + 1;
-          sessionStorage.setItem('scryfall_call_count', newCount);
-          setScryfallCallCount(newCount);
-
-          if (
-            data.layout === 'token' ||
-            data.layout === 'double_faced_token' ||
-            data.set_type === 'token' ||
-            data.type_line?.includes('Token')
-          ) {
-            console.warn(`⚠️ Skipping token for: ${cardName}`);
-            const searchResponse = await fetch(
-              `https://api.scryfall.com/cards/search?q=!"${encodeURIComponent(cardName)}"+-is:token&unique=cards&order=released`
-            );
-            if (searchResponse.ok) {
-              const searchData = await searchResponse.json();
-              if (searchData.data && searchData.data.length > 0) {
-                const nonToken = searchData.data[0];
-                cache.set(searchName, nonToken);
-                return nonToken;
-              }
-            }
-            return null;
-          }
-
-          cache.set(searchName, data);
-          return data;
-        }
-      } catch (err) {
-        console.error('Scryfall API error:', err);
+      if (deck) {
+        setSlot(prev => ({ ...prev, parsedDeck: deck, selectedKeyCards: new Set() }));
+        setError(deck.errors?.length > 0 ? deck.errors.join(', ') : '');
+      } else {
+        setSlot(prev => ({ ...prev, parsedDeck: null }));
+        setError(label ? `Parsing failed (${label})` : 'Parsing failed');
       }
-    }
+    },
+    [apiMode, lookupCard, lookupCacheRef, setError]
+  );
 
-    return null;
-  };
-
-  // ============================================================================
-  // Parse deck — calls the extracted parseDeckList module
-  // text: deck list string; setDeck: slot setter; label: optional name for error msg
-  // ============================================================================
-  const handleParseDeck = async (text, setDeck, clearKeyCards, label) => {
-    const deck = await parseDeckList(text, {
-      cardLookupMap: lookupCacheRef.current,
-      apiMode,
-      lookupCard,
-    });
-    if (deck) {
-      setDeck(deck);
-      clearKeyCards(new Set());
-      setError(deck.errors?.length > 0 ? deck.errors.join(', ') : '');
-    } else {
-      setDeck(null);
-      setError(label ? `Parsing failed (${label})` : 'Parsing failed');
-    }
-  };
-
-  // ============================================================================
-  // Run Monte Carlo simulation — calls the extracted monteCarlo module
-  // ============================================================================
+  // =============================================================================
+  // buildSimConfig — assembles the monteCarlo config object for a given slot
+  // =============================================================================
   const buildSimConfig = slot => ({
     iterations,
     turns,
@@ -595,115 +289,127 @@ const MTGMonteCarloAnalyzer = () => {
     manaOverrides: slot.manaOverrides,
     includeCostReducers: slot.includeCostReducers,
     disabledCostReducers: slot.disabledCostReducers,
-    includeDrawSpells: slot.includeDrawSpells ?? true,
-    disabledDrawSpells: slot.disabledDrawSpells ?? new Set(),
-    drawOverrides: slot.drawOverrides ?? {},
-    includeTreasures: slot.includeTreasures ?? true,
-    disabledTreasures: slot.disabledTreasures ?? new Set(),
-    treasureOverrides: slot.treasureOverrides ?? {},
-    ritualOverrides: slot.ritualOverrides ?? {},
+    includeDrawSpells: slot.includeDrawSpells,
+    disabledDrawSpells: slot.disabledDrawSpells,
+    drawOverrides: slot.drawOverrides,
+    includeTreasures: slot.includeTreasures,
+    disabledTreasures: slot.disabledTreasures,
+    treasureOverrides: slot.treasureOverrides,
+    ritualOverrides: slot.ritualOverrides,
   });
 
+  // =============================================================================
+  // Run simulation — flushSync forces the loading overlay to paint before the
+  // CPU-intensive monteCarlo loop blocks the main thread.
+  // (Web Worker offload is tracked as improvement #24.)
+  // =============================================================================
   const runSimulation = () => {
     if (!parsedDeck) {
       setError('Please parse a deck first');
       return;
     }
-
-    // In comparison mode require both decks to be parsed
     if (comparisonMode && !parsedDeckB) {
       setError('Please parse Deck B first');
       return;
     }
 
-    setIsSimulating(true);
-    setError('');
+    // Commit the loading overlay synchronously so it paints before the loop
+    flushSync(() => {
+      setIsSimulating(true);
+      setError('');
+    });
 
-    setTimeout(() => {
-      try {
-        setSimulationResults(monteCarlo(parsedDeck, buildSimConfig(deckSlotA)));
-        if (comparisonMode)
-          setSimulationResultsB(monteCarlo(parsedDeckB, buildSimConfig(deckSlotB)));
-        setIsSimulating(false);
-      } catch (err) {
-        setError('Simulation error: ' + err.message);
-        setIsSimulating(false);
+    try {
+      setDeckSlotA(prev => ({
+        ...prev,
+        simulationResults: monteCarlo(parsedDeck, buildSimConfig(deckSlotA)),
+      }));
+      if (comparisonMode) {
+        setDeckSlotB(prev => ({
+          ...prev,
+          simulationResults: monteCarlo(parsedDeckB, buildSimConfig(deckSlotB)),
+        }));
       }
-    }, 100);
+    } catch (err) {
+      setError('Simulation error: ' + err.message);
+    } finally {
+      setIsSimulating(false);
+    }
   };
 
-  // ============================================================================
+  // =============================================================================
   // Export results as PNG
-  // ============================================================================
-  const exportResultsAsPNG = async event => {
-    if (!simulationResults) return;
-    const button = event?.target;
-    const originalText = button?.textContent;
-    try {
-      const resultsSection = document.getElementById('results-section');
-      if (!resultsSection) {
-        alert('Results section not found');
-        return;
-      }
+  // =============================================================================
+  const exportResultsAsPNG = useCallback(
+    async event => {
+      if (!simulationResults) return;
+      const button = event?.target;
+      const originalText = button?.textContent;
+      try {
+        const resultsSection = document.getElementById('results-section');
+        if (!resultsSection) {
+          alert('Results section not found');
+          return;
+        }
+        if (button) {
+          button.textContent = 'Capturing...';
+          button.disabled = true;
+        }
 
-      if (button) {
-        button.textContent = '📸 Capturing...';
-        button.disabled = true;
-      }
+        const bgColor =
+          getComputedStyle(document.documentElement).getPropertyValue('--clr-bg').trim() ||
+          '#f9fafb';
 
-      // Read background colour from the live CSS variable so dark-mode
-      // screenshots use the correct dark background.
-      const bgColor =
-        getComputedStyle(document.documentElement).getPropertyValue('--clr-bg').trim() || '#f9fafb';
+        await new Promise(r => setTimeout(r, 300));
 
-      await new Promise(r => setTimeout(r, 300));
+        const canvas = await html2canvas(resultsSection, {
+          backgroundColor: bgColor,
+          scale: 2,
+          logging: false,
+          useCORS: true,
+        });
 
-      const canvas = await html2canvas(resultsSection, {
-        backgroundColor: bgColor,
-        scale: 2,
-        logging: false,
-        useCORS: true,
-      });
-
-      canvas.toBlob(blob => {
-        if (!blob) {
-          alert('Failed to generate image. Please use your browser screenshot tool.');
+        canvas.toBlob(blob => {
+          if (!blob) {
+            alert('Failed to generate image. Please use your browser screenshot tool.');
+            if (button) {
+              button.textContent = originalText;
+              button.disabled = false;
+            }
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `mtg-simulation-results-${Date.now()}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
           if (button) {
             button.textContent = originalText;
             button.disabled = false;
           }
-          return;
-        }
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `mtg-simulation-results-${Date.now()}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        });
+      } catch (err) {
+        console.error('Export error:', err);
+        alert(
+          'Failed to export. Please use your browser screenshot tool ' +
+            '(Ctrl+Shift+S on Windows, Cmd+Shift+5 on Mac)'
+        );
         if (button) {
           button.textContent = originalText;
           button.disabled = false;
         }
-      });
-    } catch (err) {
-      console.error('Export error:', err);
-      alert(
-        'Failed to export. Please use your browser screenshot tool ' +
-          '(Ctrl+Shift+S on Windows, Cmd+Shift+5 on Mac)'
-      );
-      if (button) {
-        button.textContent = originalText;
-        button.disabled = false;
       }
-    }
-  };
+    },
+    [simulationResults]
+  );
 
-  // ============================================================================
+  // =============================================================================
   // Export results as CSV — comparison-aware
-  // ============================================================================
-  const exportResultsAsCSV = () => {
+  // =============================================================================
+  const exportResultsAsCSV = useCallback(() => {
     const buildRows = cd => {
       if (!cd) return [];
       const { landsData, manaByColorData, lifeLossData, keyCardsData } = cd;
@@ -730,12 +436,10 @@ const MTGMonteCarloAnalyzer = () => {
 
     const rowsA = buildRows(chartData);
     const rowsB = buildRows(chartDataB);
-
     if (!rowsA.length && !rowsB.length) return;
 
     let rows, headers;
     if (comparisonMode && rowsA.length && rowsB.length) {
-      // Merge: prefix all columns with deck label
       const headersA = Object.keys(rowsA[0]).map(k => (k === 'Turn' ? 'Turn' : `${labelA}: ${k}`));
       const headersB = Object.keys(rowsB[0])
         .filter(k => k !== 'Turn')
@@ -779,21 +483,54 @@ const MTGMonteCarloAnalyzer = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }, [chartData, chartDataB, comparisonMode, labelA, labelB]);
+
+  // =============================================================================
+  // Simulation settings props — shared between single-deck and comparison modes
+  // =============================================================================
+  const simSettingsProps = {
+    iterations,
+    setIterations,
+    turns,
+    setTurns,
+    handSize,
+    setHandSize,
+    maxSequences,
+    setMaxSequences,
+    selectedTurnForSequences,
+    setSelectedTurnForSequences,
+    commanderMode,
+    setCommanderMode,
+    enableMulligans,
+    setEnableMulligans,
+    mulliganRule,
+    setMulliganRule,
+    mulliganStrategy,
+    setMulliganStrategy,
+    customMulliganRules,
+    setCustomMulliganRules,
+    floodNLands,
+    setFloodNLands,
+    floodTurn,
+    setFloodTurn,
+    screwNLands,
+    setScrewNLands,
+    screwTurn,
+    setScrewTurn,
+    runSimulation,
+    isSimulating,
   };
 
-  // ============================================================================
-  // Render helpers — per-slot deck panels (reused for both A and B columns)
-  // ============================================================================
-  // ============================================================================
+  // =============================================================================
   // Render
-  // ============================================================================
+  // =============================================================================
   return (
     <div className="app-root">
       {/* Simulating overlay */}
       {isSimulating && (
         <div className="sim-overlay">
           <div className="sim-spinner" />
-          <div className="sim-overlay__text">Simulating…</div>
+          <div className="sim-overlay__text">Simulating...</div>
           <div className="sim-overlay__sub">
             {iterations.toLocaleString()} iterations &middot; please wait
           </div>
@@ -865,8 +602,8 @@ const MTGMonteCarloAnalyzer = () => {
           scryfallCallCount >= SCRYFALL_SOFT_LIMIT &&
           scryfallCallCount < SCRYFALL_HARD_LIMIT && (
             <div className="scryfall-usage-warning">
-              ⚠️ You&apos;ve made {scryfallCallCount} Scryfall API requests this session. For large
-              or repeated imports, switch to the{' '}
+              You have made {scryfallCallCount} Scryfall API requests this session. For large or
+              repeated imports, switch to the{' '}
               <button className="inline-link" onClick={() => setApiMode('local')}>
                 Local JSON file
               </button>{' '}
@@ -875,7 +612,7 @@ const MTGMonteCarloAnalyzer = () => {
           )}
         {apiMode === 'scryfall' && scryfallCallCount >= SCRYFALL_HARD_LIMIT && (
           <div className="scryfall-usage-blocked">
-            🚫 Scryfall API limit reached ({SCRYFALL_HARD_LIMIT} requests this session). Please{' '}
+            Scryfall API limit reached ({SCRYFALL_HARD_LIMIT} requests this session). Please{' '}
             <button className="inline-link" onClick={() => setApiMode('local')}>
               switch to Local JSON
             </button>{' '}
@@ -935,10 +672,10 @@ const MTGMonteCarloAnalyzer = () => {
         </div>
       </div>
 
-      {/* Error */}
+      {/* Error banner */}
       {error && <div className="error-banner">⚠️ {error}</div>}
 
-      {/* ── Single-deck mode ─────────────────────────────────────────────── */}
+      {/* Single-deck mode */}
       {!comparisonMode && (
         <>
           {/* Deck Input */}
@@ -947,261 +684,35 @@ const MTGMonteCarloAnalyzer = () => {
               <h3>📝 Deck List</h3>
             </div>
             <textarea
-              value={deckText}
-              onChange={e => setDeckText(e.target.value)}
+              value={deckSlotA.deckText}
+              onChange={e => setDeckSlotA(prev => ({ ...prev, deckText: e.target.value }))}
               placeholder={
                 'Paste your deck list here (MTG Arena format)\nExample:\n4 Lightning Bolt\n4 Island\n3 Counterspell'
               }
               className="deck-textarea"
             />
             <button
-              onClick={() => handleParseDeck(deckText, setParsedDeck, setSelectedKeyCards)}
+              onClick={() => handleParseDeck(deckSlotA.deckText, setDeckSlotA)}
               className="btn-primary"
             >
               Parse Deck
             </button>
           </div>
 
-          {/* Parsed Deck panels */}
           {parsedDeck && (
-            <div>
-              <DeckStatisticsPanel parsedDeck={parsedDeck} />
-
-              {/* Lands */}
-              <details className="section-details" open>
-                <summary className="section-summary">
-                  🗺️ Lands
-                  <span className="section-summary__chevron">▾</span>
-                </summary>
-                <div className="panel-grid">
-                  <LandsPanel
-                    parsedDeck={parsedDeck}
-                    getManaSymbol={getManaSymbol}
-                    getFetchSymbol={getFetchSymbol}
-                  />
-                </div>
-              </details>
-
-              {parsedDeck.artifacts.length > 0 && (
-                <details className="section-details" open>
-                  <summary className="section-summary">
-                    🏺 Artifacts &amp; Mana Rocks
-                    <span className="section-summary__chevron">▾</span>
-                  </summary>
-                  <div className="panel-grid">
-                    <ArtifactsPanel
-                      parsedDeck={parsedDeck}
-                      includeArtifacts={includeArtifacts}
-                      setIncludeArtifacts={setIncludeArtifacts}
-                      disabledArtifacts={disabledArtifacts}
-                      setDisabledArtifacts={setDisabledArtifacts}
-                      getManaSymbol={getManaSymbol}
-                      manaOverrides={manaOverrides}
-                      setManaOverrides={setManaOverrides}
-                    />
-                  </div>
-                </details>
-              )}
-
-              {parsedDeck.creatures.length > 0 && (
-                <details className="section-details" open>
-                  <summary className="section-summary">
-                    🐉 Creatures &amp; Mana Dorks
-                    <span className="section-summary__chevron">▾</span>
-                  </summary>
-                  <div className="panel-grid">
-                    <CreaturesPanel
-                      parsedDeck={parsedDeck}
-                      includeCreatures={includeCreatures}
-                      setIncludeCreatures={setIncludeCreatures}
-                      disabledCreatures={disabledCreatures}
-                      setDisabledCreatures={setDisabledCreatures}
-                      getManaSymbol={getManaSymbol}
-                      manaOverrides={manaOverrides}
-                      setManaOverrides={setManaOverrides}
-                    />
-                  </div>
-                </details>
-              )}
-
-              {parsedDeck.exploration?.length > 0 && (
-                <details className="section-details" open>
-                  <summary className="section-summary">
-                    🧭 Exploration Effects
-                    <span className="section-summary__chevron">▾</span>
-                  </summary>
-                  <div className="panel-grid">
-                    <ExplorationPanel
-                      parsedDeck={parsedDeck}
-                      includeExploration={includeExploration}
-                      setIncludeExploration={setIncludeExploration}
-                      disabledExploration={disabledExploration}
-                      setDisabledExploration={setDisabledExploration}
-                    />
-                  </div>
-                </details>
-              )}
-
-              {parsedDeck.rampSpells?.length > 0 && (
-                <details className="section-details" open>
-                  <summary className="section-summary">
-                    🌿 Ramp Spells
-                    <span className="section-summary__chevron">▾</span>
-                  </summary>
-                  <div className="panel-grid">
-                    <RampSpellsPanel
-                      parsedDeck={parsedDeck}
-                      includeRampSpells={includeRampSpells}
-                      setIncludeRampSpells={setIncludeRampSpells}
-                      disabledRampSpells={disabledRampSpells}
-                      setDisabledRampSpells={setDisabledRampSpells}
-                      renderManaCost={renderManaCost}
-                    />
-                  </div>
-                </details>
-              )}
-
-              {parsedDeck.rituals?.length > 0 && (
-                <details className="section-details" open>
-                  <summary className="section-summary">
-                    ⚡ Rituals
-                    <span className="section-summary__chevron">▾</span>
-                  </summary>
-                  <div className="panel-grid">
-                    <RitualsPanel
-                      parsedDeck={parsedDeck}
-                      includeRituals={includeRituals}
-                      setIncludeRituals={setIncludeRituals}
-                      disabledRituals={disabledRituals}
-                      setDisabledRituals={setDisabledRituals}
-                      renderManaCost={renderManaCost}
-                      ritualOverrides={ritualOverrides}
-                      setRitualOverrides={setRitualOverrides}
-                    />
-                  </div>
-                </details>
-              )}
-
-              {parsedDeck.costReducers?.length > 0 && (
-                <details className="section-details" open>
-                  <summary className="section-summary">
-                    💎 Cost Reducers
-                    <span className="section-summary__chevron">▾</span>
-                  </summary>
-                  <div className="panel-grid">
-                    <CostReducersPanel
-                      parsedDeck={parsedDeck}
-                      includeCostReducers={includeCostReducers}
-                      setIncludeCostReducers={setIncludeCostReducers}
-                      disabledCostReducers={disabledCostReducers}
-                      setDisabledCostReducers={setDisabledCostReducers}
-                      renderManaCost={renderManaCost}
-                    />
-                  </div>
-                </details>
-              )}
-
-              {parsedDeck.drawSpells?.length > 0 && (
-                <details className="section-details" open>
-                  <summary className="section-summary">
-                    📖 Draw Spells
-                    <span className="section-summary__chevron">▾</span>
-                  </summary>
-                  <div className="panel-grid">
-                    <DrawSpellsPanel
-                      parsedDeck={parsedDeck}
-                      includeDrawSpells={includeDrawSpells}
-                      setIncludeDrawSpells={setIncludeDrawSpells}
-                      disabledDrawSpells={disabledDrawSpells}
-                      setDisabledDrawSpells={setDisabledDrawSpells}
-                      renderManaCost={renderManaCost}
-                      drawOverrides={drawOverrides}
-                      setDrawOverrides={setDrawOverrides}
-                    />
-                  </div>
-                </details>
-              )}
-
-              {parsedDeck.treasureCards?.length > 0 && (
-                <details className="section-details" open>
-                  <summary className="section-summary">
-                    💎 Treasure Generators
-                    <span className="section-summary__chevron">▾</span>
-                  </summary>
-                  <div className="panel-grid">
-                    <TreasuresPanel
-                      parsedDeck={parsedDeck}
-                      includeTreasures={includeTreasures}
-                      setIncludeTreasures={setIncludeTreasures}
-                      disabledTreasures={disabledTreasures}
-                      setDisabledTreasures={setDisabledTreasures}
-                      renderManaCost={renderManaCost}
-                      treasureOverrides={treasureOverrides}
-                      setTreasureOverrides={setTreasureOverrides}
-                    />
-                  </div>
-                </details>
-              )}
-
-              {(parsedDeck.spells.length > 0 ||
-                parsedDeck.creatures.length > 0 ||
-                parsedDeck.artifacts.length > 0 ||
-                parsedDeck.rituals?.length > 0 ||
-                parsedDeck.rampSpells?.length > 0 ||
-                parsedDeck.drawSpells?.length > 0 ||
-                parsedDeck.treasureCards?.length > 0 ||
-                parsedDeck.exploration?.length > 0) && (
-                <details className="section-details" open>
-                  <summary className="section-summary">
-                    🎯 Key Cards (Spells)
-                    <span className="section-summary__chevron">▾</span>
-                  </summary>
-                  <SpellsPanel
-                    parsedDeck={parsedDeck}
-                    selectedKeyCards={selectedKeyCards}
-                    setSelectedKeyCards={setSelectedKeyCards}
-                    renderManaCost={renderManaCost}
-                  />
-                </details>
-              )}
-
-              {/* Simulation Settings */}
-              <SimulationSettingsPanel
-                iterations={iterations}
-                setIterations={setIterations}
-                turns={turns}
-                setTurns={setTurns}
-                handSize={handSize}
-                setHandSize={setHandSize}
-                maxSequences={maxSequences}
-                setMaxSequences={setMaxSequences}
-                selectedTurnForSequences={selectedTurnForSequences}
-                setSelectedTurnForSequences={setSelectedTurnForSequences}
-                commanderMode={commanderMode}
-                setCommanderMode={setCommanderMode}
-                enableMulligans={enableMulligans}
-                setEnableMulligans={setEnableMulligans}
-                mulliganRule={mulliganRule}
-                setMulliganRule={setMulliganRule}
-                mulliganStrategy={mulliganStrategy}
-                setMulliganStrategy={setMulliganStrategy}
-                customMulliganRules={customMulliganRules}
-                setCustomMulliganRules={setCustomMulliganRules}
-                floodNLands={floodNLands}
-                setFloodNLands={setFloodNLands}
-                floodTurn={floodTurn}
-                setFloodTurn={setFloodTurn}
-                screwNLands={screwNLands}
-                setScrewNLands={setScrewNLands}
-                screwTurn={screwTurn}
-                setScrewTurn={setScrewTurn}
-                runSimulation={runSimulation}
-                isSimulating={isSimulating}
+            <>
+              <DeckPanels
+                parsedDeck={parsedDeck}
+                slot={deckSlotA}
+                setSlot={setDeckSlotA}
+                getManaSymbol={getManaSymbol}
+                getFetchSymbol={getFetchSymbol}
+                renderManaCost={renderManaCost}
               />
-            </div>
+              <SimulationSettingsPanel {...simSettingsProps} />
+            </>
           )}
 
-          {/* Empty state — deck parsed but no results yet */}
           {parsedDeck && !simulationResults && !isSimulating && (
             <div className="panel">
               <div className="empty-results">
@@ -1215,13 +726,12 @@ const MTGMonteCarloAnalyzer = () => {
             </div>
           )}
 
-          {/* Single-deck Results */}
           <ResultsPanel
             simulationResults={simulationResults}
             chartData={chartData}
             iterations={iterations}
             enableMulligans={enableMulligans}
-            selectedKeyCards={selectedKeyCards}
+            selectedKeyCards={deckSlotA.selectedKeyCards}
             selectedTurnForSequences={selectedTurnForSequences}
             exportResultsAsPNG={exportResultsAsPNG}
             exportResultsAsCSV={exportResultsAsCSV}
@@ -1230,10 +740,10 @@ const MTGMonteCarloAnalyzer = () => {
         </>
       )}
 
-      {/* ── Comparison mode ───────────────────────────────────────────────── */}
+      {/* Comparison mode */}
       {comparisonMode && (
         <>
-          {/* Row: Deck inputs */}
+          {/* Deck input row */}
           <div className="deck-columns">
             <div className="panel">
               <div className="deck-column-header deck-column-header--a">{labelA}</div>
@@ -1244,14 +754,14 @@ const MTGMonteCarloAnalyzer = () => {
                 placeholder="Deck A name"
               />
               <textarea
-                value={deckText}
-                onChange={e => setDeckText(e.target.value)}
+                value={deckSlotA.deckText}
+                onChange={e => setDeckSlotA(prev => ({ ...prev, deckText: e.target.value }))}
                 placeholder="Paste deck list here (MTG Arena format)"
                 className="deck-textarea"
                 style={{ height: 180 }}
               />
               <button
-                onClick={() => handleParseDeck(deckText, setParsedDeck, setSelectedKeyCards)}
+                onClick={() => handleParseDeck(deckSlotA.deckText, setDeckSlotA)}
                 className="btn-primary"
               >
                 Parse Deck
@@ -1266,16 +776,14 @@ const MTGMonteCarloAnalyzer = () => {
                 placeholder="Deck B name"
               />
               <textarea
-                value={deckTextB}
-                onChange={e => setDeckTextB(e.target.value)}
+                value={deckSlotB.deckText}
+                onChange={e => setDeckSlotB(prev => ({ ...prev, deckText: e.target.value }))}
                 placeholder="Paste deck list here (MTG Arena format)"
                 className="deck-textarea"
                 style={{ height: 180 }}
               />
               <button
-                onClick={() =>
-                  handleParseDeck(deckTextB, setParsedDeckB, setSelectedKeyCardsB, 'Deck B')
-                }
+                onClick={() => handleParseDeck(deckSlotB.deckText, setDeckSlotB, 'Deck B')}
                 className="btn-primary"
               >
                 Parse Deck
@@ -1283,331 +791,20 @@ const MTGMonteCarloAnalyzer = () => {
             </div>
           </div>
 
-          {/* Row: Lands */}
-          <ComparisonRow
-            left={
-              parsedDeck ? (
-                <LandsPanel
-                  parsedDeck={parsedDeck}
-                  getManaSymbol={getManaSymbol}
-                  getFetchSymbol={getFetchSymbol}
-                />
-              ) : null
-            }
-            right={
-              parsedDeckB ? (
-                <LandsPanel
-                  parsedDeck={parsedDeckB}
-                  getManaSymbol={getManaSymbol}
-                  getFetchSymbol={getFetchSymbol}
-                />
-              ) : null
-            }
+          <ComparisonPanelGrid
+            parsedDeckA={parsedDeck}
+            parsedDeckB={parsedDeckB}
+            slotA={deckSlotA}
+            setSlotA={setDeckSlotA}
+            slotB={deckSlotB}
+            setSlotB={setDeckSlotB}
+            getManaSymbol={getManaSymbol}
+            getFetchSymbol={getFetchSymbol}
+            renderManaCost={renderManaCost}
           />
 
-          {/* Row: Artifacts */}
-          <ComparisonRow
-            left={
-              parsedDeck?.artifacts?.length > 0 ? (
-                <ArtifactsPanel
-                  parsedDeck={parsedDeck}
-                  includeArtifacts={includeArtifacts}
-                  setIncludeArtifacts={setIncludeArtifacts}
-                  disabledArtifacts={disabledArtifacts}
-                  setDisabledArtifacts={setDisabledArtifacts}
-                  getManaSymbol={getManaSymbol}
-                  manaOverrides={manaOverrides}
-                  setManaOverrides={setManaOverrides}
-                />
-              ) : null
-            }
-            right={
-              parsedDeckB?.artifacts?.length > 0 ? (
-                <ArtifactsPanel
-                  parsedDeck={parsedDeckB}
-                  includeArtifacts={includeArtifactsB}
-                  setIncludeArtifacts={setIncludeArtifactsB}
-                  disabledArtifacts={disabledArtifactsB}
-                  setDisabledArtifacts={setDisabledArtifactsB}
-                  getManaSymbol={getManaSymbol}
-                  manaOverrides={manaOverridesB}
-                  setManaOverrides={setManaOverridesB}
-                />
-              ) : null
-            }
-          />
+          {(parsedDeck || parsedDeckB) && <SimulationSettingsPanel {...simSettingsProps} />}
 
-          {/* Row: Creatures */}
-          <ComparisonRow
-            left={
-              parsedDeck?.creatures?.length > 0 ? (
-                <CreaturesPanel
-                  parsedDeck={parsedDeck}
-                  includeCreatures={includeCreatures}
-                  setIncludeCreatures={setIncludeCreatures}
-                  disabledCreatures={disabledCreatures}
-                  setDisabledCreatures={setDisabledCreatures}
-                  getManaSymbol={getManaSymbol}
-                  manaOverrides={manaOverrides}
-                  setManaOverrides={setManaOverrides}
-                />
-              ) : null
-            }
-            right={
-              parsedDeckB?.creatures?.length > 0 ? (
-                <CreaturesPanel
-                  parsedDeck={parsedDeckB}
-                  includeCreatures={includeCreaturesB}
-                  setIncludeCreatures={setIncludeCreaturesB}
-                  disabledCreatures={disabledCreaturesB}
-                  setDisabledCreatures={setDisabledCreaturesB}
-                  getManaSymbol={getManaSymbol}
-                  manaOverrides={manaOverridesB}
-                  setManaOverrides={setManaOverridesB}
-                />
-              ) : null
-            }
-          />
-
-          {/* Row: Exploration */}
-          <ComparisonRow
-            left={
-              parsedDeck?.exploration?.length > 0 ? (
-                <ExplorationPanel
-                  parsedDeck={parsedDeck}
-                  includeExploration={includeExploration}
-                  setIncludeExploration={setIncludeExploration}
-                  disabledExploration={disabledExploration}
-                  setDisabledExploration={setDisabledExploration}
-                />
-              ) : null
-            }
-            right={
-              parsedDeckB?.exploration?.length > 0 ? (
-                <ExplorationPanel
-                  parsedDeck={parsedDeckB}
-                  includeExploration={includeExplorationB}
-                  setIncludeExploration={setIncludeExplorationB}
-                  disabledExploration={disabledExplorationB}
-                  setDisabledExploration={setDisabledExplorationB}
-                />
-              ) : null
-            }
-          />
-
-          {/* Row: Ramp Spells */}
-          <ComparisonRow
-            left={
-              parsedDeck?.rampSpells?.length > 0 ? (
-                <RampSpellsPanel
-                  parsedDeck={parsedDeck}
-                  includeRampSpells={includeRampSpells}
-                  setIncludeRampSpells={setIncludeRampSpells}
-                  disabledRampSpells={disabledRampSpells}
-                  setDisabledRampSpells={setDisabledRampSpells}
-                  renderManaCost={renderManaCost}
-                />
-              ) : null
-            }
-            right={
-              parsedDeckB?.rampSpells?.length > 0 ? (
-                <RampSpellsPanel
-                  parsedDeck={parsedDeckB}
-                  includeRampSpells={includeRampSpellsB}
-                  setIncludeRampSpells={setIncludeRampSpellsB}
-                  disabledRampSpells={disabledRampSpellsB}
-                  setDisabledRampSpells={setDisabledRampSpellsB}
-                  renderManaCost={renderManaCost}
-                />
-              ) : null
-            }
-          />
-
-          {/* Row: Rituals */}
-          <ComparisonRow
-            left={
-              parsedDeck?.rituals?.length > 0 ? (
-                <RitualsPanel
-                  parsedDeck={parsedDeck}
-                  includeRituals={includeRituals}
-                  setIncludeRituals={setIncludeRituals}
-                  disabledRituals={disabledRituals}
-                  setDisabledRituals={setDisabledRituals}
-                  renderManaCost={renderManaCost}
-                  ritualOverrides={ritualOverrides}
-                  setRitualOverrides={setRitualOverrides}
-                />
-              ) : null
-            }
-            right={
-              parsedDeckB?.rituals?.length > 0 ? (
-                <RitualsPanel
-                  parsedDeck={parsedDeckB}
-                  includeRituals={includeRitualsB}
-                  setIncludeRituals={setIncludeRitualsB}
-                  disabledRituals={disabledRitualsB}
-                  setDisabledRituals={setDisabledRitualsB}
-                  renderManaCost={renderManaCost}
-                  ritualOverrides={ritualOverridesB}
-                  setRitualOverrides={setRitualOverridesB}
-                />
-              ) : null
-            }
-          />
-
-          {/* Row: Cost Reducers */}
-          <ComparisonRow
-            left={
-              parsedDeck?.costReducers?.length > 0 ? (
-                <CostReducersPanel
-                  parsedDeck={parsedDeck}
-                  includeCostReducers={includeCostReducers}
-                  setIncludeCostReducers={setIncludeCostReducers}
-                  disabledCostReducers={disabledCostReducers}
-                  setDisabledCostReducers={setDisabledCostReducers}
-                  renderManaCost={renderManaCost}
-                />
-              ) : null
-            }
-            right={
-              parsedDeckB?.costReducers?.length > 0 ? (
-                <CostReducersPanel
-                  parsedDeck={parsedDeckB}
-                  includeCostReducers={includeCostReducersB}
-                  setIncludeCostReducers={setIncludeCostReducersB}
-                  disabledCostReducers={disabledCostReducersB}
-                  setDisabledCostReducers={setDisabledCostReducersB}
-                  renderManaCost={renderManaCost}
-                />
-              ) : null
-            }
-          />
-
-          {/* Row: Draw Spells */}
-          <ComparisonRow
-            left={
-              parsedDeck?.drawSpells?.length > 0 ? (
-                <DrawSpellsPanel
-                  parsedDeck={parsedDeck}
-                  includeDrawSpells={includeDrawSpells}
-                  setIncludeDrawSpells={setIncludeDrawSpells}
-                  disabledDrawSpells={disabledDrawSpells}
-                  setDisabledDrawSpells={setDisabledDrawSpells}
-                  renderManaCost={renderManaCost}
-                  drawOverrides={drawOverrides}
-                  setDrawOverrides={setDrawOverrides}
-                />
-              ) : null
-            }
-            right={
-              parsedDeckB?.drawSpells?.length > 0 ? (
-                <DrawSpellsPanel
-                  parsedDeck={parsedDeckB}
-                  includeDrawSpells={includeDrawSpellsB}
-                  setIncludeDrawSpells={setIncludeDrawSpellsB}
-                  disabledDrawSpells={disabledDrawSpellsB}
-                  setDisabledDrawSpells={setDisabledDrawSpellsB}
-                  renderManaCost={renderManaCost}
-                  drawOverrides={drawOverridesB}
-                  setDrawOverrides={setDrawOverridesB}
-                />
-              ) : null
-            }
-          />
-
-          {/* Row: Treasure Generators */}
-          <ComparisonRow
-            left={
-              parsedDeck?.treasureCards?.length > 0 ? (
-                <TreasuresPanel
-                  parsedDeck={parsedDeck}
-                  includeTreasures={includeTreasures}
-                  setIncludeTreasures={setIncludeTreasures}
-                  disabledTreasures={disabledTreasures}
-                  setDisabledTreasures={setDisabledTreasures}
-                  renderManaCost={renderManaCost}
-                  treasureOverrides={treasureOverrides}
-                  setTreasureOverrides={setTreasureOverrides}
-                />
-              ) : null
-            }
-            right={
-              parsedDeckB?.treasureCards?.length > 0 ? (
-                <TreasuresPanel
-                  parsedDeck={parsedDeckB}
-                  includeTreasures={includeTreasuresB}
-                  setIncludeTreasures={setIncludeTreasuresB}
-                  disabledTreasures={disabledTreasuresB}
-                  setDisabledTreasures={setDisabledTreasuresB}
-                  renderManaCost={renderManaCost}
-                  treasureOverrides={treasureOverridesB}
-                  setTreasureOverrides={setTreasureOverridesB}
-                />
-              ) : null
-            }
-          />
-
-          {/* Row: Spells / Key-card selector */}
-          <ComparisonRow
-            left={
-              hasCastables(parsedDeck) ? (
-                <SpellsPanel
-                  parsedDeck={parsedDeck}
-                  selectedKeyCards={selectedKeyCards}
-                  setSelectedKeyCards={setSelectedKeyCards}
-                  renderManaCost={renderManaCost}
-                />
-              ) : null
-            }
-            right={
-              hasCastables(parsedDeckB) ? (
-                <SpellsPanel
-                  parsedDeck={parsedDeckB}
-                  selectedKeyCards={selectedKeyCardsB}
-                  setSelectedKeyCards={setSelectedKeyCardsB}
-                  renderManaCost={renderManaCost}
-                />
-              ) : null
-            }
-          />
-
-          {/* Shared simulation settings */}
-          {(parsedDeck || parsedDeckB) && (
-            <SimulationSettingsPanel
-              iterations={iterations}
-              setIterations={setIterations}
-              turns={turns}
-              setTurns={setTurns}
-              handSize={handSize}
-              setHandSize={setHandSize}
-              maxSequences={maxSequences}
-              setMaxSequences={setMaxSequences}
-              selectedTurnForSequences={selectedTurnForSequences}
-              setSelectedTurnForSequences={setSelectedTurnForSequences}
-              commanderMode={commanderMode}
-              setCommanderMode={setCommanderMode}
-              enableMulligans={enableMulligans}
-              setEnableMulligans={setEnableMulligans}
-              mulliganRule={mulliganRule}
-              setMulliganRule={setMulliganRule}
-              mulliganStrategy={mulliganStrategy}
-              setMulliganStrategy={setMulliganStrategy}
-              customMulliganRules={customMulliganRules}
-              setCustomMulliganRules={setCustomMulliganRules}
-              floodNLands={floodNLands}
-              setFloodNLands={setFloodNLands}
-              floodTurn={floodTurn}
-              setFloodTurn={setFloodTurn}
-              screwNLands={screwNLands}
-              setScrewNLands={setScrewNLands}
-              screwTurn={screwTurn}
-              setScrewTurn={setScrewTurn}
-              runSimulation={runSimulation}
-              isSimulating={isSimulating}
-            />
-          )}
-
-          {/* Comparison Results */}
           {chartData && chartDataB ? (
             <ComparisonResultsPanel
               chartDataA={chartData}
@@ -1616,8 +813,8 @@ const MTGMonteCarloAnalyzer = () => {
               simulationResultsB={simulationResultsB}
               iterations={iterations}
               enableMulligans={enableMulligans}
-              selectedKeyCardsA={selectedKeyCards}
-              selectedKeyCardsB={selectedKeyCardsB}
+              selectedKeyCardsA={deckSlotA.selectedKeyCards}
+              selectedKeyCardsB={deckSlotB.selectedKeyCards}
               labelA={labelA}
               labelB={labelB}
               exportResultsAsPNG={exportResultsAsPNG}
@@ -1637,7 +834,7 @@ const MTGMonteCarloAnalyzer = () => {
 
       {/* Footer */}
       <div className="app-footer">
-        <p>All card data © Wizards of the Coast</p>
+        <p>All card data &copy; Wizards of the Coast</p>
         <p className="app-version">v{__APP_VERSION__}</p>
       </div>
     </div>

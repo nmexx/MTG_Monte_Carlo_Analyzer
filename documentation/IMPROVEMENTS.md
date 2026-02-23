@@ -10,17 +10,25 @@
 
 ## Performance / Architecture
 
-1. **Move simulation to a Web Worker** `[High]` *(superseded by #24 below)*
-   - The `monteCarlo` loop runs on the main thread inside a `setTimeout`, which blocks the UI on high iterations.
-   - A Web Worker would allow a real progress bar and prevent the browser from freezing.
+1. **Move simulation to a Web Worker** `[High]` *(partially addressed in v3.1.5; tracked as #24)*
+   - The `monteCarlo` loop now uses `flushSync` instead of `setTimeout(100ms)` to guarantee the loading overlay paints before the CPU-intensive loop — no arbitrary delay, correct React 18 pattern.
+   - Full Web Worker offload (for real progress bar and no UI janking at 50k+ iterations) is still the goal and remains tracked as #24.
 
 2. **Split App.jsx into modules** --------DONE
    - The file is 4000+ lines and mixes simulation engine, data processing, and UI.
    - Extract: `SimulationEngine.js`, `DeckParser.js`, and separate panel components (`LandsPanel`, `ResultsPanel`, `SequencesPanel`, etc.)
 
-3. **`useMemo`/`useCallback` for expensive recalculations** `[Low]`
-   - `prepareChartData()`, `buildCompleteDeck()`, and the `LAND_DATA` Sets all run on every render.
-   - Memoizing them would eliminate needless recalculations on unrelated state updates.
+3. **`useMemo`/`useCallback` for expensive recalculations** --------DONE (v3.1.5)
+   - `prepareChartData()` is memoized with `useMemo` in `App.jsx`.
+   - `handleParseDeck`, `handleShareUrl`, `exportResultsAsPNG`, and `exportResultsAsCSV` are wrapped in `useCallback`.
+   - `DeckPanels` and `ComparisonPanelGrid` use `useMemo(() => makeSlotSetter(setSlot), [setSlot])` so setter functions are stable across re-renders.
+   - **Architecture** (v3.1.5): `App.jsx` refactored 1648 → 777 lines by extracting:
+     - `src/hooks/useDeckSlot.js` — all per-deck mutable state + `defaultDeckSlot` / `serializeDeckSlot` / `makeSlotSetter`
+     - `src/hooks/useCardLookup.js` — file upload, Scryfall API fallback, rate-limit counters
+     - `src/components/DeckPanels.jsx` — the full single-deck panel stack (Lands → Key Cards)
+     - `src/components/ComparisonPanelGrid.jsx` — all `ComparisonRow` instances for comparison mode
+   - `buildPersistableState()` helper consolidates the previously duplicated localStorage / URL-hash payload.
+   - Duplicate `💎` emoji on Cost Reducers section header replaced with `⚗️`.
 
 ---
 
