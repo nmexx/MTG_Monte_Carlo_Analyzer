@@ -25,6 +25,7 @@ const SimulationSettingsPanel = ({
   setCommanderMode,
   commanderName,
   setCommanderName,
+  comparisonMode = false,
   enableMulligans,
   setEnableMulligans,
   mulliganRule,
@@ -127,7 +128,7 @@ const SimulationSettingsPanel = ({
           (official Commander rule).
         </div>
       )}
-      {commanderMode && (
+      {commanderMode && !comparisonMode && (
         <div className="commander-name-field">
           <label className="settings-label" htmlFor="commander-name-input">
             Commander card

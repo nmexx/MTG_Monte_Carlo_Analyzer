@@ -711,6 +711,33 @@ body {
   color: var(--clr-muted);
 }
 
+/* ── Collapsible panel headers ─────────────────────────────────────────────── */
+.panel-collapse-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--clr-text);
+  padding: 0;
+  margin-bottom: 12px;
+}
+
+.panel-collapse-btn:hover {
+  color: var(--clr-primary);
+}
+
+.panel-collapse-icon {
+  font-size: 0.65rem;
+  color: var(--clr-muted);
+  flex-shrink: 0;
+}
+
 .mulligan-box {
   margin-top: 15px;
   padding: 15px;

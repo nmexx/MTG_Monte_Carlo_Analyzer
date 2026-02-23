@@ -124,7 +124,6 @@ const MTGMonteCarloAnalyzer = () => {
     () => _s.selectedTurnForSequences ?? 3
   );
   const [commanderMode, setCommanderMode] = useState(() => _s.commanderMode ?? false);
-  const [commanderName, setCommanderName] = useState(() => _s.commanderName ?? '');
 
   // ── Flood / screw thresholds ───────────────────────────────────────────────
   const [floodNLands, setFloodNLands] = useState(() => _s.floodNLands ?? 5);
@@ -154,7 +153,6 @@ const MTGMonteCarloAnalyzer = () => {
     maxSequences,
     selectedTurnForSequences,
     commanderMode,
-    commanderName,
     enableMulligans,
     mulliganRule,
     mulliganStrategy,
@@ -187,7 +185,6 @@ const MTGMonteCarloAnalyzer = () => {
     maxSequences,
     selectedTurnForSequences,
     commanderMode,
-    commanderName,
     enableMulligans,
     mulliganRule,
     mulliganStrategy,
@@ -229,7 +226,6 @@ const MTGMonteCarloAnalyzer = () => {
     maxSequences,
     selectedTurnForSequences,
     commanderMode,
-    commanderName,
     enableMulligans,
     mulliganRule,
     mulliganStrategy,
@@ -292,7 +288,7 @@ const MTGMonteCarloAnalyzer = () => {
     handSize,
     maxSequences,
     commanderMode,
-    commanderName,
+    commanderName: slot.commanderName ?? '',
     enableMulligans,
     mulliganRule,
     mulliganStrategy,
@@ -562,8 +558,9 @@ const MTGMonteCarloAnalyzer = () => {
     setSelectedTurnForSequences,
     commanderMode,
     setCommanderMode,
-    commanderName,
-    setCommanderName,
+    commanderName: deckSlotA.commanderName,
+    setCommanderName: v => setDeckSlotA(prev => ({ ...prev, commanderName: v })),
+    comparisonMode,
     enableMulligans,
     setEnableMulligans,
     mulliganRule,
@@ -798,7 +795,7 @@ const MTGMonteCarloAnalyzer = () => {
             iterations={iterations}
             enableMulligans={enableMulligans}
             selectedKeyCards={deckSlotA.selectedKeyCards}
-            commanderName={commanderName}
+            commanderName={deckSlotA.commanderName}
             selectedTurnForSequences={selectedTurnForSequences}
             exportResultsAsPNG={exportResultsAsPNG}
             exportResultsAsCSV={exportResultsAsCSV}
@@ -833,6 +830,23 @@ const MTGMonteCarloAnalyzer = () => {
               >
                 Parse Deck
               </button>
+              {commanderMode && (
+                <div className="commander-name-field" style={{ marginTop: 10 }}>
+                  <label className="settings-label">🎩 Commander ({labelA})</label>
+                  <input
+                    type="text"
+                    className="settings-input"
+                    placeholder="e.g. Kenrith, the Returned King"
+                    value={deckSlotA.commanderName}
+                    onChange={e =>
+                      setDeckSlotA(prev => ({ ...prev, commanderName: e.target.value }))
+                    }
+                  />
+                  <div className="commander-name-hint">
+                    Always tracked as a key card (command zone).
+                  </div>
+                </div>
+              )}
             </div>
             <div className="panel">
               <div className="deck-column-header deck-column-header--b">{labelB}</div>
@@ -855,6 +869,23 @@ const MTGMonteCarloAnalyzer = () => {
               >
                 Parse Deck
               </button>
+              {commanderMode && (
+                <div className="commander-name-field" style={{ marginTop: 10 }}>
+                  <label className="settings-label">🎩 Commander ({labelB})</label>
+                  <input
+                    type="text"
+                    className="settings-input"
+                    placeholder="e.g. Kenrith, the Returned King"
+                    value={deckSlotB.commanderName}
+                    onChange={e =>
+                      setDeckSlotB(prev => ({ ...prev, commanderName: e.target.value }))
+                    }
+                  />
+                  <div className="commander-name-hint">
+                    Always tracked as a key card (command zone).
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -882,6 +913,8 @@ const MTGMonteCarloAnalyzer = () => {
               enableMulligans={enableMulligans}
               selectedKeyCardsA={deckSlotA.selectedKeyCards}
               selectedKeyCardsB={deckSlotB.selectedKeyCards}
+              commanderNameA={deckSlotA.commanderName}
+              commanderNameB={deckSlotB.commanderName}
               labelA={labelA}
               labelB={labelB}
               exportResultsAsPNG={exportResultsAsPNG}

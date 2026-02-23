@@ -14,13 +14,15 @@
  *   enableMulligans      – boolean (shared)
  *   selectedKeyCardsA    – Set<string>
  *   selectedKeyCardsB    – Set<string>
+ *   commanderNameA       – string (auto-tracked commander for Deck A)
+ *   commanderNameB       – string (auto-tracked commander for Deck B)
  *   labelA               – string (default "Deck A")
  *   labelB               – string (default "Deck B")
  *   exportResultsAsPNG   – () => void
  *   exportResultsAsCSV   – () => void
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ComposedChart,
   LineChart,
@@ -91,6 +93,14 @@ const DeltaBadge = ({ a, b, higherIsBetter = true, labelB }) => {
   );
 };
 
+// ── Collapsible panel header ─────────────────────────────────────────────────
+const ColHdr = ({ id, collapsed, toggle, children }) => (
+  <button className="panel-collapse-btn" onClick={() => toggle(id)} aria-expanded={!collapsed[id]}>
+    <span className="panel-collapse-icon">{collapsed[id] ? '▶' : '▼'}</span>
+    {children}
+  </button>
+);
+
 // ── Component ──────────────────────────────────────────────────────────────────
 const ComparisonResultsPanel = ({
   chartDataA,
@@ -101,11 +111,17 @@ const ComparisonResultsPanel = ({
   enableMulligans,
   selectedKeyCardsA,
   selectedKeyCardsB,
+  commanderNameA = '',
+  commanderNameB = '',
   labelA = 'Deck A',
   labelB = 'Deck B',
   exportResultsAsPNG,
   exportResultsAsCSV,
 }) => {
+  // Collapsed state for each panel section (hooks must come before any early return)
+  const [collapsed, setCollapsed] = useState({});
+  const toggle = id => setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+
   if (!chartDataA || !chartDataB) return null;
 
   const numTurns = Math.min(chartDataA.landsData.length, chartDataB.landsData.length);
@@ -143,14 +159,24 @@ const ComparisonResultsPanel = ({
     [`${labelB}: Treasure Pool`]: chartDataB.treasureData[i]?.['Treasure Pool'] ?? 0,
   }));
 
-  // ── Key card playability — union of both sets ────────────────────────────────
-  const allKeyCards = new Set([...selectedKeyCardsA, ...selectedKeyCardsB]);
+  // ── Key card playability — union of both sets + both commanders ─────────────
+  const cmdA = commanderNameA?.trim();
+  const cmdB = commanderNameB?.trim();
+  const effectiveA =
+    cmdA && !selectedKeyCardsA.has(cmdA)
+      ? new Set([...selectedKeyCardsA, cmdA])
+      : selectedKeyCardsA;
+  const effectiveB =
+    cmdB && !selectedKeyCardsB.has(cmdB)
+      ? new Set([...selectedKeyCardsB, cmdB])
+      : selectedKeyCardsB;
+  const allKeyCards = new Set([...effectiveA, ...effectiveB]);
   const keyCompare = Array.from({ length: numTurns }, (_, i) => {
     const row = { turn: chartDataA.keyCardsData[i]?.turn ?? i + 1 };
     for (const card of allKeyCards) {
-      if (selectedKeyCardsA.has(card) && chartDataA.keyCardsData[i]?.[card] !== undefined)
+      if (effectiveA.has(card) && chartDataA.keyCardsData[i]?.[card] !== undefined)
         row[`${labelA}: ${card}`] = chartDataA.keyCardsData[i][card];
-      if (selectedKeyCardsB.has(card) && chartDataB.keyCardsData[i]?.[card] !== undefined)
+      if (effectiveB.has(card) && chartDataB.keyCardsData[i]?.[card] !== undefined)
         row[`${labelB}: ${card}`] = chartDataB.keyCardsData[i][card];
     }
     return row;
@@ -171,316 +197,376 @@ const ComparisonResultsPanel = ({
     <div id="results-section">
       {/* ── Summary ─────────────────────────────────────────────────────────── */}
       <div className="panel">
-        <h3>📊 Comparison Results</h3>
-
-        <div className="comparison-summary-grid">
-          {[
-            {
-              label: labelA,
-              res: simulationResultsA,
-              finalLand: finalLandA,
-              finalMana: finalManaA,
-              finalLife: finalLifeA,
-            },
-            {
-              label: labelB,
-              res: simulationResultsB,
-              finalLand: finalLandB,
-              finalMana: finalManaB,
-              finalLife: finalLifeB,
-            },
-          ].map(({ label, res, finalLand, finalMana, finalLife }) => (
-            <div key={label} className="comparison-summary-col">
-              <h4 className={label === labelA ? 'deck-label-a' : 'deck-label-b'}>{label}</h4>
-              <p>
-                Hands kept: <strong>{res.handsKept.toLocaleString()}</strong>
-              </p>
-              {enableMulligans && (
+        <ColHdr id="summary" collapsed={collapsed} toggle={toggle}>
+          📊 Comparison Results
+        </ColHdr>
+        {!collapsed.summary && (
+          <>
+            <div className="comparison-summary-grid">
+              {[
+                {
+                  label: labelA,
+                  res: simulationResultsA,
+                  finalLand: finalLandA,
+                  finalMana: finalManaA,
+                  finalLife: finalLifeA,
+                },
+                {
+                  label: labelB,
+                  res: simulationResultsB,
+                  finalLand: finalLandB,
+                  finalMana: finalManaB,
+                  finalLife: finalLifeB,
+                },
+              ].map(({ label, res, finalLand, finalMana, finalLife }) => (
+                <div key={label} className="comparison-summary-col">
+                  <h4 className={label === labelA ? 'deck-label-a' : 'deck-label-b'}>{label}</h4>
+                  <p>
+                    Hands kept: <strong>{res.handsKept.toLocaleString()}</strong>
+                  </p>
+                  {enableMulligans && (
+                    <p>
+                      Mulligan rate:{' '}
+                      <strong>{((res.mulligans / iterations) * 100).toFixed(1)}%</strong>
+                    </p>
+                  )}
+                  <p>
+                    Lands by final turn: <strong>{finalLand.toFixed(2)}</strong>
+                  </p>
+                  <p>
+                    Mana by final turn: <strong>{finalMana.toFixed(2)}</strong>
+                  </p>
+                  <p>
+                    Life loss by final turn: <strong>{finalLife.toFixed(2)}</strong>
+                  </p>
+                  {hasTreasures && (
+                    <p>
+                      Treasures by final turn:{' '}
+                      <strong>
+                        {(label === labelA ? finalTreasureA : finalTreasureB).toFixed(2)}
+                      </strong>
+                    </p>
+                  )}
+                </div>
+              ))}
+              <div className="comparison-summary-col comparison-summary-col--delta">
+                <h4>Δ Difference (B vs A)</h4>
                 <p>
-                  Mulligan rate: <strong>{((res.mulligans / iterations) * 100).toFixed(1)}%</strong>
+                  Lands:{' '}
+                  <DeltaBadge a={finalLandA} b={finalLandB} higherIsBetter={true} labelB={labelB} />
                 </p>
-              )}
-              <p>
-                Lands by final turn: <strong>{finalLand.toFixed(2)}</strong>
-              </p>
-              <p>
-                Mana by final turn: <strong>{finalMana.toFixed(2)}</strong>
-              </p>
-              <p>
-                Life loss by final turn: <strong>{finalLife.toFixed(2)}</strong>
-              </p>
-              {hasTreasures && (
                 <p>
-                  Treasures by final turn:{' '}
-                  <strong>{(label === labelA ? finalTreasureA : finalTreasureB).toFixed(2)}</strong>
+                  Mana:{' '}
+                  <DeltaBadge a={finalManaA} b={finalManaB} higherIsBetter={true} labelB={labelB} />
                 </p>
-              )}
+                <p>
+                  Life loss:{' '}
+                  <DeltaBadge
+                    a={finalLifeA}
+                    b={finalLifeB}
+                    higherIsBetter={false}
+                    labelB={labelB}
+                  />
+                </p>
+                {hasTreasures && (
+                  <p>
+                    Treasures:{' '}
+                    <DeltaBadge
+                      a={finalTreasureA}
+                      b={finalTreasureB}
+                      higherIsBetter={true}
+                      labelB={labelB}
+                    />
+                  </p>
+                )}
+              </div>
             </div>
-          ))}
-          <div className="comparison-summary-col comparison-summary-col--delta">
-            <h4>Δ Difference (B vs A)</h4>
-            <p>
-              Lands:{' '}
-              <DeltaBadge a={finalLandA} b={finalLandB} higherIsBetter={true} labelB={labelB} />
+            <div className="export-buttons" style={{ marginTop: '1rem' }}>
+              <button onClick={exportResultsAsPNG} className="btn-success">
+                📸 Export Results as PNG
+              </button>
+              <button onClick={exportResultsAsCSV} className="btn-success">
+                📄 Export Results as CSV
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Lands per Turn ───────────────────────────────────────────────────────── */}
+      <div className="panel">
+        <ColHdr id="lands" collapsed={collapsed} toggle={toggle}>
+          Lands per Turn
+        </ColHdr>
+        {!collapsed.lands && (
+          <>
+            <p className="card-meta">
+              Solid = Total Lands · Dashed = Untapped Lands · Blue = {labelA} · Amber = {labelB}
             </p>
-            <p>
-              Mana:{' '}
-              <DeltaBadge a={finalManaA} b={finalManaB} higherIsBetter={true} labelB={labelB} />
-            </p>
-            <p>
-              Life loss:{' '}
-              <DeltaBadge a={finalLifeA} b={finalLifeB} higherIsBetter={false} labelB={labelB} />
-            </p>
-            {hasTreasures && (
-              <p>
-                Treasures:{' '}
-                <DeltaBadge
-                  a={finalTreasureA}
-                  b={finalTreasureB}
-                  higherIsBetter={true}
-                  labelB={labelB}
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={landsCompare}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="turn"
+                  label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
                 />
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="export-buttons" style={{ marginTop: '1rem' }}>
-          <button onClick={exportResultsAsPNG} className="btn-success">
-            📸 Export Results as PNG
-          </button>
-          <button onClick={exportResultsAsCSV} className="btn-success">
-            📄 Export Results as CSV
-          </button>
-        </div>
+                <YAxis label={{ value: 'Count', angle: -90, position: 'insideLeft' }} />
+                <Tooltip content={SimpleTooltip} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelA}: Total Lands`}
+                  stroke={DECK_A.primary}
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelB}: Total Lands`}
+                  stroke={DECK_B.primary}
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelA}: Untapped Lands`}
+                  stroke={DECK_A.secondary}
+                  strokeWidth={2}
+                  dot={false}
+                  strokeDasharray="6 3"
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelB}: Untapped Lands`}
+                  stroke={DECK_B.secondary}
+                  strokeWidth={2}
+                  dot={false}
+                  strokeDasharray="6 3"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </>
+        )}
       </div>
 
-      {/* ── Lands per Turn ──────────────────────────────────────────────────── */}
+      {/* ── Total Mana per Turn ───────────────────────────────────────────────────── */}
       <div className="panel">
-        <h3>Lands per Turn</h3>
-        <p className="card-meta">
-          Solid = Total Lands · Dashed = Untapped Lands · Blue = {labelA} · Amber = {labelB}
-        </p>
-        <ResponsiveContainer width="100%" height={300}>
-          <ComposedChart data={landsCompare}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="turn" label={{ value: 'Turn', position: 'insideBottom', offset: -5 }} />
-            <YAxis label={{ value: 'Count', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={SimpleTooltip} />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey={`${labelA}: Total Lands`}
-              stroke={DECK_A.primary}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey={`${labelB}: Total Lands`}
-              stroke={DECK_B.primary}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey={`${labelA}: Untapped Lands`}
-              stroke={DECK_A.secondary}
-              strokeWidth={2}
-              dot={false}
-              strokeDasharray="6 3"
-            />
-            <Line
-              type="monotone"
-              dataKey={`${labelB}: Untapped Lands`}
-              stroke={DECK_B.secondary}
-              strokeWidth={2}
-              dot={false}
-              strokeDasharray="6 3"
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+        <ColHdr id="mana" collapsed={collapsed} toggle={toggle}>
+          Available Mana per Turn
+        </ColHdr>
+        {!collapsed.mana && (
+          <>
+            <p className="card-meta">
+              Blue = {labelA} · Amber = {labelB}
+            </p>
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={manaCompare}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="turn"
+                  label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
+                />
+                <YAxis label={{ value: 'Mana', angle: -90, position: 'insideLeft' }} />
+                <Tooltip content={SimpleTooltip} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelA}: Total Mana`}
+                  stroke={DECK_A.primary}
+                  strokeWidth={3}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelB}: Total Mana`}
+                  stroke={DECK_B.primary}
+                  strokeWidth={3}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </>
+        )}
       </div>
 
-      {/* ── Total Mana per Turn ─────────────────────────────────────────────── */}
+      {/* ── Cumulative Life Loss ───────────────────────────────────────────────────── */}
       <div className="panel">
-        <h3>Available Mana per Turn</h3>
-        <p className="card-meta">
-          Blue = {labelA} · Amber = {labelB}
-        </p>
-        <ResponsiveContainer width="100%" height={300}>
-          <ComposedChart data={manaCompare}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="turn" label={{ value: 'Turn', position: 'insideBottom', offset: -5 }} />
-            <YAxis label={{ value: 'Mana', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={SimpleTooltip} />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey={`${labelA}: Total Mana`}
-              stroke={DECK_A.primary}
-              strokeWidth={3}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey={`${labelB}: Total Mana`}
-              stroke={DECK_B.primary}
-              strokeWidth={3}
-              dot={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+        <ColHdr id="life" collapsed={collapsed} toggle={toggle}>
+          Cumulative Life Loss
+        </ColHdr>
+        {!collapsed.life && (
+          <>
+            <p className="card-meta">
+              Blue = {labelA} · Amber = {labelB}
+            </p>
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={lifeCompare}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="turn"
+                  label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
+                />
+                <YAxis label={{ value: 'Life Loss', angle: -90, position: 'insideLeft' }} />
+                <Tooltip content={SimpleTooltip} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelA}: Life Loss`}
+                  stroke={DECK_A.primary}
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelB}: Life Loss`}
+                  stroke={DECK_B.primary}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </>
+        )}
       </div>
 
-      {/* ── Cumulative Life Loss ─────────────────────────────────────────────── */}
+      {/* ── Cards Drawn per Turn ───────────────────────────────────────────────────── */}
       <div className="panel">
-        <h3>Cumulative Life Loss</h3>
-        <p className="card-meta">
-          Blue = {labelA} · Amber = {labelB}
-        </p>
-        <ResponsiveContainer width="100%" height={300}>
-          <ComposedChart data={lifeCompare}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="turn" label={{ value: 'Turn', position: 'insideBottom', offset: -5 }} />
-            <YAxis label={{ value: 'Life Loss', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={SimpleTooltip} />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey={`${labelA}: Life Loss`}
-              stroke={DECK_A.primary}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey={`${labelB}: Life Loss`}
-              stroke={DECK_B.primary}
-              strokeWidth={2}
-              dot={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* ── Cards Drawn per Turn ─────────────────────────────────────────────── */}
-      <div className="panel">
-        <h3>Cards Drawn per Turn</h3>
-        <p className="card-meta">
-          Blue = {labelA} · Amber = {labelB}
-        </p>
-        <ResponsiveContainer width="100%" height={300}>
-          <ComposedChart data={drawnCompare}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="turn" label={{ value: 'Turn', position: 'insideBottom', offset: -5 }} />
-            <YAxis label={{ value: 'Cards', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={SimpleTooltip} />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey={`${labelA}: Cards Drawn`}
-              stroke={DECK_A.primary}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey={`${labelB}: Cards Drawn`}
-              stroke={DECK_B.primary}
-              strokeWidth={2}
-              dot={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+        <ColHdr id="draw" collapsed={collapsed} toggle={toggle}>
+          Cards Drawn per Turn
+        </ColHdr>
+        {!collapsed.draw && (
+          <>
+            <p className="card-meta">
+              Blue = {labelA} · Amber = {labelB}
+            </p>
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={drawnCompare}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="turn"
+                  label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
+                />
+                <YAxis label={{ value: 'Cards', angle: -90, position: 'insideLeft' }} />
+                <Tooltip content={SimpleTooltip} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelA}: Cards Drawn`}
+                  stroke={DECK_A.primary}
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`${labelB}: Cards Drawn`}
+                  stroke={DECK_B.primary}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </>
+        )}
       </div>
 
       {/* ── Treasure Pool per Turn ───────────────────────────────────────────── */}
       {hasTreasures && (
         <div className="panel">
-          <h3>💎 Treasures Generated per Turn</h3>
-          <p className="card-meta">
-            Treasure tokens created per turn. Blue = {labelA} · Amber = {labelB}
-          </p>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={treasureCompare}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="turn"
-                label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
-              />
-              <YAxis label={{ value: 'Treasures', angle: -90, position: 'insideLeft' }} />
-              <Tooltip content={SimpleTooltip} />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey={`${labelA}: Treasure Pool`}
-                stroke={DECK_A.primary}
-                strokeWidth={2}
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey={`${labelB}: Treasure Pool`}
-                stroke={DECK_B.primary}
-                strokeWidth={2}
-                dot={false}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <ColHdr id="treasure" collapsed={collapsed} toggle={toggle}>
+            💎 Treasures Generated per Turn
+          </ColHdr>
+          {!collapsed.treasure && (
+            <>
+              <p className="card-meta">
+                Treasure tokens created per turn. Blue = {labelA} · Amber = {labelB}
+              </p>
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={treasureCompare}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="turn"
+                    label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
+                  />
+                  <YAxis label={{ value: 'Treasures', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip content={SimpleTooltip} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey={`${labelA}: Treasure Pool`}
+                    stroke={DECK_A.primary}
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={`${labelB}: Treasure Pool`}
+                    stroke={DECK_B.primary}
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </>
+          )}
         </div>
       )}
 
-      {/* ── Key Card Playability ─────────────────────────────────────────────── */}
+      {/* ── Key Card Playability ───────────────────────────────────────────────────── */}
       {allKeyCards.size > 0 && (
         <div className="panel">
-          <h3>Key Cards Playability (%)</h3>
-          <p className="card-meta">
-            Solid = {labelA} key cards · Dashed = {labelB} key cards
-          </p>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={keyCompare}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="turn"
-                label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
-              />
-              <YAxis label={{ value: 'Playable (%)', angle: -90, position: 'insideLeft' }} />
-              <Tooltip content={SimpleTooltip} />
-              <Legend />
-              {(() => {
-                const lines = [];
-                let idxA = 0;
-                let idxB = 0;
-                for (const card of allKeyCards) {
-                  if (selectedKeyCardsA.has(card))
-                    lines.push(
-                      <Line
-                        key={`A-${card}`}
-                        type="monotone"
-                        dataKey={`${labelA}: ${card}`}
-                        stroke={KEY_PALETTE_A[idxA++ % KEY_PALETTE_A.length]}
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    );
-                  if (selectedKeyCardsB.has(card))
-                    lines.push(
-                      <Line
-                        key={`B-${card}`}
-                        type="monotone"
-                        dataKey={`${labelB}: ${card}`}
-                        stroke={KEY_PALETTE_B[idxB++ % KEY_PALETTE_B.length]}
-                        strokeWidth={2}
-                        dot={false}
-                        strokeDasharray="6 3"
-                      />
-                    );
-                }
-                return lines;
-              })()}
-            </LineChart>
-          </ResponsiveContainer>
+          <ColHdr id="keycards" collapsed={collapsed} toggle={toggle}>
+            Key Cards Playability (%)
+          </ColHdr>
+          {!collapsed.keycards && (
+            <>
+              <p className="card-meta">
+                Solid = {labelA} key cards · Dashed = {labelB} key cards
+              </p>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={keyCompare}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="turn"
+                    label={{ value: 'Turn', position: 'insideBottom', offset: -5 }}
+                  />
+                  <YAxis label={{ value: 'Playable (%)', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip content={SimpleTooltip} />
+                  <Legend />
+                  {(() => {
+                    const lines = [];
+                    let idxA = 0;
+                    let idxB = 0;
+                    for (const card of allKeyCards) {
+                      if (effectiveA.has(card))
+                        lines.push(
+                          <Line
+                            key={`A-${card}`}
+                            type="monotone"
+                            dataKey={`${labelA}: ${card}`}
+                            stroke={KEY_PALETTE_A[idxA++ % KEY_PALETTE_A.length]}
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                        );
+                      if (effectiveB.has(card))
+                        lines.push(
+                          <Line
+                            key={`B-${card}`}
+                            type="monotone"
+                            dataKey={`${labelB}: ${card}`}
+                            stroke={KEY_PALETTE_B[idxB++ % KEY_PALETTE_B.length]}
+                            strokeWidth={2}
+                            dot={false}
+                            strokeDasharray="6 3"
+                          />
+                        );
+                    }
+                    return lines;
+                  })()}
+                </LineChart>
+              </ResponsiveContainer>
+            </>
+          )}
         </div>
       )}
     </div>
