@@ -27,6 +27,7 @@ import {
   ComposedChart,
   LineChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -133,30 +134,54 @@ const ComparisonResultsPanel = ({
     [`${labelB}: Total Lands`]: chartDataB.landsData[i]['Total Lands'],
     [`${labelA}: Untapped Lands`]: chartDataA.landsData[i]['Untapped Lands'],
     [`${labelB}: Untapped Lands`]: chartDataB.landsData[i]['Untapped Lands'],
+    [`${labelA}: Total Lands Lo`]: chartDataA.landsData[i]['Total Lands Lo'],
+    [`${labelA}: Total Lands Hi`]: chartDataA.landsData[i]['Total Lands Hi'],
+    [`${labelB}: Total Lands Lo`]: chartDataB.landsData[i]['Total Lands Lo'],
+    [`${labelB}: Total Lands Hi`]: chartDataB.landsData[i]['Total Lands Hi'],
+    [`${labelA}: Untapped Lands Lo`]: chartDataA.landsData[i]['Untapped Lands Lo'],
+    [`${labelA}: Untapped Lands Hi`]: chartDataA.landsData[i]['Untapped Lands Hi'],
+    [`${labelB}: Untapped Lands Lo`]: chartDataB.landsData[i]['Untapped Lands Lo'],
+    [`${labelB}: Untapped Lands Hi`]: chartDataB.landsData[i]['Untapped Lands Hi'],
   }));
 
   const manaCompare = Array.from({ length: numTurns }, (_, i) => ({
     turn: chartDataA.manaByColorData[i].turn,
     [`${labelA}: Total Mana`]: chartDataA.manaByColorData[i]['Total Mana'],
     [`${labelB}: Total Mana`]: chartDataB.manaByColorData[i]['Total Mana'],
+    [`${labelA}: Total Mana Lo`]: chartDataA.manaByColorData[i]['Total Mana Lo'],
+    [`${labelA}: Total Mana Hi`]: chartDataA.manaByColorData[i]['Total Mana Hi'],
+    [`${labelB}: Total Mana Lo`]: chartDataB.manaByColorData[i]['Total Mana Lo'],
+    [`${labelB}: Total Mana Hi`]: chartDataB.manaByColorData[i]['Total Mana Hi'],
   }));
 
   const lifeCompare = Array.from({ length: numTurns }, (_, i) => ({
     turn: chartDataA.lifeLossData[i].turn,
     [`${labelA}: Life Loss`]: chartDataA.lifeLossData[i]['Life Loss'],
     [`${labelB}: Life Loss`]: chartDataB.lifeLossData[i]['Life Loss'],
+    [`${labelA}: Life Loss Lo`]: chartDataA.lifeLossData[i]['Life Loss Lo'],
+    [`${labelA}: Life Loss Hi`]: chartDataA.lifeLossData[i]['Life Loss Hi'],
+    [`${labelB}: Life Loss Lo`]: chartDataB.lifeLossData[i]['Life Loss Lo'],
+    [`${labelB}: Life Loss Hi`]: chartDataB.lifeLossData[i]['Life Loss Hi'],
   }));
 
   const drawnCompare = Array.from({ length: numTurns }, (_, i) => ({
     turn: chartDataA.cardsDrawnData[i].turn,
     [`${labelA}: Cards Drawn`]: chartDataA.cardsDrawnData[i]['Cards Drawn'],
     [`${labelB}: Cards Drawn`]: chartDataB.cardsDrawnData[i]['Cards Drawn'],
+    [`${labelA}: Cards Drawn Lo`]: chartDataA.cardsDrawnData[i]['Cards Drawn Lo'],
+    [`${labelA}: Cards Drawn Hi`]: chartDataA.cardsDrawnData[i]['Cards Drawn Hi'],
+    [`${labelB}: Cards Drawn Lo`]: chartDataB.cardsDrawnData[i]['Cards Drawn Lo'],
+    [`${labelB}: Cards Drawn Hi`]: chartDataB.cardsDrawnData[i]['Cards Drawn Hi'],
   }));
 
   const treasureCompare = Array.from({ length: numTurns }, (_, i) => ({
     turn: chartDataA.treasureData[i]?.turn ?? i + 1,
     [`${labelA}: Treasure Pool`]: chartDataA.treasureData[i]?.['Treasure Pool'] ?? 0,
     [`${labelB}: Treasure Pool`]: chartDataB.treasureData[i]?.['Treasure Pool'] ?? 0,
+    [`${labelA}: Treasure Pool Lo`]: chartDataA.treasureData[i]?.['Treasure Pool Lo'] ?? 0,
+    [`${labelA}: Treasure Pool Hi`]: chartDataA.treasureData[i]?.['Treasure Pool Hi'] ?? 0,
+    [`${labelB}: Treasure Pool Lo`]: chartDataB.treasureData[i]?.['Treasure Pool Lo'] ?? 0,
+    [`${labelB}: Treasure Pool Hi`]: chartDataB.treasureData[i]?.['Treasure Pool Hi'] ?? 0,
   }));
 
   // ── Key card playability — union of both sets + both commanders ─────────────
@@ -301,7 +326,8 @@ const ComparisonResultsPanel = ({
         {!collapsed.lands && (
           <>
             <p className="card-meta">
-              Solid = Total Lands · Dashed = Untapped Lands · Blue = {labelA} · Amber = {labelB}
+              Solid = Total Lands · Dashed = Untapped Lands · Blue = {labelA} · Amber = {labelB}.
+              Shaded bands = ±1σ.
             </p>
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={landsCompare}>
@@ -313,6 +339,52 @@ const ComparisonResultsPanel = ({
                 <YAxis label={{ value: 'Count', angle: -90, position: 'insideLeft' }} />
                 <Tooltip content={SimpleTooltip} />
                 <Legend />
+                <Area
+                  type="monotone"
+                  dataKey={d => [d[`${labelA}: Total Lands Lo`], d[`${labelA}: Total Lands Hi`]]}
+                  fill="rgba(102,126,234,0.18)"
+                  stroke="none"
+                  name={`_${labelA}_lands_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={d => [d[`${labelB}: Total Lands Lo`], d[`${labelB}: Total Lands Hi`]]}
+                  fill="rgba(245,158,11,0.18)"
+                  stroke="none"
+                  name={`_${labelB}_lands_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={d => [
+                    d[`${labelA}: Untapped Lands Lo`],
+                    d[`${labelA}: Untapped Lands Hi`],
+                  ]}
+                  fill="rgba(34,197,94,0.15)"
+                  stroke="none"
+                  name={`_${labelA}_untapped_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={d => [
+                    d[`${labelB}: Untapped Lands Lo`],
+                    d[`${labelB}: Untapped Lands Hi`],
+                  ]}
+                  fill="rgba(248,113,113,0.15)"
+                  stroke="none"
+                  name={`_${labelB}_untapped_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
                 <Line
                   type="monotone"
                   dataKey={`${labelA}: Total Lands`}
@@ -357,7 +429,7 @@ const ComparisonResultsPanel = ({
         {!collapsed.mana && (
           <>
             <p className="card-meta">
-              Blue = {labelA} · Amber = {labelB}
+              Blue = {labelA} · Amber = {labelB}. Shaded bands = ±1σ.
             </p>
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={manaCompare}>
@@ -369,6 +441,26 @@ const ComparisonResultsPanel = ({
                 <YAxis label={{ value: 'Mana', angle: -90, position: 'insideLeft' }} />
                 <Tooltip content={SimpleTooltip} />
                 <Legend />
+                <Area
+                  type="monotone"
+                  dataKey={d => [d[`${labelA}: Total Mana Lo`], d[`${labelA}: Total Mana Hi`]]}
+                  fill="rgba(102,126,234,0.18)"
+                  stroke="none"
+                  name={`_${labelA}_mana_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={d => [d[`${labelB}: Total Mana Lo`], d[`${labelB}: Total Mana Hi`]]}
+                  fill="rgba(245,158,11,0.18)"
+                  stroke="none"
+                  name={`_${labelB}_mana_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
                 <Line
                   type="monotone"
                   dataKey={`${labelA}: Total Mana`}
@@ -397,7 +489,7 @@ const ComparisonResultsPanel = ({
         {!collapsed.life && (
           <>
             <p className="card-meta">
-              Blue = {labelA} · Amber = {labelB}
+              Blue = {labelA} · Amber = {labelB}. Shaded bands = ±1σ.
             </p>
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={lifeCompare}>
@@ -409,6 +501,26 @@ const ComparisonResultsPanel = ({
                 <YAxis label={{ value: 'Life Loss', angle: -90, position: 'insideLeft' }} />
                 <Tooltip content={SimpleTooltip} />
                 <Legend />
+                <Area
+                  type="monotone"
+                  dataKey={d => [d[`${labelA}: Life Loss Lo`], d[`${labelA}: Life Loss Hi`]]}
+                  fill="rgba(102,126,234,0.18)"
+                  stroke="none"
+                  name={`_${labelA}_life_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={d => [d[`${labelB}: Life Loss Lo`], d[`${labelB}: Life Loss Hi`]]}
+                  fill="rgba(245,158,11,0.18)"
+                  stroke="none"
+                  name={`_${labelB}_life_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
                 <Line
                   type="monotone"
                   dataKey={`${labelA}: Life Loss`}
@@ -437,7 +549,7 @@ const ComparisonResultsPanel = ({
         {!collapsed.draw && (
           <>
             <p className="card-meta">
-              Blue = {labelA} · Amber = {labelB}
+              Blue = {labelA} · Amber = {labelB}. Shaded bands = ±1σ.
             </p>
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={drawnCompare}>
@@ -449,6 +561,26 @@ const ComparisonResultsPanel = ({
                 <YAxis label={{ value: 'Cards', angle: -90, position: 'insideLeft' }} />
                 <Tooltip content={SimpleTooltip} />
                 <Legend />
+                <Area
+                  type="monotone"
+                  dataKey={d => [d[`${labelA}: Cards Drawn Lo`], d[`${labelA}: Cards Drawn Hi`]]}
+                  fill="rgba(102,126,234,0.18)"
+                  stroke="none"
+                  name={`_${labelA}_drawn_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey={d => [d[`${labelB}: Cards Drawn Lo`], d[`${labelB}: Cards Drawn Hi`]]}
+                  fill="rgba(245,158,11,0.18)"
+                  stroke="none"
+                  name={`_${labelB}_drawn_band`}
+                  legendType="none"
+                  activeDot={false}
+                  dot={false}
+                />
                 <Line
                   type="monotone"
                   dataKey={`${labelA}: Cards Drawn`}
@@ -478,7 +610,8 @@ const ComparisonResultsPanel = ({
           {!collapsed.treasure && (
             <>
               <p className="card-meta">
-                Treasure tokens created per turn. Blue = {labelA} · Amber = {labelB}
+                Treasure tokens created per turn. Blue = {labelA} · Amber = {labelB}. Shaded bands =
+                ±1σ.
               </p>
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={treasureCompare}>
@@ -490,6 +623,32 @@ const ComparisonResultsPanel = ({
                   <YAxis label={{ value: 'Treasures', angle: -90, position: 'insideLeft' }} />
                   <Tooltip content={SimpleTooltip} />
                   <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey={d => [
+                      d[`${labelA}: Treasure Pool Lo`],
+                      d[`${labelA}: Treasure Pool Hi`],
+                    ]}
+                    fill="rgba(102,126,234,0.18)"
+                    stroke="none"
+                    name={`_${labelA}_treasure_band`}
+                    legendType="none"
+                    activeDot={false}
+                    dot={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey={d => [
+                      d[`${labelB}: Treasure Pool Lo`],
+                      d[`${labelB}: Treasure Pool Hi`],
+                    ]}
+                    fill="rgba(245,158,11,0.18)"
+                    stroke="none"
+                    name={`_${labelB}_treasure_band`}
+                    legendType="none"
+                    activeDot={false}
+                    dot={false}
+                  />
                   <Line
                     type="monotone"
                     dataKey={`${labelA}: Treasure Pool`}
