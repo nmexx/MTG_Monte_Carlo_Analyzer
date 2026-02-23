@@ -1148,3 +1148,119 @@ describe('monteCarlo — onProgress callback', () => {
     expect(() => monteCarlo(minimalDeck(), { iterations: 100, turns: 3 })).not.toThrow();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// openingHandLandCounts histogram
+// ─────────────────────────────────────────────────────────────────────────────
+describe('monteCarlo — openingHandLandCounts', () => {
+  const deck24Lands = () =>
+    makeDeck({
+      lands: [land({ quantity: 24 })],
+      spells: [{ name: 'Lightning Bolt', isLand: false, cmc: 1, manaCost: '{R}', quantity: 36 }],
+    });
+
+  it('returns openingHandLandCounts array of length 8', () => {
+    const { openingHandLandCounts } = monteCarlo(deck24Lands(), { iterations: 500, turns: 3 });
+    expect(openingHandLandCounts).toHaveLength(8);
+  });
+
+  it('sums to 100 (percentages) with no mulligans', () => {
+    const { openingHandLandCounts } = monteCarlo(deck24Lands(), {
+      iterations: 500,
+      turns: 3,
+      enableMulligans: false,
+    });
+    const total = openingHandLandCounts.reduce((a, b) => a + b, 0);
+    expect(total).toBeCloseTo(100, 0);
+  });
+
+  it('sums to 100 (percentages) with london mulligans enabled', () => {
+    const { openingHandLandCounts } = monteCarlo(deck24Lands(), {
+      iterations: 500,
+      turns: 3,
+      enableMulligans: true,
+      mulliganStrategy: 'balanced',
+    });
+    const total = openingHandLandCounts.reduce((a, b) => a + b, 0);
+    expect(total).toBeCloseTo(100, 0);
+  });
+
+  it('all values are non-negative', () => {
+    const { openingHandLandCounts } = monteCarlo(deck24Lands(), { iterations: 200, turns: 3 });
+    openingHandLandCounts.forEach(v => expect(v).toBeGreaterThanOrEqual(0));
+  });
+
+  it('pure-land deck concentrates mass in the high-land buckets (5-7)', () => {
+    const allLands = makeDeck({ lands: [land({ quantity: 60 })] });
+    const { openingHandLandCounts } = monteCarlo(allLands, {
+      iterations: 500,
+      turns: 3,
+      enableMulligans: false,
+    });
+    const highLandPct = openingHandLandCounts.slice(5).reduce((a, b) => a + b, 0);
+    expect(highLandPct).toBeGreaterThan(70);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// commanderName — auto key-card tracking
+// ─────────────────────────────────────────────────────────────────────────────
+describe('monteCarlo — commanderName', () => {
+  const testDeck = () =>
+    makeDeck({
+      lands: [land({ quantity: 36 })],
+      spells: [
+        {
+          name: 'Kenrith, the Returned King',
+          isLand: false,
+          cmc: 5,
+          manaCost: '{4}{W}',
+          quantity: 1,
+          colors: ['W'],
+        },
+      ],
+    });
+
+  it('auto-adds commander to keyCardPlayability', () => {
+    const results = monteCarlo(testDeck(), {
+      iterations: 200,
+      turns: 7,
+      commanderName: 'Kenrith, the Returned King',
+    });
+    expect(results.keyCardPlayability).toHaveProperty('Kenrith, the Returned King');
+  });
+
+  it('commander playability array has length equal to turns', () => {
+    const turns = 7;
+    const results = monteCarlo(testDeck(), {
+      iterations: 200,
+      turns,
+      commanderName: 'Kenrith, the Returned King',
+    });
+    expect(results.keyCardPlayability['Kenrith, the Returned King']).toHaveLength(turns);
+  });
+
+  it('unknown commander (stub) still appears with cmc=0 → 100% playability', () => {
+    const results = monteCarlo(makeDeck({ lands: [land({ quantity: 30 })] }), {
+      iterations: 200,
+      turns: 5,
+      commanderName: 'Mystery Commander',
+    });
+    expect(results.keyCardPlayability).toHaveProperty('Mystery Commander');
+    // Stub has cmc=0 so mana check always passes — all turns should be 100%
+    results.keyCardPlayability['Mystery Commander'].forEach(pct => {
+      expect(pct).toBeCloseTo(100, 0);
+    });
+  });
+
+  it('does not add commander again if already in selectedKeyCards', () => {
+    const results = monteCarlo(testDeck(), {
+      iterations: 200,
+      turns: 5,
+      commanderName: 'Kenrith, the Returned King',
+      selectedKeyCards: new Set(['Kenrith, the Returned King']),
+    });
+    // Should appear exactly once in results (no duplicate keys in an object)
+    expect(Object.keys(results.keyCardPlayability)).toEqual(['Kenrith, the Returned King']);
+  });
+});

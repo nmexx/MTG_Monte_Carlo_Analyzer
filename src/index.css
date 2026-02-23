@@ -698,6 +698,19 @@ body {
   padding-left: 24px;
 }
 
+.commander-name-field {
+  margin-top: 12px;
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.commander-name-hint {
+  font-size: 0.72rem;
+  color: var(--clr-muted);
+}
+
 .mulligan-box {
   margin-top: 15px;
   padding: 15px;

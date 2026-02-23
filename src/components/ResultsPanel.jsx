@@ -19,6 +19,9 @@
 import React from 'react';
 import CardTooltip from './CardTooltip';
 import {
+  BarChart,
+  Bar,
+  Cell,
   ComposedChart,
   LineChart,
   Line,
@@ -124,6 +127,57 @@ const ResultsPanel = ({
           </button>
         </div>
       </div>
+
+      {/* Opening Hand Land Distribution */}
+      {simulationResults.openingHandLandCounts && (
+        <div className="panel">
+          <h3>Opening Hand Land Distribution</h3>
+          <p className="card-meta">
+            Percentage of kept opening hands (after mulligans) containing each land count.
+          </p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart
+              data={simulationResults.openingHandLandCounts.map((pct, i) => ({
+                lands: i,
+                pct: parseFloat(pct.toFixed(1)),
+              }))}
+              margin={{ top: 8, right: 20, left: 0, bottom: 4 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="lands"
+                label={{ value: 'Lands in Opening Hand', position: 'insideBottom', offset: -3 }}
+              />
+              <YAxis
+                tickFormatter={v => `${v}%`}
+                domain={[0, 'auto']}
+                label={{ value: '%', angle: -90, position: 'insideLeft' }}
+              />
+              <Tooltip
+                formatter={(value, _name, props) => [
+                  `${value}%`,
+                  `${props.payload.lands} land${props.payload.lands === 1 ? '' : 's'}`,
+                ]}
+                labelFormatter={() => null}
+              />
+              <Bar dataKey="pct" name="Hands %" radius={[3, 3, 0, 0]}>
+                {simulationResults.openingHandLandCounts.map((_pct, i) => {
+                  // 0–1 = danger, 2 = warning, 3–4 = success, 5–7 = flood/blue
+                  const color =
+                    i <= 1 ? '#ef4444' : i === 2 ? '#f59e0b' : i <= 4 ? '#22c55e' : '#667eea';
+                  return <Cell key={i} fill={color} fillOpacity={0.85} />;
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="card-meta" style={{ marginTop: 8 }}>
+            <span style={{ color: '#ef4444' }}>■</span> 0–1 lands &nbsp;
+            <span style={{ color: '#f59e0b' }}>■</span> 2 lands &nbsp;
+            <span style={{ color: '#22c55e' }}>■</span> 3–4 lands (ideal) &nbsp;
+            <span style={{ color: '#667eea' }}>■</span> 5+ lands (flood risk)
+          </div>
+        </div>
+      )}
 
       {/* Lands per Turn */}
       <div className="panel">

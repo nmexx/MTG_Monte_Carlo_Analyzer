@@ -308,10 +308,18 @@ export const monteCarlo = (deckToParse, config = {}, onProgress = null) => {
     floodTurn = 5,
     screwNLands = 2,
     screwTurn = 3,
+    commanderName = '',
   } = config;
 
   const deck = buildCompleteDeck(deckToParse, config);
   const keyCardNames = Array.from(selectedKeyCards);
+
+  // Commander card is always available from the command zone — auto-track it
+  // as a key card if it isn't already in selectedKeyCards.
+  const commanderCardName = commanderName?.trim() || '';
+  if (commanderCardName && !selectedKeyCards.has(commanderCardName)) {
+    keyCardNames.push(commanderCardName);
+  }
   const simConfig = {
     includeRampSpells,
     disabledRampSpells,
@@ -346,6 +354,9 @@ export const monteCarlo = (deckToParse, config = {}, onProgress = null) => {
     fastestPlaySequencesBurst: {},
     mulligans: 0,
     handsKept: 0,
+    // Opening hand land distribution (indices 0-7) — filled with raw counts,
+    // then normalised to percentages during post-processing.
+    openingHandLandCounts: Array(8).fill(0),
   };
 
   keyCardNames.forEach(name => {
@@ -377,6 +388,12 @@ export const monteCarlo = (deckToParse, config = {}, onProgress = null) => {
   const keyCardMap = new Map(
     keyCardNames.map(name => [name, allPlayableCards.find(c => c.name === name)])
   );
+
+  // If the commander card isn't in the deck list (it lives in the command zone),
+  // register a stub so the playability/CMC machinery still works.
+  if (commanderCardName && !keyCardMap.get(commanderCardName)) {
+    keyCardMap.set(commanderCardName, { name: commanderCardName, cmc: 0, colors: [] });
+  }
 
   // Store the CMC of each key card so the UI can display the on-curve turn.
   keyCardNames.forEach(name => {
@@ -463,6 +480,11 @@ export const monteCarlo = (deckToParse, config = {}, onProgress = null) => {
     }
 
     results.handsKept++;
+
+    // Track land count in the kept opening hand (0–7 bucket).
+    const keptHandLands = hand.filter(c => c.isLand).length;
+    results.openingHandLandCounts[Math.min(7, keptHandLands)]++;
+
     const battlefield = [];
     const graveyard = [];
     let cumulativeLifeLoss = 0;
@@ -902,6 +924,13 @@ export const monteCarlo = (deckToParse, config = {}, onProgress = null) => {
     results.keyCardOnCurvePlayability[name] =
       (results.keyCardOnCurvePlayability[name] / results.handsKept) * 100;
   });
+
+  // Normalise opening-hand land counts to percentages.
+  if (results.handsKept > 0) {
+    results.openingHandLandCounts = results.openingHandLandCounts.map(
+      c => (c / results.handsKept) * 100
+    );
+  }
 
   return results;
 };

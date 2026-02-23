@@ -124,6 +124,7 @@ const MTGMonteCarloAnalyzer = () => {
     () => _s.selectedTurnForSequences ?? 3
   );
   const [commanderMode, setCommanderMode] = useState(() => _s.commanderMode ?? false);
+  const [commanderName, setCommanderName] = useState(() => _s.commanderName ?? '');
 
   // ── Flood / screw thresholds ───────────────────────────────────────────────
   const [floodNLands, setFloodNLands] = useState(() => _s.floodNLands ?? 5);
@@ -153,6 +154,7 @@ const MTGMonteCarloAnalyzer = () => {
     maxSequences,
     selectedTurnForSequences,
     commanderMode,
+    commanderName,
     enableMulligans,
     mulliganRule,
     mulliganStrategy,
@@ -185,6 +187,7 @@ const MTGMonteCarloAnalyzer = () => {
     maxSequences,
     selectedTurnForSequences,
     commanderMode,
+    commanderName,
     enableMulligans,
     mulliganRule,
     mulliganStrategy,
@@ -226,6 +229,7 @@ const MTGMonteCarloAnalyzer = () => {
     maxSequences,
     selectedTurnForSequences,
     commanderMode,
+    commanderName,
     enableMulligans,
     mulliganRule,
     mulliganStrategy,
@@ -288,6 +292,7 @@ const MTGMonteCarloAnalyzer = () => {
     handSize,
     maxSequences,
     commanderMode,
+    commanderName,
     enableMulligans,
     mulliganRule,
     mulliganStrategy,
@@ -557,6 +562,8 @@ const MTGMonteCarloAnalyzer = () => {
     setSelectedTurnForSequences,
     commanderMode,
     setCommanderMode,
+    commanderName,
+    setCommanderName,
     enableMulligans,
     setEnableMulligans,
     mulliganRule,

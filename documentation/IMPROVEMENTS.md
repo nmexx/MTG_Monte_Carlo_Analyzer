@@ -144,10 +144,11 @@
     - `monteCarlo.js` computes `floodRate` / `screwRate` from the raw per-iteration land arrays before averaging.
     - Displayed as colour-coded rate badges (blue / orange) inside the Lands per Turn panel.
 
-19. **Opening hand land distribution histogram** `[Low]`
+19. **Opening hand land distribution histogram** --------DONE (v3.2.1)
     - Bar chart of how often kept hands contain exactly 0–7 lands after mulligans.
-    - Requires storing one integer per iteration at the mulligan step; chart is a simple bar.
-    - Makes mulligan strategy tuning concrete and visual.
+    - `monteCarlo.js`: `openingHandLandCounts: Array(8).fill(0)` added to `results`; bucket is incremented right after `handsKept++`; normalised to percentages during post-processing.
+    - `ResultsPanel.jsx`: new `<BarChart>` panel below the summary stats; bars are colour-coded (red 0–1, amber 2, green 3–4, purple 5–7) with a colour legend.
+    - 6 new Vitest tests covering length, percentage sum, and pure-land-deck concentration.
 
 20. **Card draw / cantrip land-thinning** --------DONE
     - Spells with a `drawsCards: N` flag (Night's Whisper, Sign in Blood, Harmonize, Wheel of Fortune, Rhystic Study, Phyrexian Arena, Brainstorm, etc.) are now modelled by the `CARD_DRAW_DATA` library (115+ supported cards).
@@ -330,3 +331,16 @@
       - `<name>: drew N card(s): drawn1, drawn2` — renders the source card name as a tooltip link and each drawn card name as a tooltip link.
       - `<name>: drew N card(s)` (no names) — renders the source card name as a tooltip link (edge-case guard).
     - **Tests** — 2 new tests in `uiHelpers.test.js` (upkeep draw with single drawn card; upkeep draw with multiple drawn cards); total suite: `571 → 573`.
+41. **Opening hand land distribution histogram + Commander card input** --------DONE (v3.2.1)
+
+    **Histogram:**
+    - `monteCarlo.js`: `openingHandLandCounts: Array(8).fill(0)` added to `results`; land count in the kept hand is bucketed right after `handsKept++` (`Math.min(7, landCount)`) and normalised to percentages during post-processing.
+    - `ResultsPanel.jsx`: new `<BarChart>` panel appears between the summary stats and the Lands per Turn chart. Bars are colour-coded: red (0–1 lands), amber (2), green (3–4, ideal), purple (5–7, flood risk). A colour legend is shown below the chart.
+    - 6 new Vitest tests: array length 8, percentage sum ≈ 100 (with and without mulligans), non-negative values, and pure-land-deck concentration in the high buckets.
+
+    **Commander card input:**
+    - `SimulationSettingsPanel.jsx`: a text input (placeholder *"e.g. Kenrith, the Returned King"*) is shown below the Commander mode checkbox when `commanderMode` is true. The input accepts any card name and is labelled "Commander card" with a hint "Always tracked as a key card (command zone — always available)."
+    - `App.jsx`: `commanderName` state (`useState('')`) added; persisted in `buildPersistableState` (localStorage + shareable URL), tracked in the `useEffect` dep array and `handleShareUrl` dep array, and forwarded to both `buildSimConfig` and `simSettingsProps`.
+    - `monteCarlo.js`: `commanderName` destructured from config. If set and not already in `selectedKeyCards`, it is pushed onto `keyCardNames` so the existing key-card playability machinery tracks it automatically. If the card is not found in `allPlayableCards` (because it lives in the command zone, not the deck), a stub `{ name, cmc: 0, colors: [] }` is registered in `keyCardMap` — this ensures a CMC-0 always-castable fallback so results still appear.
+    - `index.css`: `.commander-name-field` and `.commander-name-hint` helper classes added.
+    - 4 new Vitest tests: commander auto-added to `keyCardPlayability`, playability array length matches `turns`, unknown commander stub passes at 100% (CMC 0), no duplicate key when already in `selectedKeyCards`; total suite: 587.
