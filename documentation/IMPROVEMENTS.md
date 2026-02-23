@@ -41,6 +41,17 @@
    - **`calculateManaAvailability` named inner functions** — the Shadowmoor and Odyssey filter-land second passes are extracted as named inner functions `_applyFilterLands()` and `_applyOdysseyFilterLands()`, making the main function body a readable orchestrator.
    - **`doesLandEnterTapped` / `playLand` contract clarified** — JSDoc updated to document the two-step shock/MDFC land contract: `doesLandEnterTapped` returns the *default* tapped state before life-payment override; `playLand` is the sole authority that decides whether to pay life and force the land in untapped.
 
+3c. **`monteCarlo.js` internal refactor** --------DONE (v3.1.7)
+   - **`cumulativeTreasures` scope fixed** — the variable was declared *inside* the turn loop, resetting to 0 every turn. Moved to the same scope as `cumulativeLifeLoss` so it correctly accumulates across the simulation.
+   - **`allPlayableCards` completeness fix** — `costReducers`, `rituals`, and `treasureCards` were missing from the array used to build `keyCardMap`. Any key card in those categories would show 0% playability. All three category arrays now included.
+   - **Phase 2 exploration cost discount** — `calculateCostDiscount` was not called for exploration cards during Phase 2 casting. Cost-reducer permanents already on the battlefield were therefore ignored when determining whether an exploration spell could be played. Now calls `calculateCostDiscount(expl, battlefield)` and passes the result to both `canPlayCard` and `tapManaSources`.
+   - **Flatten `buildCompleteDeck` override chain** — the four `applyXOverrides()` calls were nested four levels deep. Refactored to sequential `let d = …; d = …; return …;` assignments for readability.
+   - **`appendLifeLoss` helper** — the identical three-line life-loss log suffix block (`if (ll > 0) { last.includes('Cannot play') … }`) was copy-pasted in Phase 1 and Phase 4 of the main turn loop. Extracted to a named top-level helper.
+   - **`emptyPerTurn` helper** — `Array(n).fill(null).map(() => [])` appeared 6× in the `results` initialisation object. Replaced with a one-line `emptyPerTurn(n)` helper.
+   - **`castSpells` return value** — `castSpells` now returns `{ cardsDrawn, treasuresProduced }` instead of mutating `simConfig.drawTracker` / `simConfig.treasureTracker` side-channel objects. `monteCarlo.js` destructures the return value directly; the tracker setup lines have been removed.
+   - **Guard burst mana computation** — the burst-mana block (filter hand for `BURST_MANA_SOURCES`, reduce rituals, build `burstColorBonus`, construct `manaWithBurst`) ran unconditionally on every turn of every iteration even when the deck contained no burst cards (`results.hasBurstCards = false`). Wrapped in `if (results.hasBurstCards) { … }` with `burstInHand`, `ritualsInHand`, and `manaWithBurst` declared outside so the key-card playability block retains access.
+   - **Remove redundant flood/screw length guards** — `results.landsPerTurn[floodTurnIdx].length > 0` was checked before computing flood/screw rates, but `landsPerTurn[t]` is always populated (one entry per iteration) after the main loop completes. Guards removed.
+
 ---
 
 ## Missing Features

@@ -65,6 +65,23 @@ const stdDev = arr => {
   return Math.sqrt(variance);
 };
 
+/**
+ * Append a life-loss suffix to the last turn-log action.
+ * No-ops when ll <= 0 or the last action already contains 'Cannot play'.
+ */
+const appendLifeLoss = (turnLog, ll) => {
+  if (ll <= 0) return;
+  const last = turnLog.actions[turnLog.actions.length - 1];
+  if (last && !last.includes('Cannot play'))
+    turnLog.actions[turnLog.actions.length - 1] = `${last} [-${ll} life]`;
+};
+
+/** Create a fresh per-turn array of n empty sub-arrays. */
+const emptyPerTurn = n =>
+  Array(n)
+    .fill(null)
+    .map(() => []);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // buildCompleteDeck
 //   Assembles the flat array of card objects that will be shuffled each
@@ -256,13 +273,10 @@ export const buildCompleteDeck = (deckToParse, config = {}) => {
     for (let i = 0; i < card.quantity; i++) deck.push({ ...card });
   });
 
-  return applyRitualOverrides(
-    applyTreasureOverrides(
-      applyDrawOverrides(applyManaOverrides(deck, manaOverrides), drawOverrides),
-      treasureOverrides
-    ),
-    ritualOverrides
-  );
+  let d = applyManaOverrides(deck, manaOverrides);
+  d = applyDrawOverrides(d, drawOverrides);
+  d = applyTreasureOverrides(d, treasureOverrides);
+  return applyRitualOverrides(d, ritualOverrides);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -310,27 +324,15 @@ export const monteCarlo = (deckToParse, config = {}) => {
   };
 
   const results = {
-    landsPerTurn: Array(turns)
-      .fill(null)
-      .map(() => []),
-    untappedLandsPerTurn: Array(turns)
-      .fill(null)
-      .map(() => []),
+    landsPerTurn: emptyPerTurn(turns),
+    untappedLandsPerTurn: emptyPerTurn(turns),
     colorsByTurn: Array(turns)
       .fill(null)
       .map(() => ({ W: [], U: [], B: [], R: [], G: [] })),
-    totalManaPerTurn: Array(turns)
-      .fill(null)
-      .map(() => []),
-    lifeLossPerTurn: Array(turns)
-      .fill(null)
-      .map(() => []),
-    cardsDrawnPerTurn: Array(turns)
-      .fill(null)
-      .map(() => []),
-    treasurePerTurn: Array(turns)
-      .fill(null)
-      .map(() => []),
+    totalManaPerTurn: emptyPerTurn(turns),
+    lifeLossPerTurn: emptyPerTurn(turns),
+    cardsDrawnPerTurn: emptyPerTurn(turns),
+    treasurePerTurn: emptyPerTurn(turns),
     keyCardPlayability: {},
     keyCardPlayabilityBurst: {},
     keyCardOnCurvePlayability: {},
@@ -368,6 +370,9 @@ export const monteCarlo = (deckToParse, config = {}) => {
     ...(deckToParse.rampSpells || []),
     ...(deckToParse.drawSpells || []),
     ...(deckToParse.exploration || []),
+    ...(deckToParse.costReducers || []),
+    ...(deckToParse.rituals || []),
+    ...(deckToParse.treasureCards || []),
   ];
   const keyCardMap = new Map(
     keyCardNames.map(name => [name, allPlayableCards.find(c => c.name === name)])
@@ -460,6 +465,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
     const battlefield = [];
     const graveyard = [];
     let cumulativeLifeLoss = 0;
+    let cumulativeTreasures = 0;
     const turnActions = [];
     const openingHand = hand.map(c => c.name);
 
@@ -484,7 +490,6 @@ export const monteCarlo = (deckToParse, config = {}) => {
 
       // Upkeep — per-turn draw effects from draw spell permanents on battlefield
       let cardsDrawnThisTurn = 0;
-      let cumulativeTreasures = 0;
       if (includeDrawSpells) {
         battlefield.forEach(p => {
           const card = p.card;
@@ -562,11 +567,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
         );
         turnLog.lifeLoss += ll;
         cumulativeLifeLoss += ll;
-        if (ll > 0) {
-          const last = turnLog.actions[turnLog.actions.length - 1];
-          if (last && !last.includes('Cannot play'))
-            turnLog.actions[turnLog.actions.length - 1] = `${last} [-${ll} life]`;
-        }
+        appendLifeLoss(turnLog, ll);
         landsPlayedThisTurn++;
       }
 
@@ -577,7 +578,8 @@ export const monteCarlo = (deckToParse, config = {}) => {
           c => c.isExploration && !disabledExploration.has(c.name)
         );
         for (const expl of explorationInHand) {
-          if (canPlayCard(expl, manaAvailable)) {
+          const explDiscount = calculateCostDiscount(expl, battlefield);
+          if (canPlayCard(expl, manaAvailable, explDiscount)) {
             hand.splice(hand.indexOf(expl), 1);
             battlefield.push({
               card: expl,
@@ -585,7 +587,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
               summoningSick: expl.isManaCreature || false,
               enteredOnTurn: turn,
             });
-            tapManaSources(expl, battlefield);
+            tapManaSources(expl, battlefield, explDiscount);
             const type = expl.isCreature ? 'creature' : expl.isArtifact ? 'artifact' : 'permanent';
             turnLog.actions.push(`Cast ${type}: ${expl.name} (Exploration effect)`);
             const nm = calculateManaAvailability(battlefield);
@@ -621,11 +623,7 @@ export const monteCarlo = (deckToParse, config = {}) => {
         );
         turnLog.lifeLoss += ll;
         cumulativeLifeLoss += ll;
-        if (ll > 0) {
-          const last = turnLog.actions[turnLog.actions.length - 1];
-          if (last && !last.includes('Cannot play'))
-            turnLog.actions[turnLog.actions.length - 1] = `${last} [-${ll} life]`;
-        }
+        appendLifeLoss(turnLog, ll);
         landsPlayedThisTurn++;
       }
 
@@ -700,11 +698,13 @@ export const monteCarlo = (deckToParse, config = {}) => {
       }
 
       // Phase 6: Cast spells
-      simConfig.drawTracker = { count: 0 };
-      simConfig.treasureTracker = { produced: 0 };
-      castSpells({ hand, battlefield, graveyard, library, turnLog }, turn, simConfig);
-      cardsDrawnThisTurn += simConfig.drawTracker.count;
-      cumulativeTreasures += simConfig.treasureTracker.produced;
+      const { cardsDrawn: spellCardsDrawn, treasuresProduced: spellTreasures } = castSpells(
+        { hand, battlefield, graveyard, library, turnLog },
+        turn,
+        simConfig
+      );
+      cardsDrawnThisTurn += spellCardsDrawn;
+      cumulativeTreasures += spellTreasures;
 
       // Phase 7: Calculate damage from mana sources and other permanents on the battlefield
       const { total: battlefieldDmg, breakdown: battlefieldDmgLog } = calculateBattlefieldDamage(
@@ -738,54 +738,59 @@ export const monteCarlo = (deckToParse, config = {}) => {
       });
 
       // Burst mana
-      const burstInHand = hand.filter(c => BURST_MANA_SOURCES.has(c.name?.toLowerCase()));
-      const burstFromArts = burstInHand.reduce((s, c) => {
-        const known = ARTIFACT_DATA.get(c.name?.toLowerCase());
-        return s + (known?.manaAmount ?? 1);
-      }, 0);
-      const ritualsInHand = hand.filter(c => c.isRitual && canPlayCard(c, manaAvailable));
-      // Ritual gain: supports fixed netGain or scaling (base + turn * growth)
-      const ritualGainAt = c =>
-        c.ritualScaling
-          ? Math.max(0, c.ritualScaling.base + turn * c.ritualScaling.growth)
-          : c.netGain || 0;
-      const burstFromRit = ritualsInHand.reduce((s, c) => s + ritualGainAt(c), 0);
-      const burstTotal = burstFromArts + burstFromRit + cumulativeTreasures;
+      let burstInHand = [];
+      let ritualsInHand = [];
+      let manaWithBurst = manaAvailable;
+      if (results.hasBurstCards) {
+        burstInHand = hand.filter(c => BURST_MANA_SOURCES.has(c.name?.toLowerCase()));
+        const burstFromArts = burstInHand.reduce((s, c) => {
+          const known = ARTIFACT_DATA.get(c.name?.toLowerCase());
+          return s + (known?.manaAmount ?? 1);
+        }, 0);
+        ritualsInHand = hand.filter(c => c.isRitual && canPlayCard(c, manaAvailable));
+        // Ritual gain: supports fixed netGain or scaling (base + turn * growth)
+        const ritualGainAt = c =>
+          c.ritualScaling
+            ? Math.max(0, c.ritualScaling.base + turn * c.ritualScaling.growth)
+            : c.netGain || 0;
+        const burstFromRit = ritualsInHand.reduce((s, c) => s + ritualGainAt(c), 0);
+        const burstTotal = burstFromArts + burstFromRit + cumulativeTreasures;
 
-      const burstColorBonus = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
-      burstInHand.forEach(c => {
-        const known = ARTIFACT_DATA.get(c.name?.toLowerCase());
-        const amt = known?.manaAmount ?? 1;
-        ['W', 'U', 'B', 'R', 'G'].forEach(col => {
-          burstColorBonus[col] += amt;
-        });
-      });
-      ritualsInHand.forEach(c => {
-        const colors = c.ritualColors;
-        const gain = ritualGainAt(c);
-        if (colors && colors.length > 0) {
-          colors.forEach(col => {
-            if (col in burstColorBonus) burstColorBonus[col] += gain;
-          });
-        } else {
+        const burstColorBonus = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+        burstInHand.forEach(c => {
+          const known = ARTIFACT_DATA.get(c.name?.toLowerCase());
+          const amt = known?.manaAmount ?? 1;
           ['W', 'U', 'B', 'R', 'G'].forEach(col => {
-            burstColorBonus[col] += gain;
+            burstColorBonus[col] += amt;
           });
-        }
-      });
+        });
+        ritualsInHand.forEach(c => {
+          const colors = c.ritualColors;
+          const gain = ritualGainAt(c);
+          if (colors && colors.length > 0) {
+            colors.forEach(col => {
+              if (col in burstColorBonus) burstColorBonus[col] += gain;
+            });
+          } else {
+            ['W', 'U', 'B', 'R', 'G'].forEach(col => {
+              burstColorBonus[col] += gain;
+            });
+          }
+        });
 
-      const manaWithBurst =
-        burstTotal > 0
-          ? {
-              total: manaAvailable.total + burstTotal,
-              colors: Object.fromEntries(
-                Object.entries(manaAvailable.colors).map(([k, v]) => [
-                  k,
-                  v + (burstColorBonus[k] || 0),
-                ])
-              ),
-            }
-          : manaAvailable;
+        manaWithBurst =
+          burstTotal > 0
+            ? {
+                total: manaAvailable.total + burstTotal,
+                colors: Object.fromEntries(
+                  Object.entries(manaAvailable.colors).map(([k, v]) => [
+                    k,
+                    v + (burstColorBonus[k] || 0),
+                  ])
+                ),
+              }
+            : manaAvailable;
+      }
 
       // Key-card playability
       keyCardNames.forEach(cardName => {
@@ -844,11 +849,11 @@ export const monteCarlo = (deckToParse, config = {}) => {
   // Flood / screw rates — computed from raw per-turn arrays BEFORE averaging
   const floodTurnIdx = floodTurn - 1;
   const screwTurnIdx = screwTurn - 1;
-  if (floodTurnIdx >= 0 && floodTurnIdx < turns && results.landsPerTurn[floodTurnIdx].length > 0) {
+  if (floodTurnIdx >= 0 && floodTurnIdx < turns) {
     const floodCount = results.landsPerTurn[floodTurnIdx].filter(n => n >= floodNLands).length;
     results.floodRate = (floodCount / results.handsKept) * 100;
   }
-  if (screwTurnIdx >= 0 && screwTurnIdx < turns && results.landsPerTurn[screwTurnIdx].length > 0) {
+  if (screwTurnIdx >= 0 && screwTurnIdx < turns) {
     const screwCount = results.landsPerTurn[screwTurnIdx].filter(n => n <= screwNLands).length;
     results.screwRate = (screwCount / results.handsKept) * 100;
   }

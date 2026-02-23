@@ -769,6 +769,9 @@ export const castSpells = (
     disabledTreasures = new Set(),
   } = simConfig;
 
+  let _cardsDrawn = 0;
+  let _treasuresProduced = 0;
+
   // Phase 0: cost reducers — cast before mana producers so their discount
   // applies to everything cast on the same turn.
   if (includeCostReducers) {
@@ -1054,7 +1057,7 @@ export const castSpells = (
             drawnCardNames.push(drawnCard.name);
           }
           cardsDrawn = toDraw;
-          if (simConfig?.drawTracker) simConfig.drawTracker.count += cardsDrawn;
+          _cardsDrawn += cardsDrawn;
         }
 
         if (turnLog) {
@@ -1100,7 +1103,7 @@ export const castSpells = (
         let treasuresCreated = 0;
         if (tc.isOneTreasure && tc.treasuresProduced > 0) {
           treasuresCreated = tc.treasuresProduced;
-          if (simConfig?.treasureTracker) simConfig.treasureTracker.produced += treasuresCreated;
+          _treasuresProduced += treasuresCreated;
         }
 
         if (turnLog) {
@@ -1114,6 +1117,8 @@ export const castSpells = (
       }
     );
   }
+
+  return { cardsDrawn: _cardsDrawn, treasuresProduced: _treasuresProduced };
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
