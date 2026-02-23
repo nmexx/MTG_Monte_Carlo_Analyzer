@@ -44,7 +44,6 @@ body {
 
 /* ─── App shell ──────────────────────────────────────────────────────────── */
 .app-root {
-  font-family: 'Inter', 'Segoe UI', sans-serif;
   max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
@@ -85,7 +84,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: var(--clr-bg-panel);
+  background: var(--clr-bg-muted);
   border-left: 1px solid var(--clr-border);
   border-right: 1px solid var(--clr-border);
   border-bottom: 1px solid var(--clr-border);
@@ -261,9 +260,12 @@ body {
   padding: 10px;
   border-radius: var(--radius-md);
   border: 1px solid var(--clr-border);
+  background: var(--clr-bg);
+  color: var(--clr-text);
   font-size: 0.875rem;
   font-family: monospace;
   resize: vertical;
+  color-scheme: dark;
 }
 
 /* ─── Buttons ────────────────────────────────────────────────────────────── */
@@ -312,8 +314,8 @@ body {
 
 /* ─── Error banner ───────────────────────────────────────────────────────── */
 .error-banner {
-  background: #fee2e2;
-  color: var(--clr-danger);
+  background: #450a0a;
+  color: #fca5a5;
   padding: 15px;
   border-radius: var(--radius-md);
   margin-bottom: 20px;
@@ -322,9 +324,9 @@ body {
 
 /* ─── Scryfall API usage warnings ───────────────────────────────────────── */
 .scryfall-usage-warning {
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fcd34d;
+  background: #2d1a00;
+  color: #fde68a;
+  border: 1px solid #92400e;
   padding: 10px 12px;
   border-radius: var(--radius-md);
   margin-bottom: 10px;
@@ -333,9 +335,9 @@ body {
 }
 
 .scryfall-usage-blocked {
-  background: #fee2e2;
-  color: var(--clr-danger);
-  border: 1px solid #fca5a5;
+  background: #450a0a;
+  color: #fca5a5;
+  border: 1px solid #7f1d1d;
   padding: 10px 12px;
   border-radius: var(--radius-md);
   margin-bottom: 10px;
@@ -535,13 +537,13 @@ body {
 }
 
 .land-badge--logic {
-  background: var(--clr-bg-accent);
-  color: #1e40af;
+  background: rgba(30, 58, 95, 0.6);
+  color: #93c5fd;
   font-weight: 600;
 }
 
 .land-badge--parsed {
-  background: var(--clr-row-border);
+  background: var(--clr-bg-muted);
   color: var(--clr-muted);
 }
 
@@ -585,6 +587,9 @@ body {
   padding: 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--clr-border);
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  color-scheme: dark;
 }
 
 .range-display {
@@ -661,7 +666,7 @@ body {
 .custom-rules-box {
   margin-top: 10px;
   padding: 10px;
-  background: white;
+  background: var(--clr-bg);
   border-radius: var(--radius-sm);
 }
 
@@ -687,6 +692,8 @@ body {
   padding: 4px;
   border-radius: var(--radius-xs);
   border: 1px solid var(--clr-border);
+  background: var(--clr-bg);
+  color: var(--clr-text);
 }
 
 /* ─── Results panel ──────────────────────────────────────────────────────── */
@@ -740,20 +747,20 @@ body {
 .sequence-burst-meta {
   margin: 0 0 6px;
   font-size: 0.875rem;
-  color: #92400e;
+  color: #fbbf24;
 }
 
 .sequence-burst-cards {
   margin: 0 0 10px;
   font-size: 0.78rem;
-  color: #b45309;
+  color: #f59e0b;
 }
 
 /* ─── renderSequenceBody (uiHelpers) ─────────────────────────────────────── */
 .seq-opening-hand {
   margin-bottom: 12px;
   padding: 10px;
-  background: white;
+  background: var(--clr-bg-muted);
   border-radius: var(--radius-sm);
 }
 
@@ -761,7 +768,7 @@ body {
   font-weight: 600;
   margin: 0 0 6px;
   font-size: 0.85rem;
-  color: #374151;
+  color: var(--clr-text);
 }
 
 .seq-opening-cards {
@@ -786,7 +793,7 @@ body {
   margin: 0 0 4px;
   font-weight: 600;
   font-size: 0.85rem;
-  color: #374151;
+  color: var(--clr-text);
 }
 
 .seq-turn-actions {
@@ -903,8 +910,8 @@ body {
 }
 
 .deck-column-header--b {
-  background: rgba(245, 158, 11, 0.12);
-  color: #b45309;
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
   border-left: 3px solid #f59e0b;
 }
 
@@ -914,7 +921,7 @@ body {
   margin: 0 0 8px;
 }
 .deck-label-b {
-  color: #b45309;
+  color: #fbbf24;
   margin: 0 0 8px;
 }
 
@@ -939,7 +946,7 @@ body {
 }
 
 .comparison-summary-col--delta {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.25);
   border: 1px dashed var(--clr-border);
 }
 
@@ -950,11 +957,11 @@ body {
 
 /* Delta badges */
 .delta-better {
-  color: #15803d;
+  color: #4ade80;
   font-weight: 600;
 }
 .delta-worse {
-  color: #b91c1c;
+  color: #f87171;
   font-weight: 600;
 }
 .delta-neutral {
@@ -1215,7 +1222,7 @@ body {
 .sim-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(249, 250, 251, 0.78);
+  background: rgba(15, 23, 42, 0.88);
   z-index: 9000;
   display: flex;
   flex-direction: column;
@@ -1254,7 +1261,7 @@ body {
 .sim-progress-track {
   width: 260px;
   height: 6px;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
   overflow: hidden;
   margin-top: 6px;
@@ -1320,7 +1327,7 @@ body {
   position: sticky;
   bottom: 0;
   z-index: 50;
-  background: linear-gradient(to top, #fff 72%, transparent);
+  background: linear-gradient(to top, var(--clr-bg-panel) 72%, transparent);
   padding: 22px 0 6px;
   margin-top: 20px;
 }
@@ -1372,134 +1379,4 @@ body {
 
 .prob-bar-value {
   position: relative;
-}
-
-/* ─── Dark theme ─────────────────────────────────────────────────────────── */
-{
-  /* ── colour tokens ─────────────────────────────────────────────────────── */
-  --clr-text: #e2e8f0;
-  --clr-muted: #94a3b8;
-  --clr-faint: #475569;
-  --clr-border: #334155;
-  --clr-row-border: #1e293b;
-  --clr-bg: #0f172a;
-  --clr-bg-panel: #1e293b;
-  --clr-bg-muted: #162032;
-  --clr-bg-accent: #1e3a5f;
-  --clr-bg-warn: #2a1a00;
-  --clr-generic-pip: #475569;
-  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.45);
-  color-scheme: dark;
-}
-
-body {
-  background-color: #0f172a;
-  color: #e2e8f0;
-}
-
-/* Form controls ─────────────────────────────────────────────────────────── */
-.deck-textarea,
-.settings-input,
-.mulligan-select,
-.custom-rule-input,
-.flood-screw-input {
-  background: #0f172a;
-  color: #e2e8f0;
-  border-color: #334155;
-  color-scheme: dark;
-}
-
-/* Hardcoded white backgrounds ───────────────────────────────────────────── */
-.custom-rules-box {
-  background: #0f172a;
-}
-
-.seq-opening-hand {
-  background: #162032;
-}
-
-/* Hardcoded text colours ────────────────────────────────────────────────── */
-.seq-opening-title,
-.seq-turn-title {
-  color: #cbd5e1;
-}
-
-.sequence-burst-meta {
-  color: #fbbf24;
-}
-
-.sequence-burst-cards {
-  color: #f59e0b;
-}
-
-/* Land badges ───────────────────────────────────────────────────────────── */
-.land-badge--logic {
-  background: rgba(30, 58, 95, 0.6);
-  color: #93c5fd;
-}
-
-.land-badge--parsed {
-  background: #162032;
-}
-
-/* Comparison deck B accent ──────────────────────────────────────────────── */
-.deck-column-header--b {
-  background: rgba(251, 191, 36, 0.1);
-  color: #fbbf24;
-}
-
-.deck-label-b {
-  color: #fbbf24;
-}
-
-/* Comparison delta column ───────────────────────────────────────────────── */
-.comparison-summary-col--delta {
-  background: rgba(0, 0, 0, 0.25);
-}
-
-/* Delta badges ──────────────────────────────────────────────────────────── */
-.delta-better {
-  color: #4ade80;
-}
-
-.delta-worse {
-  color: #f87171;
-}
-
-/* Error / warning banners ───────────────────────────────────────────────── */
-.error-banner {
-  background: #450a0a;
-  color: #fca5a5;
-}
-
-.scryfall-usage-warning {
-  background: #2d1a00;
-  color: #fde68a;
-  border-color: #92400e;
-}
-
-.scryfall-usage-blocked {
-  background: #450a0a;
-  color: #fca5a5;
-  border-color: #7f1d1d;
-}
-
-/* Simulation overlay ────────────────────────────────────────────────────── */
-.sim-overlay {
-  background: rgba(15, 23, 42, 0.88);
-}
-
-.sim-progress-track {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-/* Sticky run-button fade ────────────────────────────────────────────────── */
-.btn-run-sticky {
-  background: linear-gradient(to top, #1e293b 72%, transparent);
-}
-
-/* Toolbar in dark mode ──────────────────────────────────────────────────── */
-.app-toolbar {
-  background: #162032;
-  border-color: #334155;
 }
