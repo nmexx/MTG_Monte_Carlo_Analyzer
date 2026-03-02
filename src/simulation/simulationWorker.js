@@ -16,19 +16,12 @@
  */
 
 import { monteCarlo } from './monteCarlo.js';
+import { SIM_SET_FIELDS } from './simConstants.js';
 
-/** Fields whose values are serialised as Arrays in the message payload. */
-const SET_FIELDS = [
-  'selectedKeyCards',
-  'disabledExploration',
-  'disabledRampSpells',
-  'disabledArtifacts',
-  'disabledCreatures',
-  'disabledRituals',
-  'disabledCostReducers',
-  'disabledDrawSpells',
-  'disabledTreasures',
-];
+/** Fields whose values are serialised as Arrays in the message payload.
+ * Imported from simConstants.js — the single source of truth shared with App.jsx.
+ */
+// SIM_SET_FIELDS imported above
 
 self.onmessage = ({ data }) => {
   if (data.type !== 'RUN') return;
@@ -37,7 +30,7 @@ self.onmessage = ({ data }) => {
 
   // Rehydrate arrays → Sets so monteCarlo receives the expected types.
   const rehydrated = { ...config };
-  SET_FIELDS.forEach(field => {
+  SIM_SET_FIELDS.forEach(field => {
     rehydrated[field] = new Set(config[field] ?? []);
   });
 

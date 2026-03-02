@@ -336,11 +336,13 @@ describe('downloadTextFile', () => {
 
   it('creates an anchor element and triggers a click', () => {
     const clickSpy = vi.fn();
+    // Capture the real createElement before spying so we can return real DOM nodes
+    // (document.body.appendChild requires genuine Nodes, not plain objects)
+    const realCreate = document.createElement.bind(document);
     const createSpy = vi.spyOn(document, 'createElement').mockImplementation(tag => {
-      if (tag === 'a') {
-        return { href: '', download: '', click: clickSpy };
-      }
-      return document.createElement(tag);
+      const el = realCreate(tag);
+      if (tag === 'a') el.click = clickSpy;
+      return el;
     });
 
     downloadTextFile('hello world', 'test.txt');
@@ -354,12 +356,14 @@ describe('downloadTextFile', () => {
 
   it('sets the correct download filename', () => {
     let capturedAnchor = null;
+    const realCreate = document.createElement.bind(document);
     const createSpy = vi.spyOn(document, 'createElement').mockImplementation(tag => {
+      const el = realCreate(tag);
       if (tag === 'a') {
-        capturedAnchor = { href: '', download: '', click: vi.fn() };
-        return capturedAnchor;
+        el.click = vi.fn();
+        capturedAnchor = el;
       }
-      return document.createElement(tag);
+      return el;
     });
 
     downloadTextFile('some content', 'my-export.csv');
@@ -375,10 +379,11 @@ describe('downloadTextFile', () => {
     });
     vi.stubGlobal('Blob', BlobSpy);
 
-    const createSpy = vi.spyOn(document, 'createElement').mockReturnValue({
-      href: '',
-      download: '',
-      click: vi.fn(),
+    const realCreate = document.createElement.bind(document);
+    const createSpy = vi.spyOn(document, 'createElement').mockImplementation(tag => {
+      const el = realCreate(tag);
+      if (tag === 'a') el.click = vi.fn();
+      return el;
     });
 
     downloadTextFile('deck data here', 'deck.txt');

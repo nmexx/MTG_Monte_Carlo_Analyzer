@@ -3,6 +3,7 @@ import LZString from 'lz-string';
 
 // ─── Simulation & Parsing ─────────────────────────────────────────────────────────────────────────────
 import { parseDeckList } from './parser/deckParser.js';
+import { SIM_SET_FIELDS } from './simulation/simConstants.js';
 
 // ─── UI Utilities ─────────────────────────────────────────────────────────────
 import {
@@ -94,8 +95,14 @@ const MTGMonteCarloAnalyzer = () => {
 
   // ── Card lookup (file upload + optional Scryfall API) ──────────────────────
   const [error, setError] = useState('');
-  const { cardsDatabase, lookupCacheRef, scryfallCallCount, handleFileUpload, lookupCard } =
-    useCardLookup(apiMode, setError);
+  const {
+    cardsDatabase,
+    isLoadingFile,
+    lookupCacheRef,
+    scryfallCallCount,
+    handleFileUpload,
+    lookupCard,
+  } = useCardLookup(apiMode, setError);
 
   // ── Mulligan settings ──────────────────────────────────────────────────────
   const [enableMulligans, setEnableMulligans] = useState(() => _s.enableMulligans ?? false);
@@ -139,29 +146,56 @@ const MTGMonteCarloAnalyzer = () => {
 
   // =============================================================================
   // buildPersistableState — single source of truth for localStorage + URL hash
+  //
+  // Wrapped in useCallback so both the useEffect and handleShareUrl can list it
+  // as a dependency, removing the need for eslint-disable-next-line comments.
   // =============================================================================
-  const buildPersistableState = () => ({
-    apiMode,
-    comparisonMode,
-    labelA,
-    labelB,
-    slotA: serializeDeckSlot(deckSlotA),
-    slotB: serializeDeckSlot(deckSlotB),
-    iterations,
-    turns,
-    handSize,
-    maxSequences,
-    selectedTurnForSequences,
-    commanderMode,
-    enableMulligans,
-    mulliganRule,
-    mulliganStrategy,
-    customMulliganRules,
-    floodNLands,
-    floodTurn,
-    screwNLands,
-    screwTurn,
-  });
+  const buildPersistableState = useCallback(
+    () => ({
+      apiMode,
+      comparisonMode,
+      labelA,
+      labelB,
+      slotA: serializeDeckSlot(deckSlotA),
+      slotB: serializeDeckSlot(deckSlotB),
+      iterations,
+      turns,
+      handSize,
+      maxSequences,
+      selectedTurnForSequences,
+      commanderMode,
+      enableMulligans,
+      mulliganRule,
+      mulliganStrategy,
+      customMulliganRules,
+      floodNLands,
+      floodTurn,
+      screwNLands,
+      screwTurn,
+    }),
+    [
+      apiMode,
+      comparisonMode,
+      labelA,
+      labelB,
+      deckSlotA,
+      deckSlotB,
+      iterations,
+      turns,
+      handSize,
+      maxSequences,
+      selectedTurnForSequences,
+      commanderMode,
+      enableMulligans,
+      mulliganRule,
+      mulliganStrategy,
+      customMulliganRules,
+      floodNLands,
+      floodTurn,
+      screwNLands,
+      screwTurn,
+    ]
+  );
 
   // ── Share URL handler ──────────────────────────────────────────────────────
   const handleShareUrl = useCallback(() => {
@@ -171,29 +205,7 @@ const MTGMonteCarloAnalyzer = () => {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    apiMode,
-    comparisonMode,
-    labelA,
-    labelB,
-    deckSlotA,
-    deckSlotB,
-    iterations,
-    turns,
-    handSize,
-    maxSequences,
-    selectedTurnForSequences,
-    commanderMode,
-    enableMulligans,
-    mulliganRule,
-    mulliganStrategy,
-    customMulliganRules,
-    floodNLands,
-    floodTurn,
-    screwNLands,
-    screwTurn,
-  ]);
+  }, [buildPersistableState]);
 
   // ── Derived chart data ─────────────────────────────────────────────────────
   const chartData = useMemo(
@@ -212,29 +224,7 @@ const MTGMonteCarloAnalyzer = () => {
     } catch (err) {
       console.warn('localStorage save failed:', err);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    deckSlotA,
-    deckSlotB,
-    apiMode,
-    comparisonMode,
-    labelA,
-    labelB,
-    iterations,
-    turns,
-    handSize,
-    maxSequences,
-    selectedTurnForSequences,
-    commanderMode,
-    enableMulligans,
-    mulliganRule,
-    mulliganStrategy,
-    customMulliganRules,
-    floodNLands,
-    floodTurn,
-    screwNLands,
-    screwTurn,
-  ]);
+  }, [buildPersistableState]);
 
   // =============================================================================
   // Parse deck — resolves card data via cache + optional Scryfall API
@@ -259,21 +249,11 @@ const MTGMonteCarloAnalyzer = () => {
 
   // =============================================================================
   // serializeConfig — converts Set fields to Arrays for postMessage transfer
+  // Uses SIM_SET_FIELDS from simConstants.js (shared with simulationWorker.js).
   // =============================================================================
-  const SET_CONFIG_FIELDS = [
-    'selectedKeyCards',
-    'disabledExploration',
-    'disabledRampSpells',
-    'disabledArtifacts',
-    'disabledCreatures',
-    'disabledRituals',
-    'disabledCostReducers',
-    'disabledDrawSpells',
-    'disabledTreasures',
-  ];
   const serializeConfig = config => {
     const out = { ...config };
-    SET_CONFIG_FIELDS.forEach(f => {
+    SIM_SET_FIELDS.forEach(f => {
       out[f] = [...(config[f] ?? [])];
     });
     return out;
@@ -405,7 +385,8 @@ const MTGMonteCarloAnalyzer = () => {
       try {
         const resultsSection = document.getElementById('results-section');
         if (!resultsSection) {
-          alert('Results section not found');
+          // Use setError instead of alert() for consistent in-app error display (#15)
+          setError('Results section not found');
           return;
         }
         if (button) {
@@ -428,7 +409,7 @@ const MTGMonteCarloAnalyzer = () => {
 
         canvas.toBlob(blob => {
           if (!blob) {
-            alert('Failed to generate image. Please use your browser screenshot tool.');
+            setError('Failed to generate image. Please use your browser screenshot tool.');
             if (button) {
               button.textContent = originalText;
               button.disabled = false;
@@ -450,7 +431,7 @@ const MTGMonteCarloAnalyzer = () => {
         });
       } catch (err) {
         console.error('Export error:', err);
-        alert(
+        setError(
           'Failed to export. Please use your browser screenshot tool ' +
             '(Ctrl+Shift+S on Windows, Cmd+Shift+5 on Mac)'
         );
@@ -460,7 +441,7 @@ const MTGMonteCarloAnalyzer = () => {
         }
       }
     },
-    [simulationResults]
+    [simulationResults, setError]
   );
 
   // =============================================================================
@@ -704,8 +685,16 @@ const MTGMonteCarloAnalyzer = () => {
                 <li>Upload the JSON file below</li>
               </ol>
             </div>
-            <input type="file" accept=".json" onChange={handleFileUpload} className="file-input" />
-            {cardsDatabase && (
+            {/* disabled during parse so the user can't queue a second file (#17) */}
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleFileUpload}
+              className="file-input"
+              disabled={isLoadingFile}
+            />
+            {isLoadingFile && <p className="loading-message">Loading cards.json&hellip;</p>}
+            {!isLoadingFile && cardsDatabase && (
               <p className="loaded-success">
                 ✓ Loaded {cardsDatabase.length.toLocaleString()} cards
               </p>

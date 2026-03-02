@@ -33,6 +33,7 @@
  */
 
 import { ARTIFACT_DATA, BURST_MANA_SOURCES } from '../../card_data/Artifacts.js';
+import { average, stdDev } from '../utils/math.js';
 import {
   shuffle,
   selectBestLand,
@@ -51,19 +52,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-const average = arr => {
-  if (!arr || arr.length === 0) return 0;
-  const sum = arr.reduce((s, v) => (v != null && !isNaN(v) ? s + v : s), 0);
-  return sum / arr.length;
-};
-
-const stdDev = arr => {
-  if (!arr || arr.length < 2) return 0;
-  const avg = average(arr);
-  const variance =
-    arr.reduce((s, v) => (v != null && !isNaN(v) ? s + (v - avg) ** 2 : s), 0) / arr.length;
-  return Math.sqrt(variance);
-};
+// average and stdDev are imported from '../utils/math.js'.
 
 /**
  * Append a life-loss suffix to the last turn-log action.
@@ -574,7 +563,7 @@ export const monteCarlo = (deckToParse, config = {}, onProgress = null) => {
 
       // Phase 1: first land drop
       let landsPlayedThisTurn = 0;
-      const firstLand = selectBestLand(hand, battlefield);
+      const firstLand = selectBestLand(hand, battlefield, turn, commanderMode);
       if (firstLand) {
         const ll = playLand(
           firstLand,
@@ -630,7 +619,7 @@ export const monteCarlo = (deckToParse, config = {}, onProgress = null) => {
 
       // Phase 4: additional land drops
       while (landsPlayedThisTurn < maxLandsPerTurn) {
-        const land = selectBestLand(hand, battlefield);
+        const land = selectBestLand(hand, battlefield, turn, commanderMode);
         if (!land) break;
         const ll = playLand(
           land,

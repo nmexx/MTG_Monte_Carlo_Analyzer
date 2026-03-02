@@ -1,17 +1,17 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { readFileSync } from 'fs'
-import { resolve } from 'path'
-import { fileURLToPath } from 'url'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url))
-const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 // Replaces %APP_VERSION% in index.html with the version from package.json
 const htmlVersionPlugin = () => ({
   name: 'html-version-inject',
-  transformIndexHtml: (html) => html.replace(/%APP_VERSION%/g, pkg.version),
-})
+  transformIndexHtml: html => html.replace(/%APP_VERSION%/g, pkg.version),
+});
 
 export default defineConfig({
   plugins: [react(), htmlVersionPlugin()],
@@ -27,7 +27,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    sourcemap: false,
+    // 'hidden' generates source maps without serving them publicly —
+    // keeps production bundles debuggable without exposing source paths.
+    sourcemap: 'hidden',
     minify: 'terser',
     rollupOptions: {
       input: {
@@ -41,9 +43,14 @@ export default defineConfig({
             return 'vendor-react';
           }
           // Recharts + its deps (d3 etc.) — heavy but rarely changes
-          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3') ||
-              id.includes('node_modules/victory') || id.includes('node_modules/internmap') ||
-              id.includes('node_modules/robust-predicates') || id.includes('node_modules/delaunator')) {
+          if (
+            id.includes('node_modules/recharts') ||
+            id.includes('node_modules/d3') ||
+            id.includes('node_modules/victory') ||
+            id.includes('node_modules/internmap') ||
+            id.includes('node_modules/robust-predicates') ||
+            id.includes('node_modules/delaunator')
+          ) {
             return 'vendor-charts';
           }
           // html2canvas — only used for PNG export
@@ -53,5 +60,5 @@ export default defineConfig({
         },
       },
     },
-  }
-})
+  },
+});

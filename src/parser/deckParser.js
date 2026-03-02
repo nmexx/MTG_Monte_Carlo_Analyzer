@@ -88,6 +88,8 @@ export const parseDeckList = async (deckText, parserCtx = {}) => {
   if (cardCounts.size === 0) return null;
 
   // ── Look up and categorise each card ─────────────────────────────────────
+  // All lookups are dispatched in parallel so Scryfall API mode doesn't
+  // serialise 60+ individual network requests one after another.
   const lands = [];
   const artifacts = [];
   const creatures = [];
@@ -99,8 +101,12 @@ export const parseDeckList = async (deckText, parserCtx = {}) => {
   const treasureCards = [];
   const spells = [];
 
-  for (const [cardName, quantity] of cardCounts.entries()) {
-    const cardData = await lookupCard(cardName);
+  const cardEntries = [...cardCounts.entries()];
+  const cardDataResults = await Promise.all(cardEntries.map(([name]) => lookupCard(name)));
+
+  for (let ei = 0; ei < cardEntries.length; ei++) {
+    const [cardName, quantity] = cardEntries[ei];
+    const cardData = cardDataResults[ei];
     if (!cardData) {
       errors.push(`Card "${cardName}" not found`);
       continue;

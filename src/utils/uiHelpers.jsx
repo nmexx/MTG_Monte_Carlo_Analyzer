@@ -36,21 +36,19 @@ export const parseManaSymbols = manaCost => {
   return (manaCost.match(/\{([^}]+)\}/g) || []).map(s => s.replace(/[{}]/g, ''));
 };
 
-const MANA_COST_TITLES = {
-  W: 'White mana',
-  U: 'Blue mana',
-  B: 'Black mana',
-  R: 'Red mana',
-  G: 'Green mana',
-  C: 'Colorless mana',
-};
-
 export const renderManaCost = manaCost => {
-  const colorSymbols = { W: '☀️', U: '💧', B: '💀', R: '🔥', G: '🌿', C: '◇' };
+  const colorSymbols = {
+    W: '\u2600\ufe0f',
+    U: '\ud83d\udca7',
+    B: '\ud83d\udc80',
+    R: '\ud83d\udd25',
+    G: '\ud83c\udf3f',
+    C: '\u25c7',
+  };
   return parseManaSymbols(manaCost).map((symbol, idx) => {
     if (colorSymbols[symbol])
       return (
-        <span key={idx} className="mana-cost-symbol" title={MANA_COST_TITLES[symbol]}>
+        <span key={idx} className="mana-cost-symbol" title={MANA_TITLES[symbol] || symbol}>
           {colorSymbols[symbol]}
         </span>
       );
@@ -61,6 +59,28 @@ export const renderManaCost = manaCost => {
     );
   });
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Module-level helpers shared by buildActionSegments and buildArrowSegments.
+// Defining them only once avoids duplicating identical closures inside each
+// function body.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Creates a plain-text segment. */
+const _p = t => ({ text: t, isCard: false });
+
+/**
+ * Splits a comma-separated card-name list into alternating
+ * [card-segment, ', '-segment, card-segment …] array.
+ */
+const _fromList = listStr =>
+  listStr
+    .split(', ')
+    .flatMap((name, i, arr) =>
+      i < arr.length - 1
+        ? [{ text: name.trim(), isCard: true }, _p(', ')]
+        : [{ text: name.trim(), isCard: true }]
+    );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fetch type badge
@@ -100,16 +120,14 @@ export const getFetchTitle = fetchType => {
 //     "Cast draw spell: <name> → drew N cards: <n1>, <n2>"
 //     "<name>: drew N card(s): drawn1, drawn2"  [upkeep per-turn draw]
 //     "<name>: created N treasure(s)"
+//
+// Delegates to module-level _p / _fromList helpers (no local redefinition).
 // ─────────────────────────────────────────────────────────────────────────────
 export const buildActionSegments = action => {
-  const p = t => ({ text: t, isCard: false }); // plain text segment
+  // Alias module-level helpers for readability inside the function body.
+  const p = _p;
   const c = t => ({ text: t.trim(), isCard: true }); // card name segment
-
-  // Split a comma-separated name list into alternating [card, plain(', '), card...] segs
-  const fromList = listStr =>
-    listStr
-      .split(', ')
-      .flatMap((name, i, arr) => (i < arr.length - 1 ? [c(name), p(', ')] : [c(name)]));
+  const fromList = _fromList;
 
   // ── "Drew: <name>" ─────────────────────────────────────────────────────────
   if (action.startsWith('Drew: ')) {
@@ -248,36 +266,28 @@ export const buildActionSegments = action => {
 //     " → drew N cards: name1, name2"
 //     " → draws each turn"
 //     " → no land found"
+//
+// Uses module-level _p / _fromList helpers shared with buildActionSegments.
 // ─────────────────────────────────────────────────────────────────────────────
 const buildArrowSegments = tail => {
-  const p = t => ({ text: t, isCard: false });
-  const fromList = listStr =>
-    listStr
-      .split(', ')
-      .flatMap((name, i, arr) =>
-        i < arr.length - 1
-          ? [{ text: name.trim(), isCard: true }, p(', ')]
-          : [{ text: name.trim(), isCard: true }]
-      );
-
   const segs = [];
 
   // "→ drew N cards: name1, name2"
   const drewM = tail.match(/^( → drew \d+ cards?: )(.+)$/);
   if (drewM) {
-    segs.push(p(drewM[1]), ...fromList(drewM[2]));
+    segs.push(_p(drewM[1]), ..._fromList(drewM[2]));
     return segs;
   }
 
   // "→ drew N card" (0 drawn or just 1 without names)
   if (/ → drew \d+ card/.test(tail)) {
-    segs.push(p(tail));
+    segs.push(_p(tail));
     return segs;
   }
 
   // "→ draws each turn"
   if (tail.includes('→ draws each turn') || tail.includes('→ no land found')) {
-    segs.push(p(tail));
+    segs.push(_p(tail));
     return segs;
   }
 
@@ -288,20 +298,20 @@ const buildArrowSegments = tail => {
     const stateNote = arrowM[3];
     const rest2 = arrowM[4] || '';
 
-    segs.push(p(arrowM[1]), ...fromList(landList), p(stateNote));
+    segs.push(_p(arrowM[1]), ..._fromList(landList), _p(stateNote));
 
     // "; land3, land4 to hand"
     const toHandM = rest2.match(/^(; )(.+?)( to hand)(.*)$/);
     if (toHandM) {
-      segs.push(p(toHandM[1]), ...fromList(toHandM[2]), p(toHandM[3]));
-      if (toHandM[4]) segs.push(p(toHandM[4]));
+      segs.push(_p(toHandM[1]), ..._fromList(toHandM[2]), _p(toHandM[3]));
+      if (toHandM[4]) segs.push(_p(toHandM[4]));
     } else if (rest2) {
-      segs.push(p(rest2));
+      segs.push(_p(rest2));
     }
     return segs;
   }
 
-  segs.push(p(tail));
+  segs.push(_p(tail));
   return segs;
 };
 
@@ -362,6 +372,9 @@ export const renderSequenceBody = (data, accentColor = '#667eea') => (
 
 // ─────────────────────────────────────────────────────────────────────────────
 // downloadTextFile
+//
+// Creates a temporary <a> element, appends it to the DOM (required in Firefox
+// so that programmatic .click() triggers a download), then removes it.
 // ─────────────────────────────────────────────────────────────────────────────
 export const downloadTextFile = (content, filename) => {
   const blob = new Blob([content], { type: 'text/plain' });
@@ -369,7 +382,9 @@ export const downloadTextFile = (content, filename) => {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
 

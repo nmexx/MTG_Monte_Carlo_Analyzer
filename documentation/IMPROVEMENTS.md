@@ -354,3 +354,128 @@
 43. **±1σ standard-deviation bands in comparison charts** --------DONE (v3.2.3)
 
     - `ComparisonResultsPanel.jsx`: `Area` added to recharts imports; `SimpleTooltip` updated to filter out array-valued payload entries (SD bands) and `_*`-prefixed keys so the tooltip stays clean; all five per-turn merged data arrays (`landsCompare`, `manaCompare`, `lifeCompare`, `drawnCompare`, `treasureCompare`) now include the Lo/Hi bound fields already present in `chartData.landsData`, `chartData.manaByColorData`, `chartData.lifeLossData`, `chartData.cardsDrawnData`, `chartData.treasureData`; one pair of translucent `<Area>` bands added per deck line in all five charts (Total Lands, Untapped Lands, Total Mana, Life Loss, Cards Drawn, Treasure Pool); chart sub-headings updated to include “Shaded bands = ±1σ”. No new tests required — the Lo/Hi fields are already covered by `uiHelpers.test.js` and the visual rendering is not unit-testable.
+
+
+44. **Code-quality pass — bug fixes, deduplication, and DX improvements** --------DONE (v3.3.0)
+
+    Internal audit of the codebase identified 18 issues across correctness, duplication, performance, React
+    patterns, and DX.  All 18 were resolved in this release.
+
+    **Bug fixes**
+
+    - **(#1) `selectBestLand` tapped-land heuristic** — `simulationCore.js`: the untapped-preference
+      filter was checking the static `entersTappedAlways` flag, which is `false` for shock, check, slow,
+      and MDFC lands because those lands enter untapped *conditionally*.  The fix calls
+      `doesLandEnterTapped(l, battlefield, turn, commanderMode)` dynamically so the heuristic is correct
+      for the actual game state.  `selectBestLand` now accepts `turn` and `commanderMode` parameters
+      (both defaulting so existing unit-test call sites need no changes); both call sites in
+      `monteCarlo.js` updated to forward the current turn and mode.
+
+    - **(#3) Scryfall token double-count** — `useCardLookup.js`: when the name lookup missed and the
+      hook fell through to a search fallback, the Scryfall call counter was incremented twice (once in
+      the fuzzy-cache path and once in the fallback path).  The fallback path no longer double-increments.
+
+    - **(#4) Fuzzy cache wrong-card match** — `useCardLookup.js`: the in-memory name cache was searched
+      with a single pass that could return a substring match before checking for an exact prefix match
+      (e.g. searching "Forest" could return "Barren Moor" via substring before "Forest of Spirits" via
+      prefix).  Split into two ordered loops: prefix match first, substring match second.
+
+    - **(#15) `alert()` in `exportResultsAsPNG`** — `App.jsx`: three bare `alert(...)` calls replaced
+      with `setError(...)` so errors surface in the existing in-app error banner rather than a browser
+      modal.  `setError` added to the `useCallback` dependency array.
+
+    **Deduplication**
+
+    - **(#5) Duplicate `average` / missing `stdDev`** — `monteCarlo.js` defined its own private
+      `average` and `stdDev` functions that were identical to (or absent from) `utils/math.js`.  Both
+      removed from `monteCarlo.js`; `math.js` now exports `average` and `stdDev`.  `monteCarlo.js`
+      imports both from `math.js`.
+
+    - **(#6) `SET_CONFIG_FIELDS` duplication** — Both `App.jsx` (main thread) and
+      `simulationWorker.js` (Web Worker) maintained separate copies of the same nine-element array that
+      lists which config fields hold `Set` values and must be serialised before `postMessage`.  New file
+      `src/simulation/simConstants.js` exports `SIM_SET_FIELDS`; both consumers import from it instead
+      of defining their own copy.  The local `SET_CONFIG_FIELDS` in `App.jsx` and `SET_FIELDS` in
+      `simulationWorker.js` are removed.
+
+    - **(#7) `MANA_TITLES` / `MANA_COST_TITLES` duplicate** — `uiHelpers.jsx`: `MANA_COST_TITLES` was
+      an identical copy of `MANA_TITLES`.  `MANA_COST_TITLES` removed; `renderManaCost` updated to use
+      `MANA_TITLES`.
+
+    - **(#8) `_p` / `_fromList` duplicated inside segment builders** — `uiHelpers.jsx`: the two helper
+      closures were defined once inside `buildArrowSegments` and again inside `buildActionSegments`.
+      Both lifted to module scope so both functions share one definition.
+
+    - **(#13) Redundant guard in `math.js`** — `average(arr)` contained the dead ternary
+      `arr.length > 0 ? sum / arr.length : 0`; the early-return guard at the top already handles the
+      empty-array case.  Simplified to `return sum / arr.length`.
+
+    - **(#14) Redundant `doesLandEnterTapped` branch** — `simulationCore.js`: the branch
+      `if (land.entersTappedAlways === false) return false;` is dead code because the final
+      `return false` statement already covers it.  Removed.
+
+    **Performance / React patterns**
+
+    - **(#9) `buildPersistableState` not memoized** — `App.jsx`: the plain inline function forced both
+      `handleShareUrl` and the localStorage `useEffect` to list every top-level state variable in their
+      dependency arrays, plus two `eslint-disable-next-line react-hooks/exhaustive-deps` suppressions.
+      `buildPersistableState` is now a `useCallback` with its own dep list; both consumers depend only
+      on `[buildPersistableState]` and the eslint-disable comments are removed.
+
+    - **(#10) `lookupCard` unstable reference** — `useCardLookup.js`: `lookupCard` had
+      `[apiMode, scryfallCallCount]` as deps; because `scryfallCallCount` is incremented on every
+      Scryfall call, the function reference changed on every API call, triggering unnecessary re-renders.
+      A `scryfallCallCountRef` (`useRef`) now tracks the live value; the `useState` counter is kept for
+      display only.  Dep array changed to `[apiMode]`.
+
+    - **(#11) `lookupCacheRef` in `handleParseDeck` deps** — `App.jsx`: a `useRef` object never changes
+      identity; including it in a `useCallback` dep array is misleading.  Removed from the dep list.
+
+    - **(#12) Sequential `await` in `parseDeckList`** — `deckParser.js`: card lookups inside the main
+      loop were awaited one at a time.  Refactored to use `Promise.all` so all card lookups fire in
+      parallel, substantially reducing total parse time on large deck lists.
+
+    **Developer experience**
+
+    - **(#16) `downloadTextFile` Firefox compat** — `uiHelpers.jsx`: the trigger `<a>` was never
+      attached to the DOM before `.click()`, causing silent failure on Firefox.
+      `document.body.appendChild` / `removeChild` added around the click.
+
+    - **(#17) No loading state during `cards.json` parse** — `useCardLookup.js`: large JSON files
+      (~200 MB) locked the UI for several seconds with no feedback.  Added `isLoadingFile` state (set
+      `true` before `JSON.parse`, cleared in `finally`).  `App.jsx` uses it to disable the file
+      `<input>` during parse and render a `"Loading cards.json…"` message below the input.
+
+    - **(#18) `sourcemap: false` in production build** — `vite.config.js`: changed to
+      `sourcemap: 'hidden'` so source maps are generated but not bundled into the output, enabling
+      production error monitoring without shipping source to end users.
+
+45. **Split `simulationCore.js` into focused sub-modules** --------DONE (v3.3.0)
+
+    **(#19 — Maintainability)** `simulationCore.js` had grown to 1 269 lines, making it hard to
+    navigate and review.  The file was split into four focused sub-modules with no circular
+    dependencies, while keeping the public API fully backward-compatible for all existing callers
+    (`monteCarlo.js`, test files) with zero import-path changes.
+
+    **New files**
+
+    - `src/simulation/simHelpers.js` (~65 lines) — shared constants (`SUBTYPE_TO_COLOR`,
+      `COLOR_TO_SUBTYPE`, `PAIN_LAND_ACTIVE_TURNS`) and pure helpers (`parseColorPips`,
+      `getAllSpells`).  No sim-internal imports; safe to import from anywhere.
+
+    - `src/simulation/landUtils.js` (~310 lines) — land-play logic: `matchesRampFilter`,
+      `doesLandEnterTapped`, `selectBestLand`, `findBestLandToFetch`, `playLand`.
+      Imports from `simHelpers.js` and `landData.js` only.
+
+    - `src/simulation/manaUtils.js` (~285 lines) — mana accounting: `tapManaSources`,
+      `calculateManaAvailability`, `calculateCostDiscount`, `solveColorPips`, `canPlayCard`.
+      Imports from `simHelpers.js` and `card_data/Artifacts.js` only.
+
+    - `src/simulation/castSpells.js` (~370 lines) — `castSpells` (all 4 casting phases) plus
+      the private `_runCastingLoop` helper.  Imports from `manaUtils.js` and `landUtils.js`.
+
+    **Retained in `simulationCore.js`** (~186 lines) — `shuffle`,
+    `calculateBattlefieldDamage`, and `enforceHandSizeLimit`.  The file now re-exports
+    everything from the four sub-modules so callers are unaffected.
+
+    All 588 tests continue to pass.

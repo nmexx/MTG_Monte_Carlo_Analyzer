@@ -1,6 +1,6 @@
 {
   "name": "mtg-monte-carlo-analyzer",
-  "version": "3.2.3",
+  "version": "3.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
